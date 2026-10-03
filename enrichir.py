@@ -159,6 +159,8 @@ def demander_resume(cle, adresse, modele, texte_fiche):
                     "User-Agent": "bobine/0.1",
                 },
             )
+            # Requête volontairement synchrone : le script tourne en tâche de
+            # fond, une fiche à la fois — et on garde zéro dépendance à installer.
             with urllib.request.urlopen(requete, timeout=120) as reponse:
                 donnees = json.loads(reponse.read().decode("utf-8"))
             contenu = donnees["choices"][0]["message"]["content"]

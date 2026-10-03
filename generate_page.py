@@ -9,7 +9,6 @@ Usage : python3 generate_page.py [--vault ~/Vault]
 import argparse
 import html
 import json
-import shutil
 from datetime import datetime
 from pathlib import Path
 

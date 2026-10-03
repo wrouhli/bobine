@@ -28,4 +28,12 @@ Bobine est fait pour **Monsieur et Madame Tout-le-Monde** : messages d'interface
 
 Le plus simple : un dossier vide, un clone dedans, et tu lances `./install.sh` — Bobine sait s'installer en bac à sable. Sur le repo de travail : `.venv/bin/python enrichir.py --dry-run` pour un test rapide.
 
+## Lancer les tests
+
+Aucune dépendance à installer (bibliothèque standard uniquement) :
+
+    python3 -m unittest discover -s tests
+
+Ils couvrent le nettoyage des sous-titres (SRT/VTT), l'extraction des identifiants de liens et la sûreté des noms de fichiers. Si tu as `pytest`, `pytest tests/` fonctionne aussi.
+
 Merci ! 🙏
