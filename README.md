@@ -7,6 +7,7 @@
     <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="Licence : MIT"></a>
     <img src="https://img.shields.io/badge/macOS%20%2B%20iPhone-pens%C3%A9%20pour-black?logo=apple" alt="Pensé pour macOS + iPhone">
     <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
+    <a href="https://github.com/wrouhli/bobine/actions/workflows/tests.yml"><img src="https://github.com/wrouhli/bobine/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   </p>
 </div>
 
