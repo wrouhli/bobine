@@ -1,0 +1,30 @@
+# Données personnelles — ne jamais publier dans le repo
+raw/
+images/
+journal.json
+logs/
+index.md
+vault.html
+graph.html
+*.inbox-local.txt
+
+# Réglages locaux et secrets
+config.env
+.env
+.crushrc
+.crushrc.bak-*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+.temp/
+.crush/
+
+# Divers local
+.inbox-local.txt
+.watch.lock
+.watch-echecs-lecture

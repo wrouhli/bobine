@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>👉 LIS-MOI D'ABORD — Installation de Bobine</title>
+<style>
+  :root{
+    --violet:#6C4DFF; --violet-clair:#f3efff; --vert:#28a745; --rouge:#e5484d;
+    --texte:#1c2230; --gris:#63708a; --bord:#e4e8f0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#f7f8fc;color:var(--texte);
+       font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .wrap{max-width:760px;margin:0 auto;padding:40px 22px 80px;}
+  .hero{text-align:center;margin-bottom:38px;}
+  .hero .big{font-size:56px;line-height:1;margin-bottom:10px;}
+  h1{font-size:34px;margin:0 0 8px;letter-spacing:-0.5px;}
+  .sub{color:var(--gris);font-size:18px;}
+  .badge{display:inline-block;background:var(--violet-clair);color:var(--violet);
+         font-weight:600;border-radius:999px;padding:6px 14px;font-size:14px;margin-top:14px;}
+  .card{background:#fff;border:1px solid var(--bord);border-radius:16px;
+        padding:26px 28px;margin:18px 0;box-shadow:0 2px 10px rgba(28,34,48,.05);}
+  .step-num{display:inline-flex;align-items:center;justify-content:center;
+            width:34px;height:34px;border-radius:50%;background:var(--violet);color:#fff;
+            font-weight:700;margin-right:10px;flex:none;}
+  .step-title{display:flex;align-items:center;font-size:20px;font-weight:700;margin-bottom:12px;}
+  .ok{color:var(--vert);font-weight:700;}
+  .no{color:var(--rouge);font-weight:700;}
+  .warn-card{background:#fff8f8;border:2px solid var(--rouge);}
+  .peace{background:#f4fbf6;border:2px solid var(--vert);}
+  .dialogue{background:#f2f3f7;border-radius:12px;padding:18px;margin:16px 0;
+            font-size:13.5px;color:#3a4152;}
+  .dlg-win{background:#fefefe;border-radius:10px;padding:20px;max-width:460px;margin:0 auto 10px;
+           box-shadow:0 10px 30px rgba(28,34,48,.18);text-align:center;border:1px solid #d8dce6;}
+  .dlg-icon{font-size:34px;}
+  .dlg-title{font-weight:700;font-size:14px;margin:8px 0 6px;}
+  .dlg-text{font-size:12.5px;color:#4a5266;margin-bottom:16px;}
+  .dlg-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .btn{border-radius:8px;padding:7px 16px;font-size:13px;font-weight:600;border:1px solid #cdd3e0;background:#fff;color:#2c3345;position:relative;}
+  .btn.good{border:3px solid var(--vert);box-shadow:0 0 0 4px rgba(40,167,69,.15);}
+  .btn.bad{border:3px solid var(--rouge);box-shadow:0 0 0 4px rgba(229,72,77,.12);}
+  .tag{position:absolute;top:-16px;right:-14px;font-size:19px;}
+  .caption{text-align:center;color:var(--gris);font-size:13px;}
+  code{background:#eef0f6;padding:2px 7px;border-radius:6px;font-size:14px;}
+  .fp{background:#eef0f6;border-radius:8px;padding:10px 14px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;overflow-x:auto;}
+  .footer{text-align:center;color:var(--gris);font-size:14px;margin-top:40px;}
+  a{color:var(--violet);}
+  ul{padding-left:22px;margin:8px 0;}
+  li{margin:6px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="big">🎞️</div>
+    <h1>Installer Bobine — 2 minutes</h1>
+    <div class="sub">Lis cette page <b>avant</b> d'ouvrir « 👉 2. Installer Bobine.command ».<br>Elle te dit exactement quoi cliquer quand macOS pose ses questions.</div>
+    <div class="badge">⏱️ 2 minutes • tu ne peux rien casser • promis</div>
+  </div>
+
+  <div class="card">
+    <div class="step-title"><span class="step-num">?</span>Pourquoi macOS va me faire des misères ?</div>
+    <p>Apple ne connaît pas encore Bobine (il vient d'arriver, tout neuf, et son créateur n'a pas payé le « badge officiel » d'Apple à 99&nbsp;$ par an 😅). Alors quand un fichier vient d'Internet, macOS demande confirmation — <b>c'est normal, et c'est même plutôt sain</b>.</p>
+    <p>Tout le code de Bobine est <b>public</b> : tu n'installes rien d'autre que ce que tu peux lire sur <a href="https://github.com/wrouhli/bobine">GitHub</a>. Aucun logiciel malveillant, promis.</p>
+  </div>
+
+  <div class="card">
+    <div class="step-title"><span class="step-num">1</span>Double-clique sur « 👉 2. Installer Bobine.command »</div>
+    <p>Ouvre le dossier que tu viens de télécharger, et double-clique sur <code>👉 2. Installer Bobine.command</code>.<br>
+    Un dialogue d'Apple apparaît — voici exactement ce qu'il faut faire :</p>
+
+    <div class="dialogue">
+      <div class="dlg-win">
+        <div class="dlg-icon">⚠️</div>
+        <div class="dlg-title">Élément « 👉 2. Installer Bobine.command » non ouvert</div>
+        <div class="dlg-text">Apple n'a pas pu confirmer que ce fichier ne contenait pas de logiciel malveillant susceptible d'endommager votre Mac ou de porter atteinte à votre vie privée.</div>
+        <div class="dlg-btns">
+          <span class="btn good">Terminé <span class="tag">👈 ✅</span></span>
+          <span class="btn bad">Placer dans la corbeille <span class="tag">🚫</span></span>
+        </div>
+      </div>
+      <div class="caption">(Ton écran ressemblera à ça — les couleurs d'encadré sont de nous.) Clique sur <span class="ok">« Terminé »</span>.<br>
+      <b>Surtout pas</b> <span class="no">« Placer dans la corbeille »</span> : ça enverrait le fichier à la corbeille (ce n'est pas grave, mais bon 😄).</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="step-title"><span class="step-num">2</span>Une autorisation dans les Réglages</div>
+    <p>Ouvre <b>Réglages Système</b> (⚙️ dans le Dock) → <b>Confidentialité et sécurité</b> → descends tout en bas, jusqu'à la section <b>Sécurité</b>. Tu y verras un message au sujet de « Installer Bobine.command » :</p>
+
+    <div class="dialogue">
+      <div class="dlg-win" style="max-width:480px;text-align:left">
+        <div class="dlg-text" style="margin-bottom:8px">« 👉 2. Installer Bobine.command » a été bloqué car il ne provient pas d'un développeur identifié.</div>
+        <div class="dlg-btns" style="justify-content:flex-end">
+          <span class="btn good">Ouvrir quand même <span class="tag">👈 ✅</span></span>
+        </div>
+      </div>
+      <div class="caption">Clique sur <span class="ok">« Ouvrir quand même »</span>, puis valide avec ton empreinte / ton mot de passe.<br>
+      <b>Tu ne le vois pas ?</b> Pas de panique : ce bouton n'apparaît <u>qu'après</u> l'étape 1 (et seulement pendant un moment). Re-fais d'abord l'étape 1, puis reviens ici.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="step-title"><span class="step-num">3</span>Re-double-clique sur « 👉 2. Installer Bobine.command »</div>
+    <p>Dernier dialogue, dernier clic :</p>
+
+    <div class="dialogue">
+      <div class="dlg-win">
+        <div class="dlg-icon">❓</div>
+        <div class="dlg-title">« 👉 2. Installer Bobine.command » — voulez-vous l'ouvrir ?</div>
+        <div class="dlg-text">macOS ne peut pas vérifier que ce fichier ne contient pas de logiciel malveillant. Voulez-vous l'ouvrir quand même ?</div>
+        <div class="dlg-btns">
+          <span class="btn good">Ouvrir quand même <span class="tag">👈 ✅</span></span>
+        </div>
+      </div>
+      <div class="caption">Clique sur <span class="ok">« Ouvrir quand même »</span> (ou simplement « Ouvrir » selon ta version de macOS) — et hop, <b>le Terminal s'ouvre tout seul et l'installation démarre !</b> 🎬</div>
+    </div>
+  </div>
+
+  <div class="card peace">
+    <div class="step-title">🛟 Si tu as cliqué « Placer dans la corbeille » (ça arrive à tout le monde !)</div>
+    <p>Pas de panique, rien n'est perdu :</p>
+    <ul>
+      <li><b>Option 1 :</b> ouvre la <b>Corbeille</b>, clic droit sur « 👉 2. Installer Bobine.command » → <b>« Remettre en place »</b>.</li>
+      <li><b>Option 2 :</b> re-double-clique sur le fichier ZIP que tu as téléchargé — un dossier tout neuf se recrée.</li>
+    </ul>
+    <p>Puis reprends à l'étape 1 (en cliquant « Terminé » cette fois 😄).</p>
+  </div>
+
+  <div class="card">
+    <div class="step-title">💻 Plan B — la méthode qui marche à tous les coups</div>
+    <p>Si les dialogues d'Apple te résistent, il y a un chemin garanti, sans aucune fenêtre surprise :</p>
+    <ul>
+      <li>Ouvre <b>Terminal</b> (⌘ + Espace → tape « Terminal » → Entrée)</li>
+      <li>Tape <code>cd&nbsp;</code> (avec l'espace), puis <b>glisse le dossier téléchargé</b> dans la fenêtre, puis Entrée</li>
+      <li>Puis tape : <span class="fp">./install.sh</span> et Entrée</li>
+    </ul>
+    <p>C'est exactement la même installation, en direct.</p>
+  </div>
+
+  <div class="footer">
+    🎞️ Bobine — open source, gratuit, sans compte. <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a><br>
+    <span style="font-size:12.5px">Page d'aide incluse dans le dossier téléchargé — tu peux la refermer et la rouvrir à tout moment.</span>
+  </div>
+
+</div>
+</body>
+</html>
