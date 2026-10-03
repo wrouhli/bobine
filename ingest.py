@@ -143,7 +143,9 @@ def recuperer_metadonnees(lien, cookies):
     commande = YTDLP + ["--dump-json", "--no-warnings", "--skip-download",
                         "--no-playlist"]
     commande += options_cookies(cookies, lien)
-    commande.append(lien)
+    # « -- » : tout ce qui suit est positionnel — un lien ne peut jamais être
+    # pris pour une option de l'outil, même s'il commence par « - ».
+    commande += ["--", lien]
     resultat = subprocess.run(commande, capture_output=True, text=True, timeout=120)
     if resultat.returncode != 0:
         raise RuntimeError((resultat.stderr or "yt-dlp a échoué").strip()[:300])
@@ -158,7 +160,7 @@ def telecharger_media(lien, dossier, nom, cookies):
 
     subprocess.run(
         base + ["-f", "bestaudio", "-x", "--audio-format", "m4a",
-                "-o", str(dossier / f"{nom}.%(ext)s"), lien],
+                "-o", str(dossier / f"{nom}.%(ext)s"), "--", lien],
         capture_output=True, timeout=300,
     )
     return audio if audio.exists() else None
@@ -223,7 +225,7 @@ def recuperer_sous_titres(lien, meta, dossier, nom, cookies):
                         "--sub-langs", motif, "--convert-subs", "srt",
                         "-o", str(base)]
     commande += options_cookies(cookies, lien)
-    commande.append(lien)
+    commande += ["--", lien]
 
     def fichiers_sous_titres():
         # .srt d'abord (convertis), puis .vtt : quand une autre langue fait un
@@ -300,7 +302,7 @@ def recuperer_carrousel(lien, cookies):
     images dans ce projet)."""
     commande = GALLERYDL + ["-j"]
     commande += options_cookies(cookies, lien)
-    commande.append(lien)
+    commande += ["--", lien]
     resultat = subprocess.run(commande, capture_output=True, text=True, timeout=300)
 
     def chercher_legende(objet):
