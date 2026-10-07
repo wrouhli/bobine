@@ -204,7 +204,7 @@ elif [ "$GARDE" = "oui" ]; then
 else
   for f in ingest.py enrichir.py generate_page.py graphe.py filtre.py watch.sh install.sh \
            desinstaller.sh requirements.txt config.example.env filtres.exemple.yaml \
-           LICENSE README.md .gitignore; do
+           LICENSE .gitignore; do
     [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
   done
   [ -d "$DEPOT/exemples" ] && cp -R "$DEPOT/exemples" "$CIBLE/" 2>/dev/null
@@ -222,6 +222,36 @@ cd "$(dirname "$0")" || exit 1
 exec bash ./desinstaller.sh
 CMD
 chmod +x "Désinstaller Bobine.command"
+
+# Un petit README pour le vault — le guide complet reste sur la page du projet.
+if [ ! -f "README.md" ]; then
+  cat > "README.md" <<EOF
+# 🎞️ $NOM_VAULT
+
+Ton vault, chez toi : chaque vidéo partagée depuis ton iPhone devient une fiche
+ici — téléchargée, transcrite et résumée automatiquement.
+
+## Au quotidien
+
+- **Partager** : Instagram, TikTok ou YouTube → Partager → le raccourci « Send to Bobine ».
+- **La page** : double-clique « Ma page » (recherche, pastilles de thèmes, fiches).
+- **Le réveil** : relève la boîte toutes les 15 minutes — journal : logs/watch.log
+- **À la main** : launchctl kickstart -k gui/\$(id -u)/com.bobine.watch
+
+## Les fichiers
+
+- raw/ — tes fiches (Markdown, ouvrables avec n'importe quel outil)
+- index.md — l'index condensé (résumés + thèmes)
+- vault.html et graph.html — la page et la carte
+- config.env — ta configuration (clé API, nom, options)
+- logs/ — les journaux, en cas de souci
+
+## Les docs
+
+- Guide complet, dépannage, recette du Raccourci : https://github.com/wrouhli/bobine
+- Tout retirer un jour : double-clique « Désinstaller Bobine.command ».
+EOF
+fi
 
 # Une petite page d'accueil (elle sera remplacée toute seule au premier vrai passage).
 if [ ! -f "vault.html" ]; then
@@ -550,7 +580,7 @@ printf "   Copie iPhone    : %s\n" "$SYNC"
 printf "   Assistant Crush : %s\n" "$CRUSH_PRET"
 echo
 printf "   ${GRAS}Et maintenant ?${FIN}\n"
-printf "   1. Crée le raccourci iPhone « Send to Bobine » — recette pas-à-pas dans le README\n"
+printf "   1. Crée le raccourci iPhone « Send to Bobine » — recette pas-à-pas sur la page du projet\n"
 printf "   2. Partage une vidéo de test, puis surveille :  %s/logs/watch.log\n" "$SCRIPT_DIR"
 printf "   3. Ta page : %s/vault.html\n" "$SCRIPT_DIR"
 printf "   4. Un jour, pour tout retirer :  ./desinstaller.sh  (dans le dossier de ton vault)\n"
