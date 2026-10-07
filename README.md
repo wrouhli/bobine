@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="assets/banniere.png" alt="Bobine — tes Reels sauvegardés deviennent une base locale, chez toi" width="820">
+  <img src="assets/banniere.png" alt="Bobine : tes Reels sauvegardés deviennent une base locale, chez toi" width="820">
   <h1>🎞️ Bobine</h1>
-  <p><b>Tes Reels — et n'importe quelle vidéo TikTok/YouTube — sauvegardés deviennent une base de connaissances locale, cherchable et interrogeable. Sur ton Mac ou ton serveur, chez toi.</b></p>
+  <p><b>Tes Reels, et n'importe quelle vidéo TikTok/YouTube, sauvegardés deviennent une base de connaissances locale, cherchable et interrogeable. Sur ton Mac ou ton serveur, chez toi.</b></p>
   <p>
     <a href="https://github.com/wrouhli/bobine/releases"><img src="https://img.shields.io/github/v/release/wrouhli/bobine?color=6C4DFF&label=version" alt="Version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="Licence : MIT"></a>
