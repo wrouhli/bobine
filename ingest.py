@@ -58,7 +58,10 @@ def verifier_outils():
     try:
         subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
     except (OSError, subprocess.CalledProcessError):
-        manquants.append("ffmpeg  ->  brew install ffmpeg")
+        if sys.platform == "darwin":
+            manquants.append("ffmpeg  ->  brew install ffmpeg")
+        else:
+            manquants.append("ffmpeg  ->  sudo apt install ffmpeg  (Debian/Ubuntu)")
 
     if manquants:
         log("ERREUR : outil(s) manquant(s)")
