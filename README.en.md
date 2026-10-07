@@ -7,7 +7,7 @@
     <a href="https://github.com/wrouhli/bobine/releases"><img src="https://img.shields.io/github/v/release/wrouhli/bobine?color=6C4DFF&label=version" alt="Version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/macOS%20%2B%20iPhone-black?logo=apple" alt="macOS + iPhone">
-    <a href="linux/README.md"><img src="https://img.shields.io/badge/Linux%20%2F%20VPS-black?logo=linux" alt="Linux / VPS"></a>
+    <a href="linux/README.en.md"><img src="https://img.shields.io/badge/Linux%20%2F%20VPS-black?logo=linux" alt="Linux / VPS"></a>
     <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
     <a href="https://github.com/wrouhli/bobine/actions/workflows/tests.yml"><img src="https://github.com/wrouhli/bobine/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   </p>
@@ -17,7 +17,7 @@ You share a video from your iPhone. A few minutes later, Bobine has downloaded i
 
 > **Two editions, the same vault:**
 > 🍎 **Mac + iPhone**: you're in the right place. Download the folder, double-click, done (iCloud, notifications, Crush).
-> 🐧 **Linux / VPS**: the server edition: installer, systemd wake-up, HTTPS page → **[linux/](linux/README.md)** *(the guide is in French for now)*
+> 🐧 **Linux / VPS**: the server edition: installer, systemd wake-up, HTTPS page → **[linux/](linux/README.en.md)**
 
 > **📥 Just downloaded the folder?** Start with **"👉 1. LIS-MOI D'ABORD (installation)"**, a French page that walks you through the install click by click, macOS security questions included. Everything is also detailed in the [Installation](#installation) section.
 
@@ -39,7 +39,7 @@ You share a video from your iPhone. A few minutes later, Bobine has downloaded i
 - [Contributing](#contributing)
 - [Author](#author)
 - [License](#license)
-- [Linux / VPS edition](linux/README.md)
+- [Linux / VPS edition](linux/README.en.md)
 
 ## Overview
 
@@ -242,7 +242,7 @@ Bobine/
 ## FAQ
 
 **What about Windows or Linux?**
-Windows: no. Bobine is designed and tested for Mac + iPhone, and that's a deliberate choice. **Linux: yes.** A complete Linux/VPS edition exists (installer, systemd wake-up, HTTPS page, local inbox) → **[linux/](linux/README.md)** (a French guide for now). Same core, same license, same philosophy: everything at home.
+Windows: no. Bobine is designed and tested for Mac + iPhone, and that's a deliberate choice. **Linux: yes.** A complete Linux/VPS edition exists (installer, systemd wake-up, HTTPS page, local inbox) → **[linux/](linux/README.en.md)**. Same core, same license, same philosophy: everything at home.
 
 **Where does my data go?**
 Nowhere: everything stays in your vault folder. No account, no server, no telemetry. The only exchanges with the outside world: the video downloads, and the call to **your** API key for the summaries (if you enable it).
