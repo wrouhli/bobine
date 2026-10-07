@@ -26,7 +26,7 @@ jobs:
       - name: Tests unitaires
         run: python -m unittest discover -s tests -v
       - name: Syntaxe des scripts Python
-        run: python -m py_compile ingest.py enrichir.py generate_page.py graphe.py
+        run: python -m py_compile ingest.py enrichir.py generate_page.py graphe.py filtre.py
       - name: Syntaxe des scripts shell
         run: |
           bash -n install.sh

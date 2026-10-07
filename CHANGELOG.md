@@ -5,6 +5,7 @@
 - **Sécurité** : séparateur `--` avant chaque lien envoyé à yt-dlp/gallery-dl — un lien ne peut jamais être pris pour une option de l'outil ; import inutilisé retiré.
 - **Tests** : première suite de tests unitaires (lançable sans rien installer) — sous-titres SRT/VTT, identifiants de liens, noms de fichiers.
 - **Vérifications automatiques** : chaque PR lance les tests et les contrôles de syntaxe (GitHub Actions, Python 3.10 + 3.12) — badge de statut dans le README.
+- **Filtre d'import** : `filtre.py` — avant de lancer une longue transcription, choisis quoi ingérer depuis un export Instagram : tri exact par tes collections, mots-clés en filet de secours, `--init-config` et `--rapport` pour vérifier. Tout est local, rien de personnel n'est versionné.
 
 ## v1.0.0 — 3 octobre 2026
 

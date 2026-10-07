@@ -1,0 +1,39 @@
+# filtres.exemple.yaml — un exemple complet, à copier en filtres.yaml.
+#
+# Le plus sûr : laisse filtre.py le générer depuis TON export, avec tes
+# vraies collections déjà listées :
+#
+#     python filtre.py --export "…/instagram-mon_compte" --init-config
+#
+# Puis passe à false ce que tu ne veux pas voir atterrir dans ton vault.
+#
+# Rappel : filtres.yaml est personnel (il décrit TES collections) et n'est
+# jamais publié — voir .gitignore.
+
+defaut: revoir        # sort des posts qu'aucune règle ne classe : revoir | garder | ecarter
+
+exclusions: []        # mots-clés qui écartent un post quoi qu'il arrive
+
+collections:          # une entrée par collection de ton compte
+  - nom: "Cuisine"
+    garder: true
+  - nom: "Voyages"
+    garder: true
+  - nom: "Mèmes"
+    garder: false
+  - nom: "Citations"
+    garder: false
+
+themes:               # filet de secours pour les posts sans collection
+  astuces:
+    garder: true
+    mots_cles: [astuce, astuces, tips, tuto]
+  voyages:
+    garder: true
+    mots_cles: [voyage, voyages, itineraire, roadtrip]
+  memes:
+    garder: false
+    mots_cles: [meme, memes, humour, drole]
+  citations:
+    garder: false
+    mots_cles: [citation, citations, mindset]
