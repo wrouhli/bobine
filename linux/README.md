@@ -1,5 +1,7 @@
 # Bobine : version Linux (serveur ou VPS)
 
+<sub>🌍 <b>Français</b> · <a href="README.en.md">English</a></sub>
+
 **Tes Reels, et n'importe quelle vidéo TikTok/YouTube, sauvegardés deviennent
 une base de connaissances locale, cherchable et interrogeable. Sur ta machine,
 chez toi.**
