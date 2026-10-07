@@ -1,5 +1,9 @@
 # Journal des versions
 
+## Non publié
+
+🐧 **Édition Linux/VPS** — le portage serveur rejoint le dépôt : dossier `linux/` (installeur guidé, réveil systemd, boîte de réception locale, serveur de liens `POST /push`, page à distance). Le cœur (ingestion, transcription, résumés, pages) est partagé avec l'édition Mac ; la CI teste les deux et garde un garde-fou : le cœur ne peut pas dériver.
+
 ## v1.1.0 — 7 octobre 2026
 
 L'import de masse 🎛️

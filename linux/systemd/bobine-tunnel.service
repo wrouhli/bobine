@@ -1,0 +1,23 @@
+# Modèle de référence — tunnel Cloudflare dédié à la page Bobine.
+# Ne touche pas au tunnel existant (ex. ssh) : c'est un tunnel À PART,
+# créé par l'utilisateur (aucun droit root nécessaire).
+#
+# Mise en place (une fois, dans un shell sur le serveur) :
+#   cloudflared tunnel create bobine-page
+#   cloudflared tunnel route dns bobine-page bobine.mon-domaine.tld
+#   # puis écrire ~/.cloudflared/bobine-page.yml (uuid du tunnel, ingress → http://127.0.0.1:8786)
+#   cp systemd/bobine-tunnel.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now bobine-page.service bobine-tunnel.service
+[Unit]
+Description=Bobine — tunnel Cloudflare (page à distance)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cloudflared --no-autoupdate tunnel --config %h/.cloudflared/bobine-page.yml run
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

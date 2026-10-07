@@ -1,0 +1,9 @@
+# Modèle de référence — install-linux.sh écrit ta version (avec tes vrais
+# chemins) dans ~/.config/systemd/user/bobine-watch.service.
+[Unit]
+Description=Bobine — relève la boîte de réception et prépare les fiches
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash %h/Bobine/watch-linux.sh
+WorkingDirectory=%h/Bobine
