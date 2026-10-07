@@ -1,11 +1,15 @@
 # Journal des versions
 
-## Non publié
+## v1.2.0 — 7 octobre 2026
 
-🐧 **Édition Linux/VPS** — le portage serveur rejoint le dépôt : dossier `linux/` (installeur guidé, réveil systemd, boîte de réception locale, serveur de liens `POST /push`, page à distance). Le cœur (ingestion, transcription, résumés, pages) est partagé avec l'édition Mac ; la CI teste les deux et garde un garde-fou : le cœur ne peut pas dériver.
+L'édition Linux 🐧
 
-- 🧹 **Accueil deux éditions** : bannière neutre (Mac ou serveur), badges de plateforme propres, README de vault dédié côté Mac.
-- 🔤 **Libellés des pages** : « mes vidéos sauvegardées » — Reels, TikTok et YouTube ; l'astuce de la carte dit « ouvrir la vidéo ». Captures du README rafraîchies.
+- **Édition Linux/VPS** : le portage serveur rejoint le dépôt — dossier `linux/` : installeur guidé, réveil systemd (au lieu de launchd), boîte de réception locale, serveur de liens (`POST /push` — envoie tes liens depuis un Raccourci iPhone), page servie à distance, modèles systemd et tunnel documentés. Le cœur (ingestion, transcription, résumés, pages) est partagé avec l'édition Mac ; la CI teste les deux et garde un garde-fou : le cœur ne peut pas dériver.
+- **Accueil deux éditions** : bannière neutre (« Sur ton Mac. Sur ton serveur. »), badges de plateforme propres, README de vault dédié côté Mac.
+- **Libellés** : les pages disent « mes vidéos sauvegardées » — Reels, TikTok et YouTube ; captures du README rafraîchies.
+- **Robustesse** : `enrichir` ignore les fichiers cachés (« ._ » AppleDouble semés par certains transferts macOS).
+
+Publication : https://github.com/wrouhli/bobine/releases/tag/v1.2.0
 
 ## v1.1.0 — 7 octobre 2026
 
