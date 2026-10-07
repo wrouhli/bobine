@@ -1,0 +1,15 @@
+# Modèle de référence — copie ta version dans ~/.config/systemd/user/bobine-page.service
+# Prérequis : PAGE_PASSWORD=… dans config.env (openssl rand -hex 16).
+# Astuce : protégée en amont par Cloudflare Access ? Ajoute « --sans-mot-de-passe »
+# à la ligne ExecStart (une seule porte, celle de Cloudflare).
+[Unit]
+Description=Bobine — sert la page (vault.html + graph.html, mot de passe)
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/Bobine/page_server.py --vault %h/Bobine
+Restart=on-failure
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

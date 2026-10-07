@@ -1,0 +1,9 @@
+# Dépendances de Bobine (Python 3.10+ ; testé avec 3.12)
+
+yt-dlp          # téléchargement des vidéos et métadonnées
+faster-whisper  # transcription audio locale
+gallery-dl      # carrousels (photos)
+numpy           # simulation du graphe (graph.html)
+
+# av ≥ 19 casse faster-whisper 1.2.1 (erreur « metadata_errors ») :
+av<19

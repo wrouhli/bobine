@@ -6,12 +6,17 @@
     <a href="https://github.com/wrouhli/bobine/releases"><img src="https://img.shields.io/github/v/release/wrouhli/bobine?color=6C4DFF&label=version" alt="Version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="Licence : MIT"></a>
     <img src="https://img.shields.io/badge/macOS%20%2B%20iPhone-pens%C3%A9%20pour-black?logo=apple" alt="Pensé pour macOS + iPhone">
+    <a href="linux/README.md"><img src="https://img.shields.io/badge/Linux%20%2F%20VPS-%C3%A9dition-black?logo=linux" alt="Édition Linux / VPS"></a>
     <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
     <a href="https://github.com/wrouhli/bobine/actions/workflows/tests.yml"><img src="https://github.com/wrouhli/bobine/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   </p>
 </div>
 
 Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a téléchargée, transcrite, résumée et rangée dans une fiche. Le soir, tu ouvres une petite page web sur ton téléphone : tout est là, avec une recherche. **Et tout reste chez toi.**
+
+> **Deux éditions, le même vault :**
+> 🍎 **Mac + iPhone** — tu es au bon endroit : télécharge le dossier, double-clique, c'est fini (iCloud, notifications, Crush).
+> 🐧 **Linux / VPS** — la version serveur : installeur, réveil systemd, page en HTTPS → **[linux/](linux/README.md)**
 
 > **📥 Tu viens de télécharger le dossier ?** Ouvre d'abord **« 👉 1. LIS-MOI D'ABORD (installation) »** : cette page t'accompagne clic par clic pendant l'installation (questions de sécurité de macOS comprises). Tout est aussi détaillé dans la section [Installation](#installation).
 
@@ -33,6 +38,7 @@ Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a
 - [Contribuer](#contribuer)
 - [Auteur](#auteur)
 - [Licence](#licence)
+- [Édition Linux / VPS](linux/README.md)
 
 ## Aperçu
 
@@ -235,7 +241,7 @@ Bobine/
 ## FAQ
 
 **Et sur Windows ou Linux ?**
-Bobine est pensé et testé pour Mac + iPhone — c'est un choix assumé. Le cœur est en Python (portable), mais l'expérience complète (double-clic, iCloud, réveil automatique) est faite pour l'écosystème Apple.
+Windows : non — Bobine est pensé et testé pour Mac + iPhone, c'est un choix assumé. **Linux, oui** : une édition Linux/VPS complète existe (installeur, réveil systemd, page en HTTPS, boîte de réception locale) → **[linux/](linux/README.md)**. Même cœur, même licence, même philosophie : tout chez toi.
 
 **Où vont mes données ?**
 Nulle part : tout reste dans ton dossier de vault. Aucun compte, aucun serveur, aucune télémétrie. Les seuls échanges avec l'extérieur : le téléchargement des vidéos, et l'appel à **ta** clé API pour les résumés (si tu l'actives).

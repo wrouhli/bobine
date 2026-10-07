@@ -1,0 +1,17 @@
+# Modèle de référence — facultatif : le serveur de liens HTTP (POST /push).
+# Adapte les chemins si besoin, puis :
+#   cp bobine-inbox.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now bobine-inbox.service
+# (le jeton se met dans config.env : INBOX_TOKEN=…)
+[Unit]
+Description=Bobine — serveur de liens (POST /push)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/Bobine/inbox_server.py --vault %h/Bobine
+Restart=on-failure
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

@@ -33,3 +33,19 @@ jobs:
           bash -n desinstaller.sh
           bash -n watch.sh
           bash -n "👉 2. Installer Bobine.command"
+      - name: Tests unitaires (édition Linux)
+        run: python -m unittest discover -s linux/tests -v
+      - name: Syntaxe (édition Linux)
+        run: python -m py_compile linux/ingest.py linux/filtre.py linux/enrichir.py linux/generate_page.py linux/graphe.py linux/inbox_server.py linux/page_server.py
+      - name: Syntaxe des scripts shell (édition Linux)
+        run: |
+          bash -n linux/install-linux.sh
+          bash -n linux/desinstaller-linux.sh
+          bash -n linux/watch-linux.sh
+          bash -n linux/activer-page-web.sh
+      - name: Le cœur partagé n'a pas dérivé
+        run: |
+          for f in ingest.py filtre.py enrichir.py generate_page.py graphe.py requirements.txt filtres.exemple.yaml LICENSE \
+                   tests/test_ingest.py tests/test_enrichir.py tests/test_filtre.py; do
+            cmp "$f" "linux/$f" || { echo "::error::$f a dérivé entre la racine et linux/ — garde-les identiques"; exit 1; }
+          done

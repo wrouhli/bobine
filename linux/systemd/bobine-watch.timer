@@ -1,0 +1,11 @@
+# Modèle de référence — install-linux.sh copie ta version dans
+# ~/.config/systemd/user/ puis :  systemctl --user enable --now bobine-watch.timer
+[Unit]
+Description=Bobine — réveil toutes les 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target
