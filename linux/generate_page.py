@@ -118,7 +118,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vault — mes Reels sauvegardés</title>
+<title>Vault — mes vidéos sauvegardées</title>
 <style>
   :root { --bg:#f5f6f8; --card:#fff; --txt:#1b1e24; --muted:#69707d;
           --accent:#0b7cff; --chip:#eef1f5; }
@@ -159,7 +159,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
 </head>
 <body>
 <header>
-  <h1>Vault — mes Reels sauvegardés <span id="stats">__STATS__</span> <a href="graph.html">Carte &#128376;</a></h1>
+  <h1>Vault — mes vidéos sauvegardées <span id="stats">__STATS__</span> <a href="graph.html">Carte &#128376;</a></h1>
   <input id="q" type="search" placeholder="Rechercher (titre, contenu, auteur)…" autocomplete="off">
   <div id="themes">__CHIPS__</div>
 </header>
@@ -254,7 +254,7 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
   <a href="vault.html">← Liste</a>
 </header>
 <div id="zoom"><button id="zi">+</button><button id="zo">−</button></div>
-<div id="hint">Glisse les points · pince pour zoomer · touche un point pour ouvrir le Reel</div>
+<div id="hint">Glisse les points · pince pour zoomer · touche un point pour ouvrir la vidéo</div>
 <div id="signature">🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></div>
 <canvas id="c"></canvas>
 __SVG__
@@ -602,7 +602,7 @@ def main():
             .replace("__STATS__", str(len(entrees)) + " / " + str(len(entrees)))
             .replace("__DATE__", datetime.now().strftime("%d/%m/%Y %H:%M"))
             .replace("__COUNT__", str(len(entrees)))
-            .replace("Vault — mes Reels sauvegardés", nom_html + " — mes Reels sauvegardés"))
+            .replace("Vault — mes vidéos sauvegardées", nom_html + " — mes vidéos sauvegardées"))
     if not carte:
         page = page.replace(lien_carte, "")
     (vault / "vault.html").write_text(page, encoding="utf-8")

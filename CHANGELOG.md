@@ -4,6 +4,9 @@
 
 🐧 **Édition Linux/VPS** — le portage serveur rejoint le dépôt : dossier `linux/` (installeur guidé, réveil systemd, boîte de réception locale, serveur de liens `POST /push`, page à distance). Le cœur (ingestion, transcription, résumés, pages) est partagé avec l'édition Mac ; la CI teste les deux et garde un garde-fou : le cœur ne peut pas dériver.
 
+- 🧹 **Accueil deux éditions** : bannière neutre (Mac ou serveur), badges de plateforme propres, README de vault dédié côté Mac.
+- 🔤 **Libellés des pages** : « mes vidéos sauvegardées » — Reels, TikTok et YouTube ; l'astuce de la carte dit « ouvrir la vidéo ». Captures du README rafraîchies.
+
 ## v1.1.0 — 7 octobre 2026
 
 L'import de masse 🎛️
