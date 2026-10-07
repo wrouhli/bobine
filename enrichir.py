@@ -201,6 +201,8 @@ def main():
 
     en_attente = []
     for fiche in sorted(dossier_fiches.glob("*.md"), key=lambda p: p.stat().st_mtime):
+        if fiche.name.startswith("."):
+            continue   # fichiers cachés (.DS_Store, « ._ » AppleDouble…) : jamais des fiches
         _, champs = lire_fiche(fiche)
         source = champs.get("source", "")
         code = code_court(source)
