@@ -152,6 +152,8 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .contenu { font-size:14.5px; line-height:1.45; margin:0; }
   .vide { color:var(--muted); text-align:center; padding:40px 0; }
   footer { color:var(--muted); font-size:12px; text-align:center; padding:8px 16px 28px; }
+  footer .signature { display:block; margin-top:6px; }
+  footer .signature a { color:var(--accent); text-decoration:none; }
 </style>
 </head>
 <body>
@@ -161,7 +163,8 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   <div id="themes">__CHIPS__</div>
 </header>
 <main id="liste">__CARTES__</main>
-<footer>Généré le __DATE__ · __COUNT__ fiches · Bobine · Régénérer : python3 generate_page.py</footer>
+<footer>Généré le __DATE__ · __COUNT__ fiches · Bobine · Régénérer : python3 generate_page.py
+<span class="signature">🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></span></footer>
 <script>
 const ENTREES = __DATA__;
 const norm = s => (s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
@@ -233,8 +236,11 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
   header h1 { font-size:16px; margin:0; font-weight:600; }
   header span { color:#8b93a5; font-size:13px; flex:1; }
   header a { pointer-events:auto; color:#5ea3ff; text-decoration:none; font-size:14px; font-weight:600; }
-  #hint { position:fixed; bottom:10px; left:0; right:0; text-align:center; color:#6b7285;
+  #hint { position:fixed; bottom:28px; left:0; right:0; text-align:center; color:#6b7285;
           font-size:12px; z-index:2; pointer-events:none; }
+  #signature { position:fixed; bottom:8px; left:0; right:0; text-align:center; color:#6b7285;
+               font-size:11px; z-index:2; pointer-events:none; }
+  #signature a { pointer-events:auto; color:#5ea3ff; text-decoration:none; }
   #zoom { position:fixed; right:14px; bottom:44px; display:flex; flex-direction:column;
           gap:8px; z-index:3; }
   #zoom button { width:34px; height:34px; border-radius:8px; border:1px solid #2a2f3d;
@@ -248,6 +254,7 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
 </header>
 <div id="zoom"><button id="zi">+</button><button id="zo">−</button></div>
 <div id="hint">Glisse les points · pince pour zoomer · touche un point pour ouvrir le Reel</div>
+<div id="signature">🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></div>
 <canvas id="c"></canvas>
 __SVG__
 <script>
