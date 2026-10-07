@@ -14,6 +14,10 @@ config.env
 .crushrc
 .crushrc.bak-*
 
+# Le filtre d'import (perso : décrit TES collections)
+filtres.yaml
+liens*.txt
+
 # Python
 .venv/
 __pycache__/

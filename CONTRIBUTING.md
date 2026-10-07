@@ -34,6 +34,6 @@ Aucune dépendance à installer (bibliothèque standard uniquement) :
 
     python3 -m unittest discover -s tests
 
-Ils couvrent le nettoyage des sous-titres (SRT/VTT), l'extraction des identifiants de liens et la sûreté des noms de fichiers. Chaque pull request les lance automatiquement (GitHub Actions, Python 3.10 et 3.12). Si tu as `pytest`, `pytest tests/` fonctionne aussi.
+Ils couvrent le nettoyage des sous-titres (SRT/VTT), l'extraction des identifiants de liens, la sûreté des noms de fichiers, et le filtre d'import (`filtre.py` : export Instagram, filtres.yaml, classement). Chaque pull request les lance automatiquement (GitHub Actions, Python 3.10 et 3.12). Si tu as `pytest`, `pytest tests/` fonctionne aussi.
 
 Merci ! 🙏

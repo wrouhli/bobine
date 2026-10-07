@@ -202,8 +202,9 @@ if [ "$GARDE" = "reinstall" ]; then
 elif [ "$GARDE" = "oui" ]; then
   ok "D'accord — ce dossier devient ton dossier Bobine (il ne sera pas supprimé)."
 else
-  for f in ingest.py enrichir.py generate_page.py graphe.py watch.sh install.sh \
-           desinstaller.sh requirements.txt config.example.env LICENSE README.md .gitignore; do
+  for f in ingest.py enrichir.py generate_page.py graphe.py filtre.py watch.sh install.sh \
+           desinstaller.sh requirements.txt config.example.env filtres.exemple.yaml \
+           LICENSE README.md .gitignore; do
     [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
   done
   [ -d "$DEPOT/exemples" ] && cp -R "$DEPOT/exemples" "$CIBLE/" 2>/dev/null

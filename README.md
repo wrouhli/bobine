@@ -24,6 +24,7 @@ Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a
 - [Ce qu'il te faut](#ce-quil-te-faut)
 - [Installation](#installation)
 - [Ton Bobine au quotidien](#ton-bobine-au-quotidien)
+- [Importer un export Instagram](#importer-un-export-instagram)
 - [Les coûts](#les-coûts)
 - [Dépannage — les classiques](#dépannage--les-classiques)
 - [Désinstaller Bobine](#désinstaller-bobine)
@@ -139,6 +140,38 @@ Puis pose tes questions en langage naturel : « Quelles vidéos parlent de cuisi
 - **Sur l'iPhone** : Fichiers → iCloud Drive → **Bobine** → `vault.html` (mis à jour à chaque nouveau lot ; la carte du graphe reste sur le Mac).
 - **Pour poser des questions** : lance `crush` dans le dossier de ton vault (voir « Interroger ton vault ») — ou lis les fiches directement : ce sont de simples fichiers Markdown dans `raw/` (un `grep`, Obsidian…).
 
+## Importer un export Instagram
+
+*Option avancée* — pour rattraper d'un coup des années de sauvegardes.
+
+Si ton compte a des centaines (ou des milliers) de Reels gardés « pour plus tard », tout ingérer d'un coup serait des heures de transcription pour des fiches jamais relues. **`filtre.py` te laisse trier avant** : il lit ton export, applique tes règles, et seuls les posts retenus partent en transcription. Le tri suit **tes propres collections** — c'est ton rangement qui fait foi.
+
+> 🛡️ **Côté compte, rien à craindre** : l'export se demande via l'outil officiel d'Instagram ; `filtre.py` ne se connecte à rien (tout est local) ; et l'ingestion garde sa cadence douce habituelle (une vidéo à la fois, 15 par passage).
+
+**1.** Sur Instagram : **Paramètres → Centre des comptes → Vos informations et autorisations → Télécharger vos informations** (format **JSON**). Ça arrive par e-mail, parfois sous 48 h.
+
+**2.** Décompresse l'archive et range-la quelque part à toi. Tu dois y voir `saved_posts.json` et `saved_collections.json`.
+
+**3.** Dans le dossier de ton vault, génère ton fichier de tri, puis vérifie-le :
+
+```bash
+cd ~/Bobine     # le dossier de ton vault
+.venv/bin/python filtre.py --export "CHEMIN/VERS/instagram-mon_compte" --init-config
+.venv/bin/python filtre.py --export "CHEMIN/VERS/instagram-mon_compte" --rapport
+```
+
+`--init-config` écrit **`filtres.yaml`**, pré-rempli avec tes collections : ouvre-le et passe à `false` ce que tu ne veux pas voir atterrir (mèmes, pubs, citations…). `--rapport` montre le résultat de tes choix — motif par motif, avec des exemples — **sans rien lancer**. Les posts qu'aucune règle ne classe restent « à revoir » : jamais perdus, jamais ingérés par surprise.
+
+**4.** Quand le rapport te plaît, produis la liste et lance la transcription (par lots, comme d'habitude) :
+
+```bash
+.venv/bin/python filtre.py --export "CHEMIN/VERS/instagram-mon_compte"
+.venv/bin/python ingest.py liens-filtres.txt --vault . --cookies chrome --limite 10
+.venv/bin/python enrichir.py --vault .     # résumés + pages
+```
+
+*(`filtres.yaml` reste chez toi — il n'est jamais publié. Tu peux aussi l'inspecter : `filtres.exemple.yaml` montre un fichier complet, commenté.)*
+
 ## Les coûts
 
 | Brique | Coût |
@@ -178,6 +211,7 @@ Le dossier de ton vault (celui que tu as choisi à l'installation) ressemble à 
 ```
 Bobine/
 ├── ingest.py           # télécharge + transcrit → fiches (raw/)
+├── filtre.py           # (option) choisit quoi ingérer depuis un export Instagram
 ├── enrichir.py         # résumés via ta clé API → index.md + pages
 ├── generate_page.py    # fabrique vault.html (lisible sans JavaScript) + la carte
 ├── graphe.py           # (héritage) liens [[Thèmes]] pour Obsidian
@@ -188,6 +222,7 @@ Bobine/
 ├── Désinstaller Bobine.command # double-clic : désinstalle
 ├── requirements.txt    # dépendances Python
 ├── config.example.env  # à copier en config.env (clé API, réglages)
+├── filtres.yaml        # (si tu importes) tes règles de tri — reste chez toi
 ├── LICENSE
 ├── raw/                # TES fiches (jamais dans le repo)
 ├── index.md            # l'index condensé (résumés + thèmes)
