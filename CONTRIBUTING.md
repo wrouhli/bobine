@@ -22,11 +22,11 @@ Bobine est fait pour **Monsieur et Madame Tout-le-Monde** : messages d'interface
 
 - **Aucune donnée personnelle** dans le repo (fiches, logs, journaux, clés…).
 - **Jamais de secret** commité (clé API, tokens).
-- Garde les garde-fous existants (limites de téléchargement, retries) — ils protègent les utilisateurs.
+- Garde les garde-fous existants (limites de téléchargement, retries) : ils protègent les utilisateurs.
 
 ## Tester avant d'envoyer
 
-Le plus simple : un dossier vide, un clone dedans, et tu lances `./install.sh` — Bobine sait s'installer en bac à sable. Sur le repo de travail : `.venv/bin/python enrichir.py --dry-run` pour un test rapide.
+Le plus simple : un dossier vide, un clone dedans, et tu lances `./install.sh` : Bobine sait s'installer en bac à sable. Sur le repo de travail : `.venv/bin/python enrichir.py --dry-run` pour un test rapide.
 
 ## Lancer les tests
 
@@ -40,6 +40,6 @@ L'**édition Linux** (`linux/`) a sa suite à côté :
 
     python3 -m unittest discover -s linux/tests
 
-La CI lance les deux, et vérifie que les fichiers du cœur partagé (ingestion, enrichir, pages, tests communs…) restent **identiques au bit près** entre la racine et `linux/` — un garde-fou contre la dérive.
+La CI lance les deux, et vérifie que les fichiers du cœur partagé (ingestion, enrichir, pages, tests communs…) restent **identiques au bit près** entre la racine et `linux/` : un garde-fou contre la dérive.
 
 Merci ! 🙏

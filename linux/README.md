@@ -1,12 +1,12 @@
-# Bobine — version Linux (serveur ou VPS)
+# Bobine : version Linux (serveur ou VPS)
 
-**Tes Reels — et n'importe quelle vidéo TikTok/YouTube — sauvegardés deviennent
+**Tes Reels, et n'importe quelle vidéo TikTok/YouTube, sauvegardés deviennent
 une base de connaissances locale, cherchable et interrogeable. Sur ta machine,
 chez toi.**
 
-L'édition Linux/VPS du projet [Bobine](https://github.com/wrouhli/bobine) —
-elle vit dans le dossier `linux/` du dépôt et partage son cœur (ingestion,
-transcription, résumés, pages) avec l'édition Mac. Ici, Bobine vit sur un serveur — un petit VPS, une
+L'édition Linux/VPS du projet [Bobine](https://github.com/wrouhli/bobine).
+Elle vit dans le dossier `linux/` du dépôt et partage son cœur (ingestion,
+transcription, résumés, pages) avec l'édition Mac. Ici, Bobine vit sur un serveur : un petit VPS, une
 machine à la maison, un vieux portable sous Linux. Pas d'iCloud, pas de
 double-clic : un minuteur systemd et une boîte de réception locale.
 
@@ -28,8 +28,8 @@ double-clic : un minuteur systemd et une boîte de réception locale.
 ## Prérequis
 
 - Linux avec systemd (Debian 12+/Ubuntu 22.04+ et cousins ; aarch64 ok) ;
-- Python 3.10+ avec venv — `sudo apt install python3 python3-venv` (Debian récent : le paquet versionné, ex. `python3.13-venv`) ;
-- ffmpeg — `sudo apt install ffmpeg` ;
+- Python 3.10+ avec venv : `sudo apt install python3 python3-venv` (Debian récent : le paquet versionné, ex. `python3.13-venv`) ;
+- ffmpeg : `sudo apt install ffmpeg` ;
 - ~2 Go libres (le modèle de transcription se télécharge au premier passage).
 
 ## Installation
@@ -41,12 +41,12 @@ Copie le dossier sur le serveur, puis lance l'installateur :
     cd ~/bobine-linux && ./install-linux.sh
 
 L'installateur te guide : nom du vault, emplacement, clé API (facultative),
-réveil systemd. Il ne demande jamais de droits root — sauf si tu acceptes
+réveil systemd. Il ne demande jamais de droits root, sauf si tu acceptes
 d'installer ffmpeg via apt.
 
 ## Envoyer un lien
 
-Trois façons — toutes écrivent dans la même boîte (`inbox.txt`) :
+Trois façons, toutes écrivent dans la même boîte (`inbox.txt`) :
 
 **1. Directement sur le serveur :**
 
@@ -56,7 +56,7 @@ Trois façons — toutes écrivent dans la même boîte (`inbox.txt`) :
 
     ssh mon-serveur "echo 'https://youtu.be/jNQXAC9IVRw' >> ~/Bobine/inbox.txt"
 
-**3. Par HTTP, depuis n'importe où (serveur de liens optionnel)** — voir la
+**3. Par HTTP, depuis n'importe où (serveur de liens optionnel)** : voir la
 section suivante.
 
 Tout ce qui a déjà été traité est ignoré automatiquement : les vieux liens
@@ -75,7 +75,7 @@ Sans systemd (ou en cas de souci), l'équivalent en cron :
 ## Le serveur de liens (optionnel)
 
 Un micro-serveur HTTP (bibliothèque standard Python, zéro dépendance) qui
-accepte tes liens par POST — pratique depuis un raccourci de téléphone :
+accepte tes liens par POST, pratique depuis un raccourci de téléphone :
 
     cd ~/Bobine
     openssl rand -hex 16                     # fabrique un jeton…
@@ -88,7 +88,7 @@ Test (le serveur écoute sur 127.0.0.1:8785 par défaut) :
          -d 'https://youtu.be/jNQXAC9IVRw' http://127.0.0.1:8785/push
 
 Pour l'utiliser à distance, expose-le proprement via ton tunnel (Cloudflare
-Tunnel, Tailscale) ou un proxy avec mot de passe (Caddy, nginx) — **jamais ce
+Tunnel, Tailscale) ou un proxy avec mot de passe (Caddy, nginx) : **jamais ce
 port en clair sur internet**. Un modèle de service systemd est fourni dans
 `systemd/bobine-inbox.service`.
 
@@ -103,7 +103,7 @@ port en clair sur internet**. Un modèle de service systemd est fourni dans
 
 Ou ramène simplement le fichier : `scp mon-serveur:~/Bobine/vault.html .`
 
-**À distance, avec un mot de passe** — `page_server.py` sert UNIQUEMENT
+**À distance, avec un mot de passe** : `page_server.py` sert UNIQUEMENT
 `vault.html` et `graph.html` (jamais tes fiches ni ta config), protégés par un
 mot de passe :
 
@@ -117,7 +117,7 @@ adresse consultable de partout, téléphone compris. Modèles de services system
 fournis : `systemd/bobine-page.service` (la page) et
 `systemd/bobine-tunnel.service` (le tunnel Cloudflare dédié). Le script
 `activer-page-web.sh mon-domaine.tld` automatise toute la mise en place
-(mot de passe, tunnel dédié, services) — sans sudo.
+(mot de passe, tunnel dédié, services), sans sudo.
 
 Protégée par Cloudflare Access (ou un autre videur en amont) ? Lance la page
 avec `--sans-mot-de-passe` : Cloudflare fait la porte, la page ne demande plus
@@ -175,9 +175,9 @@ le dépôt Charm :
 | Page sur téléphone | copie iCloud | URL servie par ta machine (tunnel/proxy) |
 | Installation | double-clic `.command` | `./install-linux.sh` |
 
-Le reste — ingestion, filtre d'import Instagram, transcription, résumés,
-pages, carte — est le même code que Bobine pour Mac.
+Le reste (ingestion, filtre d'import Instagram, transcription, résumés,
+pages, carte) est le même code que Bobine pour Mac.
 
 ---
 
-Bobine — écrit et réalisé par Wahid Rouhli · [github.com/wrouhli/bobine](https://github.com/wrouhli/bobine)
+Bobine, écrit et réalisé par Wahid Rouhli · [github.com/wrouhli/bobine](https://github.com/wrouhli/bobine)
