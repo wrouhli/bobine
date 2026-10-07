@@ -1,4 +1,5 @@
 <div align="center">
+  <sub>🌍 <b>Français</b> · <a href="README.en.md">English</a></sub>
   <img src="assets/banniere.png" alt="Bobine : tes Reels sauvegardés deviennent une base locale, chez toi" width="820">
   <h1>🎞️ Bobine</h1>
   <p><b>Tes Reels, et n'importe quelle vidéo TikTok/YouTube, sauvegardés deviennent une base de connaissances locale, cherchable et interrogeable. Sur ton Mac ou ton serveur, chez toi.</b></p>
@@ -261,7 +262,7 @@ Les retours et contributions sont bienvenus — le projet est resté simple expr
 
 - **Un bug, une idée ?** → ouvre une [issue](https://github.com/wrouhli/bobine/issues).
 - **Une correction ?** → une pull request directe, sans cérémonie (détails : [CONTRIBUTING.md](CONTRIBUTING.md)).
-- **Une traduction anglaise du README ?** → bienvenue, dis-le en issue.
+- **Une coquille dans la [version anglaise](README.en.md) ?** → bienvenue, dis-le en issue.
 
 Et bien sûr : **une ⭐ sur le repo** aide d'autres personnes à découvrir Bobine.
 
