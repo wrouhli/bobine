@@ -1,276 +1,276 @@
 <div align="center">
-  <sub>🌍 <b>Français</b> · <a href="README.en.md">English</a></sub>
-  <img src="assets/banniere.png" alt="Bobine : tes Reels sauvegardés deviennent une base locale, chez toi" width="820">
+  <sub>🌍 <a href="README.fr.md">Français</a> · <b>English</b></sub>
+  <img src="assets/banniere.png" alt="Bobine: your saved videos become a local library, at home" width="820">
   <h1>🎞️ Bobine</h1>
-  <p><b>Tes Reels, et n'importe quelle vidéo TikTok/YouTube, sauvegardés deviennent une base de connaissances locale, cherchable et interrogeable. Sur ton Mac ou ton serveur, chez toi.</b></p>
+  <p><b>Your saved Reels, and any TikTok or YouTube video, become a local, searchable, askable knowledge base. On your Mac or your server, at home.</b></p>
   <p>
     <a href="https://github.com/wrouhli/bobine/releases"><img src="https://img.shields.io/github/v/release/wrouhli/bobine?color=6C4DFF&label=version" alt="Version"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="Licence : MIT"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/macOS%20%2B%20iPhone-black?logo=apple" alt="macOS + iPhone">
-    <a href="linux/README.md"><img src="https://img.shields.io/badge/Linux%20%2F%20VPS-black?logo=linux" alt="Linux / VPS"></a>
+    <a href="linux/README.en.md"><img src="https://img.shields.io/badge/Linux%20%2F%20VPS-black?logo=linux" alt="Linux / VPS"></a>
     <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
     <a href="https://github.com/wrouhli/bobine/actions/workflows/tests.yml"><img src="https://github.com/wrouhli/bobine/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   </p>
 </div>
 
-Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a téléchargée, transcrite, résumée et rangée dans une fiche. Le soir, tu ouvres une petite page web sur ton téléphone : tout est là, avec une recherche. **Et tout reste chez toi.**
+You share a video from your iPhone. A few minutes later, Bobine has downloaded it, transcribed it, summarized it and filed it into a card. In the evening, you open a little web page on your phone: everything is there, with search. **And everything stays at home.**
 
-> **Deux éditions, le même vault :**
-> 🍎 **Mac + iPhone** : tu es au bon endroit. Télécharge le dossier, double-clique, c'est fini (iCloud, notifications, Crush).
-> 🐧 **Linux / VPS**, la version serveur : installeur, réveil systemd, page en HTTPS → **[linux/](linux/README.md)**
+> **Two editions, the same vault:**
+> 🍎 **Mac + iPhone**: you're in the right place. Download the folder, double-click, done (iCloud, notifications, Crush).
+> 🐧 **Linux / VPS**: the server edition: installer, systemd wake-up, HTTPS page → **[linux/](linux/README.en.md)**
 
-> **📥 Tu viens de télécharger le dossier ?** Ouvre d'abord **« 👉 1. LIS-MOI D'ABORD (installation) »** : cette page t'accompagne clic par clic pendant l'installation (questions de sécurité de macOS comprises). Tout est aussi détaillé dans la section [Installation](#installation).
+> **📥 Just downloaded the folder?** Start with **"👉 1. LIS-MOI D'ABORD (installation)"**, a French page that walks you through the install click by click, macOS security questions included. Everything is also detailed in the [Installation](#installation) section.
 
 ---
 
-## Sommaire
+## Contents
 
-- [Aperçu](#aperçu)
-- [Comment ça marche](#comment-ça-marche)
-- [Ce qu'il te faut](#ce-quil-te-faut)
+- [Overview](#overview)
+- [How it works](#how-it-works)
+- [What you need](#what-you-need)
 - [Installation](#installation)
-- [Ton Bobine au quotidien](#ton-bobine-au-quotidien)
-- [Importer un export Instagram](#importer-un-export-instagram)
-- [Les coûts](#les-coûts)
-- [Dépannage : les classiques](#dépannage--les-classiques)
-- [Désinstaller Bobine](#désinstaller-bobine)
-- [La structure du projet](#la-structure-du-projet)
+- [Your day-to-day Bobine](#your-day-to-day-bobine)
+- [Importing an Instagram export](#importing-an-instagram-export)
+- [The costs](#the-costs)
+- [Troubleshooting: the classics](#troubleshooting-the-classics)
+- [Uninstalling Bobine](#uninstalling-bobine)
+- [Project structure](#project-structure)
 - [FAQ](#faq)
-- [Contribuer](#contribuer)
-- [Auteur](#auteur)
-- [Licence](#licence)
-- [Édition Linux / VPS](linux/README.md)
+- [Contributing](#contributing)
+- [Author](#author)
+- [License](#license)
+- [Linux / VPS edition](linux/README.en.md)
 
-## Aperçu
+## Overview
 
-**La page de ton Bobine.** Recherche instantanée, pastilles de thèmes, fiches avec résumés :
+**Your Bobine page**: instant search, topic pills, cards with summaries:
 
-![La page de ton Bobine : recherche, thèmes, fiches](assets/capture-liste.png)
+![Your Bobine page: search, topics, cards](assets/capture-liste.png)
 
-**La carte des thèmes.** Les sujets de ta collection, reliés entre eux :
+**The topic map**: the subjects of your collection, linked to one another:
 
-![La carte des thèmes de ton Bobine](assets/capture-carte.png)
+![Bobine's topic map](assets/capture-carte.png)
 
-**Et tu peux lui poser des questions** : « Quelles vidéos parlent de cuisine ? » L'assistant lit tes fiches et te répond *(voir « demander à ta collection », dans l'installation)*.
+**And you can ask it questions**: "Which videos talk about cooking?" The assistant reads your cards and answers *(see "ask your collection", in the installation section)*.
 
-*(Toutes ces captures proviennent d'un Bobine de démonstration.)*
+*(All these screenshots come from a demo Bobine.)*
 
-## Comment ça marche
+## How it works
 
 ```
 iPhone                        Mac                                    iPhone
 ──────                        ───                                    ──────
-Partager ───────►  boîte iCloud ──►  toutes les 15 min :          ┌► Fichiers → iCloud Drive
-  (Instagram,     (inbox.txt)        1. relève la boîte           │    → Bobine
-   TikTok,                           2. télécharge l'audio         │    → vault.html
-   YouTube…)                         3. transcription locale       │      (recherche + résumés)
-                                     4. résumé (ta clé API)        │
-                                     5. fiches + page ─────────────┘
+Share ──────────►  iCloud box ──►  every 15 minutes:               ┌► Files → iCloud Drive
+  (Instagram,     (inbox.txt)       1. checks the box              │    → Bobine
+   TikTok,                          2. downloads the audio          │    → vault.html
+   YouTube…)                        3. local transcription          │      (search + summaries)
+                                    4. summary (your API key)       │
+                                    5. cards + page ────────────────┘
 ```
 
-- **Transcription locale** (Whisper) : gratuite. Pour YouTube, Bobine récupère d'abord les **sous-titres** (récupération de quelques kilo-octets, en secondes) et ne transcrit que s'il n'y en a pas.
-- **Résumés** : *facultatifs*, avec ta propre clé API (DeepSeek, OpenAI, OpenRouter…), Bobine écrit pour chaque fiche un titre, des thèmes et un résumé concret, met à jour l'index et régénère les pages.
-- **Garde-fous** : jamais de rafale de téléchargements (15 par passage, 50 par jour maximum), jamais deux passages en même temps, un échec n'est retenté que 2 fois.
+- **Local transcription** (Whisper): free. For YouTube, Bobine first fetches the **subtitles** (a few kilobytes, a matter of seconds) and only transcribes when there are none.
+- **Summaries**: *optional*. With your own API key (DeepSeek, OpenAI, OpenRouter…), Bobine writes a concrete title, topics and summary for each card, updates the index and regenerates the pages.
+- **Guardrails**: never a download burst (15 per run, 50 per day max), never two runs at once, a failure is retried only twice.
 
-## Ce qu'il te faut
+## What you need
 
-- un **Mac** + une connexion internet ;
-- **Python 3.10 ou plus** (le script d'installation te guide) ;
-- **ffmpeg** (`brew install ffmpeg`) ;
-- *(facultatif, recommandé)* un **iPhone** pour le partage en un geste ;
-- *(facultatif, recommandé)* une **clé API** pour les résumés : [DeepSeek](https://platform.deepseek.com) est le moins cher (quelques centimes pour des centaines de vidéos).
+- a **Mac** + an internet connection;
+- **Python 3.10 or newer** (the install script guides you);
+- **ffmpeg** (`brew install ffmpeg`);
+- *(optional, recommended)* an **iPhone**, to share in one gesture;
+- *(optional, recommended)* an **API key** for the summaries: [DeepSeek](https://platform.deepseek.com) is the cheapest (a few cents for hundreds of videos).
 
 ## Installation
 
-L'installation est **interactive**, guidée du début à la fin : tu choisis le **nom** de ton vault et **où** l'installer, tu mets ta clé API si tu veux (facultatif), et Bobine fait le reste (environnement, dépendances, réveil automatique).
+Installation is **interactive**, guided from start to finish: you choose the **name** of your vault and **where** to install it, you paste your API key if you want summaries (optional), and Bobine does the rest (environment, dependencies, automatic wake-up).
 
-1. **Télécharge** ce dossier (« Code » → « Download ZIP »), puis décompresse-le (double-clic sur le fichier `.zip`).
-2. Ouvre le dossier téléchargé et **commence par « 👉 1. LIS-MOI D'ABORD (installation) »** : cette page t'explique, clic par clic, les 2-3 questions de sécurité de macOS (c'est normal qu'il en pose, et c'est même sain).
-3. **Double-clique sur « 👉 2. Installer Bobine.command »** et réponds aux questions (nom, emplacement, clé API facultative).
-4. Si on te le demande : `brew install ffmpeg`.
+1. **Download** this folder ("Code" → "Download ZIP"), then unzip it (double-click the `.zip`).
+2. Open the downloaded folder and **start with "👉 1. LIS-MOI D'ABORD (installation)"** (a French page): it explains, click by click, the 2-3 macOS security questions (it's normal for macOS to ask, and it's actually healthy).
+3. **Double-click "👉 2. Installer Bobine.command"** and answer the questions (name, location, optional API key).
+4. If prompted: `brew install ffmpeg`.
 
-> **🛡️ Les dialogues de macOS, en résumé** (tout est illustré, en images, dans la page ci-dessus) : clique **« Terminé »** (jamais « Placer dans la corbeille »), puis Réglages Système → **Confidentialité et sécurité** → « Ouvrir quand même », puis re-double-clique sur l'installateur.
+> **🛡️ macOS dialogs, in short** (everything is illustrated with images in the page above): click **"Terminé"** (never "Placer dans la corbeille" / Move to Trash), then System Settings → **Privacy & Security** → "Open Anyway", then double-click the installer again.
 >
-> **Tu as cliqué « Placer dans la corbeille » ?** Pas de drame : clic droit sur le fichier dans la corbeille → « Remettre en place », ou re-décompresse le ZIP.
+> **Clicked "Placer dans la corbeille"?** No drama: right-click the file in the Trash → "Put Back", or unzip the ZIP again.
 
-**Autre méthode, toujours fiable : en Terminal.** Place-toi dans le dossier téléchargé (astuce : tape `cd` suivi d'une espace, puis glisse le dossier dans la fenêtre du Terminal, et appuie sur Entrée), puis lance :
+**Another method, always reliable: the Terminal.** Move into the downloaded folder (tip: type `cd` followed by a space, then drag the folder into the Terminal window, and press Enter), then run:
 
 ```bash
-./install.sh    # bannière, questions guidées, environnement + dépendances...
+./install.sh    # banner, guided questions, environment + dependencies...
 ```
 
-À la fin, tout vit dans **le dossier de ton vault** (celui que tu as choisi) : tu peux alors supprimer le dossier téléchargé, il ne sert plus à rien.
+At the end, everything lives in **your vault folder** (the one you chose): you can then delete the downloaded folder, it is no longer needed.
 
-*(Vérification facultative, dans le dossier de ton vault : `.venv/bin/python enrichir.py --dry-run`.)*
+*(Optional check, in your vault folder: `.venv/bin/python enrichir.py --dry-run`.)*
 
-### *Facultatif* : la clé API des résumés
+### *Optional*: the API key for summaries
 
-Ouvre `config.env` (créé par l'installation) et colle ta clé sur la bonne ligne :
+Open `config.env` (created by the installation) and paste your key on the right line:
 
 ```
 DEEPSEEK_API_KEY=sk-…
 ```
 
-C'est tout. Les autres lignes restent vides.
+That's it. The other lines stay empty.
 
-### *Recommandé* : le raccourci iPhone (partager en un geste)
+### *Recommended*: the iPhone shortcut (share in one gesture)
 
-Sur ton iPhone, app **Raccourcis** (« Shortcuts ») :
+On your iPhone, in the **Shortcuts** app:
 
-1. **+** → ajoute l'action « **Append to Text File** » (cherche « append ») ;
-2. dans le champ texte : insère la variable « **Shortcut Input** » ;
-3. **File Path** : écris exactement `inbox.txt` (laisse l'emplacement « Shortcuts » sur iCloud Drive) ;
-4. active l'option « **New Line** » si elle apparaît ;
-5. ⓘ → active « **Show in Share Sheet** », type : URLs uniquement ;
-6. nomme-le « **Send to Bobine** ».
+1. **+** → add the **"Append to Text File"** action (search for "append");
+2. in the text field: insert the **"Shortcut Input"** variable;
+3. **File Path**: type exactly `inbox.txt` (leave the location "Shortcuts" on iCloud Drive);
+4. enable the **"New Line"** option if it appears;
+5. ⓘ → enable **"Show in Share Sheet"**, type: URLs only;
+6. name it **"Send to Bobine"**.
 
-Usage : dans Instagram/TikTok/YouTube → **Partager → Send to Bobine**. C'est tout.
+Usage: in Instagram/TikTok/YouTube → **Share → Send to Bobine**. That's it.
 
-### *Recommandé* : demande à ta collection (Crush)
+### *Recommended*: ask your collection (Crush)
 
-[Crush](https://charm.sh/crush) est un assistant qui vit dans le Terminal : léger, open source, sans compte à créer. Il utilise **la même clé API que tes résumés** : lancé dans le dossier de ton vault, il lit tes fiches pour répondre.
+[Crush](https://charm.sh/crush) is an assistant that lives in the Terminal: light, open source, no account to create. It uses **the same API key as your summaries**; and since it launches inside your vault folder, it reads your cards to answer.
 
-![Demander à sa collection : l'assistant lit tes fiches et répond](assets/capture-crush.png)
+![Ask your collection: the assistant reads your cards and answers](assets/capture-crush.png)
 
 ```bash
-cd ~/Bobine    # le dossier de ton vault
+cd ~/Bobine    # your vault folder
 crush
 ```
 
-Puis pose tes questions en langage naturel : « Quelles vidéos parlent de cuisine ? », « Résume la vidéo sur le montage », « Quelles idées pour un post ? »… *(exemple dans l'image ci-dessus, sur un Bobine de démonstration.)*
+Then ask questions in plain language: "Which videos talk about cooking?", "Summarize the video about editing", "Any ideas for a post?"… *(example in the image above, from a demo Bobine.)*
 
-*(L'installation prépare tout : le fichier `.crushrc` du dossier contient ta clé, le modèle DeepSeek et la lecture seule. Pas encore installé ? `brew install charmbracelet/tap/crush` : le script d'installation te l'a proposé.)*
+*(The installation prepares everything: the folder's `.crushrc` file holds your key, the DeepSeek model and read-only access. Not installed yet? `brew install charmbracelet/tap/crush`; the install script offered to do it for you.)*
 
-## Ton Bobine au quotidien
+## Your day-to-day Bobine
 
-- **Sur le Mac** : **double-clique sur « Ma page »** dans le dossier de ton vault (ou ouvre `vault.html`) : recherche, pastilles de thèmes, liens vers les vidéos.
-- **Sur l'iPhone** : Fichiers → iCloud Drive → **Bobine** → `vault.html` (mis à jour à chaque nouveau lot ; la carte du graphe reste sur le Mac).
-- **Pour poser des questions** : lance `crush` dans le dossier de ton vault (voir « Interroger ton vault »), ou lis les fiches directement : ce sont de simples fichiers Markdown dans `raw/` (un `grep`, Obsidian…).
+- **On the Mac**: **double-click "Ma page"** in your vault folder (or open `vault.html`): search, topic pills, links to the videos.
+- **On the iPhone**: Files → iCloud Drive → **Bobine** → `vault.html` (updated with every new batch; the graph map stays on the Mac).
+- **To ask questions**: run `crush` in your vault folder (see "ask your collection"), or simply read the cards: they are plain Markdown files in `raw/` (a `grep`, Obsidian…).
 
-## Importer un export Instagram
+## Importing an Instagram export
 
-*Option avancée* : pour rattraper d'un coup des années de sauvegardes.
+*Advanced option*: to catch up on years of saves at once.
 
-Si ton compte a des centaines (ou des milliers) de Reels gardés « pour plus tard », tout ingérer d'un coup serait des heures de transcription pour des fiches jamais relues. **`filtre.py` te laisse trier avant** : il lit ton export, applique tes règles, et seuls les posts retenus partent en transcription. Le tri suit **tes propres collections** : c'est ton rangement qui fait foi.
+If your account holds hundreds (or thousands) of Reels kept "for later", ingesting everything in one go would mean hours of transcription for cards you would never re-read. **`filtre.py` lets you sort first**: it reads your export, applies your rules, and only the selected posts go to transcription. The sorting follows **your own collections**: your filing is the source of truth.
 
-> 🛡️ **Côté compte, rien à craindre** : l'export se demande via l'outil officiel d'Instagram ; `filtre.py` ne se connecte à rien (tout est local) ; et l'ingestion garde sa cadence douce habituelle (une vidéo à la fois, 15 par passage).
+> 🛡️ **Nothing to fear on the account side**: the export is requested via Instagram's official tool; `filtre.py` connects to nothing (everything is local); and the ingestion keeps its usual gentle pace (one video at a time, 15 per run).
 
-**1.** Sur Instagram : **Paramètres → Centre des comptes → Vos informations et autorisations → Télécharger vos informations** (format **JSON**). Ça arrive par e-mail, parfois sous 48 h.
+**1.** On Instagram: **Settings → Accounts Center → Your information and permissions → Download your information** (**JSON** format). It arrives by email, sometimes within 48 hours.
 
-**2.** Décompresse l'archive et range-la quelque part à toi. Tu dois y voir `saved_posts.json` et `saved_collections.json`.
+**2.** Unzip the archive and store it somewhere of yours. You should see `saved_posts.json` and `saved_collections.json` in there.
 
-**3.** Dans le dossier de ton vault, génère ton fichier de tri, puis vérifie-le :
+**3.** In your vault folder, generate your sorting file, then check it:
 
 ```bash
-cd ~/Bobine     # le dossier de ton vault
-.venv/bin/python filtre.py --export "CHEMIN/VERS/instagram-mon_compte" --init-config
-.venv/bin/python filtre.py --export "CHEMIN/VERS/instagram-mon_compte" --rapport
+cd ~/Bobine     # your vault folder
+.venv/bin/python filtre.py --export "PATH/TO/instagram-my_account" --init-config
+.venv/bin/python filtre.py --export "PATH/TO/instagram-my_account" --rapport
 ```
 
-`--init-config` écrit **`filtres.yaml`**, pré-rempli avec tes collections : ouvre-le et passe à `false` ce que tu ne veux pas voir atterrir (mèmes, pubs, citations…). `--rapport` montre le résultat de tes choix, motif par motif, avec des exemples, **sans rien lancer**. Les posts qu'aucune règle ne classe restent « à revoir » : jamais perdus, jamais ingérés par surprise.
+`--init-config` writes **`filtres.yaml`**, pre-filled with your collections: open it and switch to `false` anything you don't want landing in (memes, ads, quotes…). `--rapport` shows the outcome of your choices, pattern by pattern, with examples, **without running anything**. Posts that no rule classifies stay "to review": never lost, never ingested by surprise.
 
-**4.** Quand le rapport te plaît, produis la liste et lance la transcription (par lots, comme d'habitude) :
+**4.** When the report looks right, produce the list and start transcription (in batches, as usual):
 
 ```bash
-.venv/bin/python filtre.py --export "CHEMIN/VERS/instagram-mon_compte"
+.venv/bin/python filtre.py --export "PATH/TO/instagram-my_account"
 .venv/bin/python ingest.py liens-filtres.txt --vault . --cookies chrome --limite 10
-.venv/bin/python enrichir.py --vault .     # résumés + pages
+.venv/bin/python enrichir.py --vault .     # summaries + pages
 ```
 
-*(`filtres.yaml` reste chez toi : il n'est jamais publié. Tu peux aussi l'inspecter : `filtres.exemple.yaml` montre un fichier complet, commenté.)*
+*(`filtres.yaml` stays with you: it is never published. You can also inspect it: `filtres.exemple.yaml` shows a complete, commented file.)*
 
-## Les coûts
+## The costs
 
-| Brique | Coût |
+| Piece | Cost |
 |---|---|
-| Téléchargement des vidéos (yt-dlp) | 0 € |
-| Transcription (Whisper, en local) | 0 € |
-| Sous-titres YouTube | 0 € |
-| Résumés (ta clé API) | quelques centimes pour des centaines de vidéos |
+| Video downloads (yt-dlp) | Free |
+| Transcription (Whisper, local) | Free |
+| YouTube subtitles | Free |
+| Summaries (your API key) | a few cents for hundreds of videos |
 
-## Dépannage : les classiques
+## Troubleshooting: the classics
 
-- **Rien ne se passe après un partage** → regarde `logs/watch.log` (dernier passage + erreurs). Le réveil tourne toutes les 15 minutes, et rattrape au réveil du Mac.
-- **Erreurs « yt-dlp »** → Instagram et YouTube changent souvent ; la mise à jour règle presque tout : `.venv/bin/pip install -U yt-dlp`
-- **Un post ne passe jamais** → il est probablement supprimé ou privé (fréquent sur les vieilles sauvegardes) : Bobine ne le retente que 2 fois puis passe au suivant.
-- **Une fiche sans texte** → la vidéo n'a ni parole ni sous-titres (musique seule). La fiche gardera la description seulement.
-- **Aucune alerte quand le réveil se bloque ?** Si la boîte iCloud devient illisible ~1 h, une notification macOS est envoyée automatiquement.
-- **Relancer à la main** (pour un lot, ou après un import) :
+- **Nothing happens after a share** → check `logs/watch.log` (last run + errors). The wake-up runs every 15 minutes, and catches up when the Mac wakes.
+- **"yt-dlp" errors** → Instagram and YouTube change often; updating fixes almost everything: `.venv/bin/pip install -U yt-dlp`
+- **A post never goes through** → it is probably deleted or private (common on old saves): Bobine retries it only twice, then moves on.
+- **A card with no text** → the video has no speech and no subtitles (music only). The card will keep the description only.
+- **No alert when the wake-up gets stuck?** If the iCloud box becomes unreadable for ~1 h, a macOS notification is sent automatically.
+- **Run it by hand** (for a batch, or after an import):
 
 ```bash
-cd ~/Bobine        # le dossier de ton vault (l'emplacement que tu as choisi)
+cd ~/Bobine        # your vault folder (the location you chose)
 .venv/bin/python ingest.py liens.txt --vault . --cookies chrome --limite 10
-.venv/bin/python enrichir.py --vault .     # résumés + pages
+.venv/bin/python enrichir.py --vault .     # summaries + pages
 ```
 
-## Désinstaller Bobine
+## Uninstalling Bobine
 
-Tout retirer, proprement, depuis le dossier de ton vault :
+Remove everything, cleanly, from your vault folder:
 
-**Double-clique sur « Désinstaller Bobine.command »** (ou, en Terminal : `./desinstaller.sh`).
+**Double-click "Désinstaller Bobine.command"** (or, in the Terminal: `./desinstaller.sh`).
 
-Il n'agit que sur ce dossier-ci (jamais sur un autre vault) : il retire le réveil automatique et la copie iCloud, et peut mettre le dossier (fiches comprises) à la corbeille. *(Crush, l'assistant, est un outil à part : il reste installé si tu veux le garder. Et sur ton iPhone, tu peux supprimer le raccourci « Send to Bobine ».)*
+It only acts on this folder (never on another vault): it removes the automatic wake-up and the iCloud copy, and can move the folder (cards included) to the Trash. *(Crush, the assistant, is a separate tool: it stays installed if you want to keep it. And on your iPhone, you can delete the "Send to Bobine" shortcut.)*
 
-## La structure du projet
+## Project structure
 
-Le dossier de ton vault (celui que tu as choisi à l'installation) ressemble à ceci :
+Your vault folder (the one you chose at installation) looks like this:
 
 ```
 Bobine/
-├── ingest.py           # télécharge + transcrit → fiches (raw/)
-├── filtre.py           # (option) choisit quoi ingérer depuis un export Instagram
-├── enrichir.py         # résumés via ta clé API → index.md + pages
-├── generate_page.py    # fabrique vault.html (lisible sans JavaScript) + la carte
-├── graphe.py           # (héritage) liens [[Thèmes]] pour Obsidian
-├── watch.sh            # le réveil : relève la boîte et enchaîne tout
-├── install.sh          # installation guidée (environnement, réveil)
-├── 👉 2. Installer Bobine.command   # double-clic : (ré)installe
-├── desinstaller.sh     # désinstallation guidée (réveil, iCloud, dossier)
-├── Désinstaller Bobine.command # double-clic : désinstalle
-├── requirements.txt    # dépendances Python
-├── config.example.env  # à copier en config.env (clé API, réglages)
-├── filtres.yaml        # (si tu importes) tes règles de tri, elles restent chez toi
+├── ingest.py           # downloads + transcribes → cards (raw/)
+├── filtre.py           # (optional) picks what to ingest from an Instagram export
+├── enrichir.py         # summaries via your API key → index.md + pages
+├── generate_page.py    # builds vault.html (readable without JavaScript) + the map
+├── graphe.py           # (legacy) [[Topics]] links for Obsidian
+├── watch.sh            # the wake-up: checks the box and chains everything
+├── install.sh          # guided installation (environment, wake-up)
+├── 👉 2. Installer Bobine.command   # double-click: (re)installs
+├── desinstaller.sh     # guided uninstall (wake-up, iCloud, folder)
+├── Désinstaller Bobine.command # double-click: uninstalls
+├── requirements.txt    # Python dependencies
+├── config.example.env  # copy to config.env (API key, settings)
+├── filtres.yaml        # (if you import) your sorting rules, they stay with you
 ├── LICENSE
-├── raw/                # TES fiches (jamais dans le repo)
-├── index.md            # l'index condensé (résumés + thèmes)
-├── vault.html          # la page à consulter
-├── Ma page.webloc      # double-clic : ouvre la page dans ton navigateur
-├── graph.html          # la carte des thèmes
-└── logs/               # journaux (watch.log)
+├── raw/                # YOUR cards (never in the repo)
+├── index.md            # the condensed index (summaries + topics)
+├── vault.html          # the page to browse
+├── Ma page.webloc      # double-click: opens the page in your browser
+├── graph.html          # the topic map
+└── logs/               # logs (watch.log)
 ```
 
 ## FAQ
 
-**Et sur Windows ou Linux ?**
-Windows : non. Bobine est pensé et testé pour Mac + iPhone, c'est un choix assumé. **Linux, oui** : une édition Linux/VPS complète existe (installeur, réveil systemd, page en HTTPS, boîte de réception locale) → **[linux/](linux/README.md)**. Même cœur, même licence, même philosophie : tout chez toi.
+**What about Windows or Linux?**
+Windows: no. Bobine is designed and tested for Mac + iPhone, and that's a deliberate choice. **Linux: yes.** A complete Linux/VPS edition exists (installer, systemd wake-up, HTTPS page, local inbox) → **[linux/](linux/README.en.md)**. Same core, same license, same philosophy: everything at home.
 
-**Où vont mes données ?**
-Nulle part : tout reste dans ton dossier de vault. Aucun compte, aucun serveur, aucune télémétrie. Les seuls échanges avec l'extérieur : le téléchargement des vidéos, et l'appel à **ta** clé API pour les résumés (si tu l'actives).
+**Where does my data go?**
+Nowhere: everything stays in your vault folder. No account, no server, no telemetry. The only exchanges with the outside world: the video downloads, and the call to **your** API key for the summaries (if you enable it).
 
-**Et si je ne mets pas de clé API ?**
-Tout fonctionne quand même : chaque fiche garde la transcription et la description. Seuls les résumés et les thèmes attendent une clé. Tu peux l'ajouter plus tard, Bobine rattrapera les fiches en attente.
+**What if I don't use an API key?**
+Everything still works: each card keeps the transcription and the description. Only the summaries and topics wait for a key; you can add one later, and Bobine will catch up on the pending cards.
 
-**En quoi c'est différent d'Obsidian ou Notion ?**
-Ce n'est pas un remplaçant : Bobine **fabrique** ta bibliothèque. Les fiches sont de simples fichiers Markdown (`raw/`), que tu peux ouvrir avec n'importe quel outil, y compris Obsidian.
+**How is it different from Obsidian or Notion?**
+It is not a replacement: Bobine **builds** your library. The cards are plain Markdown files (`raw/`), which you can open with any tool, including Obsidian.
 
-**Ça marche depuis quelles apps ?**
-Instagram (Reels), TikTok, YouTube, et tout ce qui propose un bouton « Partager » sur iPhone.
+**Which apps does it work with?**
+Instagram (Reels), TikTok, YouTube, and anything that offers a "Share" button on iPhone.
 
-## Contribuer
+## Contributing
 
-Les retours et contributions sont bienvenus, le projet est resté simple exprès :
+Feedback and contributions are welcome: the project was kept simple on purpose:
 
-- **Un bug, une idée ?** → ouvre une [issue](https://github.com/wrouhli/bobine/issues).
-- **Une correction ?** → une pull request directe, sans cérémonie (détails : [CONTRIBUTING.md](CONTRIBUTING.md)).
-- **Une coquille dans la [version anglaise](README.en.md) ?** → bienvenue, dis-le en issue.
+- **A bug, an idea?** → open an [issue](https://github.com/wrouhli/bobine/issues).
+- **A fix?** → a direct pull request, no ceremony (details: [CONTRIBUTING.md](CONTRIBUTING.md)).
+- **A typo in this English version?** → welcome, just tell us in an issue.
 
-Et bien sûr : **une ⭐ sur le repo** aide d'autres personnes à découvrir Bobine.
+And of course: **a ⭐ on the repo** helps other people discover Bobine.
 
-## Auteur
+## Author
 
-Créé et maintenu par **[Wahid Rouhli](https://www.wahidrouhli.com/)**.
+Created and maintained by **[Wahid Rouhli](https://www.wahidrouhli.com/)**.
 
-## Licence
+## License
 
-MIT : voir `LICENSE`.
-Merci aussi à [yt-dlp](https://github.com/yt-dlp/yt-dlp), [faster-whisper](https://github.com/SYSTRAN/faster-whisper), [gallery-dl](https://github.com/mikf/gallery-dl) et [Charm](https://charm.sh).
+MIT: see `LICENSE`.
+Thanks also to [yt-dlp](https://github.com/yt-dlp/yt-dlp), [faster-whisper](https://github.com/SYSTRAN/faster-whisper), [gallery-dl](https://github.com/mikf/gallery-dl) and [Charm](https://charm.sh).
