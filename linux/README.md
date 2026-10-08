@@ -27,6 +27,8 @@ double-clic : un minuteur systemd et une boîte de réception locale.
 3. S'il y a une clé API : résumé + thèmes → `index.md` ;
 4. `vault.html` (liste) et `graph.html` (carte des thèmes) sont régénérés.
 
+*Sans clé API : les fiches arrivent quand même dans `raw/` (lisibles en Markdown), et l'index et les pages se remplissent dès que tu ajoutes une clé ; Bobine rattrape tout ce qui attend.*
+
 ## Prérequis
 
 - Linux avec systemd (Debian 12+/Ubuntu 22.04+ et cousins ; aarch64 ok) ;

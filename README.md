@@ -2,7 +2,7 @@
   <sub>🌍 <a href="README.fr.md">Français</a> · <b>English</b></sub>
   <img src="assets/banniere.png" alt="Bobine: your saved videos become a local library, at home" width="820">
   <h1>🎞️ Bobine</h1>
-  <p><b>Your saved Reels, and any TikTok or YouTube video, become a local, searchable, askable knowledge base. On your Mac or your server, at home.</b></p>
+  <p><b>Your saved Reels, and any TikTok or YouTube video, become a local knowledge base you can search and question. On your Mac or your server, at home.</b></p>
   <p>
     <a href="https://github.com/wrouhli/bobine/releases"><img src="https://img.shields.io/github/v/release/wrouhli/bobine?color=6C4DFF&label=version" alt="Version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
@@ -245,16 +245,16 @@ Bobine/
 Windows: no. Bobine is designed and tested for Mac + iPhone, and that's a deliberate choice. **Linux: yes.** A complete Linux/VPS edition exists (installer, systemd wake-up, HTTPS page, local inbox) → **[linux/](linux/README.en.md)**. Same core, same license, same philosophy: everything at home.
 
 **Where does my data go?**
-Everything stays in your vault folder. No account, no server of ours, no telemetry. Two things do leave your machine: the video downloads (Instagram, TikTok, YouTube, like any downloader), and, only if you turn on the AI features (summaries, asking questions with Crush), the relevant texts (transcripts, cards, your questions) sent to the provider you chose (DeepSeek, OpenAI, OpenRouter…) with your own API key. No AI features? Nothing leaves except the downloads.
+Bobine keeps your knowledge base on your machine: no account, no server of ours, no telemetry. A few things do leave your machine, all transparent: the video downloads from Instagram, TikTok and YouTube (like any downloader); the one-time downloads of the Python dependencies and the transcription model; and, only if you turn on the AI features (summaries, asking questions with Crush), the relevant texts (transcripts, cards, your questions) sent to the provider you chose (DeepSeek, OpenAI, OpenRouter…) with your own API key. On the Mac edition, the generated page can also be synced through iCloud (offered at installation, you can decline it).
 
 **What if I don't use an API key?**
-Everything still works: each card keeps the transcription and the description. Only the summaries and topics wait for a key; you can add one later, and Bobine will catch up on the pending cards.
+Everything runs fine: each card is still created with its transcription and description, in `raw/`, and you can browse them as plain Markdown. One nuance: the searchable web page is generated from the summaries, so without a key your new cards won't show up there yet; add a key whenever you want and Bobine catches up on everything pending (nothing is ever lost).
 
 **How is it different from Obsidian or Notion?**
 It is not a replacement: Bobine **builds** your library. The cards are plain Markdown files (`raw/`), which you can open with any tool, including Obsidian.
 
 **Which apps does it work with?**
-Instagram (Reels), TikTok, YouTube, and anything that offers a "Share" button on iPhone.
+Instagram (Reels), TikTok and YouTube links, shared from your iPhone or pasted anywhere.
 
 ## Contributing
 
