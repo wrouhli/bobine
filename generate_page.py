@@ -62,6 +62,12 @@ def lire_index(chemin):
     return [e for e in entrees if e["titre"]]
 
 
+def pluriel(n, mot):
+    """Accord simple : singulier pour 0 et 1 (« 0 échec », « 1 fiche »),
+    pluriel à partir de 2 (« 2 fiches »)."""
+    return f"{n} {mot}" if n < 2 else f"{n} {mot}s"
+
+
 def positions_initiales(entrees, iterations=700):
     """Simule la physique du graphe côté Python, pour livrer une carte déjà
     équilibrée : le navigateur (et l'aperçu iPhone) n'a plus qu'à l'afficher.
@@ -280,7 +286,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   <div class="film"></div>
   <div id="liste" class="grid">__GROUPES__</div>
   <p class="vide" id="vide" style="display:none">Aucune fiche ne correspond. Essaie un autre mot ou enlève le filtre.</p>
-  <footer>Généré le __DATE__ · __COUNT__ fiches · Bobine · Régénérer : <code>python3 generate_page.py</code><br>
+  <footer>Généré le __DATE__ · __COUNT__ · Bobine · Régénérer : <code>python3 generate_page.py</code><br>
   <span class="sig">🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></span></footer>
 </div>
 <script>
@@ -318,6 +324,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   var total = cartes.length;
   function norm(s){ return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
   function esc(s){ return (s || "").replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c]; }); }
+  function pluriel(n, mot){ return n + " " + mot + (n < 2 ? "" : "s"); }
   function surligner(texte, requete){
     var t = esc(texte);
     if (!requete) { return t; }
@@ -350,7 +357,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
       }
       m.style.display = visible ? "" : "none";
     });
-    stats.textContent = vus + " / " + total + " fiches";
+    stats.textContent = vus + " / " + pluriel(total, "fiche");
     vide.style.display = vus ? "none" : "";
     pastilles.forEach(function(p){
       var on = !!actifs[p.dataset.t];
@@ -526,6 +533,7 @@ const THEMES = __THEMES__;
              lienFort:"rgba(185,166,255,.65)", ancien:"#79809f", recent:"#c9b8ff" }
   };
   var pal = PALETTES.light;
+  function pluriel(n, mot){ return n + " " + mot + (n < 2 ? "" : "s"); }
   function themeEffectif(){
     var m = racine.getAttribute("data-theme");
     if (m === "dark" || m === "light") { return m; }
@@ -619,7 +627,7 @@ const THEMES = __THEMES__;
     });
   }
   var sansTheme = FICHES.filter(function(f){ return !(f.themes || []).length; }).length;
-  document.getElementById("stats").textContent = nf + " fiches · " + THEMES.length + " thèmes"
+  document.getElementById("stats").textContent = pluriel(nf, "fiche") + " · " + pluriel(THEMES.length, "thème")
     + (sansTheme ? " · " + sansTheme + " sans thème" : "");
 
   /* ---- toile ---- */
@@ -1167,12 +1175,12 @@ def main():
             .replace("__CHIPS__", rendre_chips(entrees))
             .replace("__STATS__", str(len(entrees)) + " / " + str(len(entrees)))
             .replace("__DATE__", datetime.now().strftime("%d/%m/%Y %H:%M"))
-            .replace("__COUNT__", str(len(entrees)))
+            .replace("__COUNT__", pluriel(len(entrees), "fiche"))
             .replace("Vault — mes vidéos sauvegardées", nom_html + " — mes vidéos sauvegardées"))
     if not carte:
         page = page.replace(lien_carte, "")
     (vault / "vault.html").write_text(page, encoding="utf-8")
-    print(f"vault.html généré — {len(entrees)} fiches")
+    print(f"vault.html généré — {pluriel(len(entrees), 'fiche')}")
 
     if carte and entrees:
         pos = positions_initiales(entrees)
@@ -1187,8 +1195,8 @@ def main():
                   .replace("__POS__", json.dumps(pos))
                   .replace("__THEMES__", json.dumps(themes_graphe, ensure_ascii=False))
                   .replace("__SVG__", svg_statique(entrees, pos))
-                  .replace("__STATS_G__", str(len(entrees)) + " fiches · "
-                           + str(nb_themes) + " thèmes")
+                  .replace("__STATS_G__", pluriel(len(entrees), "fiche") + " · "
+                           + pluriel(nb_themes, "thème"))
                   .replace("La carte du Vault", "La carte du " + nom_html)
                   .replace("Vault — la carte", nom_html + " — la carte"))
         (vault / "graph.html").write_text(graphe, encoding="utf-8")

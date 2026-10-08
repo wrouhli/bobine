@@ -132,9 +132,16 @@ ok_before=$(grep -c '"statut": "ok"' "$VAULT/journal.json" 2>/dev/null || true)
   nouvelles=$((ok_after - ok_before))
 
   if [ "$nouvelles" -gt 0 ]; then
-    echo "$nouvelles nouvelle(s) fiche(s) traitée(s)."
+    if [ "$nouvelles" -gt 1 ]; then
+      fiches="$nouvelles nouvelles fiches"
+      accord=" traitées"
+    else
+      fiches="$nouvelles nouvelle fiche"
+      accord=" traitée"
+    fi
+    echo "$fiches$accord."
     # Résumés + pages (nécessite une clé API dans config.env ; sinon saute).
     "$PYTHON" "$SCRIPT_DIR/enrichir.py" --vault "$VAULT" 2>&1 || true
-    osascript -e "display notification \"$nouvelles nouvelle(s) fiche(s) dans $NOM\" with title \"$NOM\"" 2>/dev/null || true
+    osascript -e "display notification \"$fiches dans $NOM\" with title \"$NOM\"" 2>/dev/null || true
   fi
 } >> "$LOG" 2>&1
