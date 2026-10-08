@@ -606,6 +606,7 @@ const THEMES = __THEMES__;
   document.getElementById("statique").style.display = "none";
   canvas.style.display = "block";
   var dpr = 1, W = 0, H = 0, zoom = 1, panX = 0, panY = 0, survol = null;
+  var tokenAnim = 0;   /* annule un retour en cours dès qu'on re-touche */
 
   function voisins(i){
     var s = [i];
@@ -642,17 +643,18 @@ const THEMES = __THEMES__;
     nodes.forEach(function(n, i){
       var actif = !foyer || foyer.indexOf(i) !== -1;
       ctx.globalAlpha = actif ? 1 : 0.14;
+      var rr = n.r + (survol === i ? 1.5 : 0);
       if (n.type === "theme") {
         ctx.shadowColor = pal.theme;
         ctx.shadowBlur = foyer && actif ? 22 : 13;
         ctx.fillStyle = pal.theme;
-        ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(n.x, n.y, rr, 0, Math.PI * 2); ctx.fill();
         ctx.shadowBlur = 0;
       } else {
         var col = couleurFiche(n);
         if (n.t !== null && n.t > 0.66) { ctx.shadowColor = col; ctx.shadowBlur = 7; }
         ctx.fillStyle = col;
-        ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(n.x, n.y, rr, 0, Math.PI * 2); ctx.fill();
         ctx.shadowBlur = 0;
       }
     });
@@ -702,10 +704,46 @@ const THEMES = __THEMES__;
   function hit(sx, sy){
     var p = toWorld(sx, sy);
     for (var i = nodes.length - 1; i >= 0; i--) {
-      var n = nodes[i], dx = n.x - p.x, dy = n.y - p.y, rr = n.r + 9;
+      var n = nodes[i], dx = n.x - p.x, dy = n.y - p.y;
+      var rr = n.r + (n.type === "theme" ? 12 : 14);
       if (dx * dx + dy * dy < rr * rr) { return i; }
     }
     return null;
+  }
+
+  /* ---- le glisser vit : les voisins suivent, puis tout revient en douceur ---- */
+  function entrainerVoisins(idx){
+    var n = nodes[idx];
+    edges.forEach(function(edge){
+      var autre = -1;
+      if (edge.s === idx) { autre = edge.t; }
+      else if (edge.t === idx) { autre = edge.s; }
+      if (autre === -1) { return; }
+      var o = nodes[autre];
+      var dx = o.x - n.x, dy = o.y - n.y;
+      var d = Math.max(1, Math.hypot(dx, dy));
+      o.x += (n.x + dx / d * 115 - o.x) * 0.22;
+      o.y += (n.y + dy / d * 115 - o.y) * 0.22;
+    });
+  }
+  function lancerRetour(){
+    if (!POS || POS.length !== nodes.length) { return; }
+    var depuis = nodes.map(function(n){ return [n.x, n.y]; });
+    var mon = ++tokenAnim;
+    var debut = performance.now();
+    var duree = 750;
+    function pas(maintenant){
+      if (mon !== tokenAnim) { return; }
+      var k = Math.min(1, (maintenant - debut) / duree);
+      var e = 1 - Math.pow(1 - k, 3);
+      nodes.forEach(function(n, i){
+        n.x = depuis[i][0] + (POS[i][0] - depuis[i][0]) * e;
+        n.y = depuis[i][1] + (POS[i][1] - depuis[i][1]) * e;
+      });
+      dessiner();
+      if (k < 1) { requestAnimationFrame(pas); }
+    }
+    requestAnimationFrame(pas);
   }
 
   /* ---- aperçu (surimpression) ---- */
@@ -746,7 +784,8 @@ const THEMES = __THEMES__;
   var dragNode = null, panning = false, pinchPrev = null, downX = 0, downY = 0, bouge = false;
   canvas.addEventListener("pointerdown", function(e){
     fermerApercu();
-    canvas.setPointerCapture(e.pointerId);
+    tokenAnim++;                    /* annule un éventuel retour en cours */
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     downX = e.clientX; downY = e.clientY; bouge = false;
     if (pointers.size === 2) { dragNode = null; panning = false; pinchPrev = null; }
@@ -771,7 +810,11 @@ const THEMES = __THEMES__;
       if (dragNode !== null) {
         var p = toWorld(e.clientX, e.clientY);
         nodes[dragNode].x = p.x; nodes[dragNode].y = p.y;
-        if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) { bouge = true; }
+        entrainerVoisins(dragNode);
+        if (Math.hypot(e.clientX - downX, e.clientY - downY) > 8) {
+          if (!bouge) { canvas.style.cursor = "grabbing"; }
+          bouge = true;
+        }
         dessiner();
       } else if (panning) {
         panX += e.clientX - prev.x; panY += e.clientY - prev.y;
@@ -780,13 +823,18 @@ const THEMES = __THEMES__;
       return;
     }
     var i = hit(e.clientX, e.clientY);
-    if (i !== survol) { survol = i; dessiner(); }
+    if (i !== survol) { survol = i; canvas.style.cursor = i === null ? "" : "grab"; dessiner(); }
   });
   function finPointer(e){
     if (!pointers.has(e.pointerId)) { return; }
     pointers.delete(e.pointerId);
-    if (dragNode !== null && !bouge) { cliquer(dragNode); }
-    if (pointers.size === 0) { dragNode = null; panning = false; pinchPrev = null; }
+    if (dragNode !== null) {
+      if (bouge) { lancerRetour(); } else { cliquer(dragNode); }
+    }
+    if (pointers.size === 0) {
+      dragNode = null; panning = false; pinchPrev = null;
+      canvas.style.cursor = "";
+    }
   }
   canvas.addEventListener("pointerup", finPointer);
   canvas.addEventListener("pointercancel", function(e){
