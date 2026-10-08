@@ -17,7 +17,7 @@ The Linux/VPS edition of the [Bobine](https://github.com/wrouhli/bobine) project
 3. With an API key: summary + topics → `index.md`;
 4. `vault.html` (list) and `graph.html` (topic map) are regenerated.
 
-*Without an API key: cards still land in `raw/` (readable as plain Markdown), and the index and pages fill in as soon as you add a key; Bobine catches up on everything pending.*
+*Without an API key: cards appear on the page right away, marked "(summary pending)", and Bobine replaces them with real summaries as soon as you add a key.*
 
 ## Requirements
 

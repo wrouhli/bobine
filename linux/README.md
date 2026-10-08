@@ -27,7 +27,7 @@ double-clic : un minuteur systemd et une boîte de réception locale.
 3. S'il y a une clé API : résumé + thèmes → `index.md` ;
 4. `vault.html` (liste) et `graph.html` (carte des thèmes) sont régénérés.
 
-*Sans clé API : les fiches arrivent quand même dans `raw/` (lisibles en Markdown), et l'index et les pages se remplissent dès que tu ajoutes une clé ; Bobine rattrape tout ce qui attend.*
+*Sans clé API : les fiches apparaissent quand même dans la page, marquées « résumé en attente », et Bobine les remplacera par les vrais résumés dès que tu ajoutes une clé.*
 
 ## Prérequis
 

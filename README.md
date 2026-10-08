@@ -248,7 +248,7 @@ Windows: no. Bobine is designed and tested for Mac + iPhone, and that's a delibe
 Bobine keeps your knowledge base on your machine: no account, no server of ours, no telemetry. A few things do leave your machine, all transparent: the video downloads from Instagram, TikTok and YouTube (like any downloader); the one-time downloads of the Python dependencies and the transcription model; and, only if you turn on the AI features (summaries, asking questions with Crush), the relevant texts (transcripts, cards, your questions) sent to the provider you chose (DeepSeek, OpenAI, OpenRouter…) with your own API key. On the Mac edition, the generated page can also be synced through iCloud (offered at installation, you can decline it).
 
 **What if I don't use an API key?**
-Everything runs fine: each card is still created with its transcription and description, in `raw/`, and you can browse them as plain Markdown. One nuance: the searchable web page is generated from the summaries, so without a key your new cards won't show up there yet; add a key whenever you want and Bobine catches up on everything pending (nothing is ever lost).
+Everything runs fine: each card is still created with its transcription and description, in `raw/`, and it appears on your page right away, marked "(summary pending)". Add a key whenever you want: Bobine replaces the pending entries with real summaries and topics, automatically.
 
 **How is it different from Obsidian or Notion?**
 It is not a replacement: Bobine **builds** your library. The cards are plain Markdown files (`raw/`), which you can open with any tool, including Obsidian.
