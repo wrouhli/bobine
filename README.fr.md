@@ -4,12 +4,15 @@
   <h1>🎞️ Bobine</h1>
   <p><b>Tes Reels, et n'importe quelle vidéo TikTok/YouTube, sauvegardés deviennent une base de connaissances locale, cherchable et interrogeable. Sur ton Mac ou ton serveur, chez toi.</b></p>
   <p>
-    <a href="https://github.com/wrouhli/bobine/releases"><img src="https://img.shields.io/github/v/release/wrouhli/bobine?color=6C4DFF&label=version" alt="Version"></a>
+    <a href="https://github.com/wrouhli/bobine/releases"><img src="https://img.shields.io/github/v/release/wrouhli/bobine?color=6C4DFF&label=version&style=flat" alt="Version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="Licence : MIT"></a>
     <img src="https://img.shields.io/badge/macOS%20%2B%20iPhone-black?logo=apple" alt="macOS + iPhone">
     <a href="linux/README.md"><img src="https://img.shields.io/badge/Linux%20%2F%20VPS-black?logo=linux" alt="Linux / VPS"></a>
     <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
     <a href="https://github.com/wrouhli/bobine/actions/workflows/tests.yml"><img src="https://github.com/wrouhli/bobine/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  </p>
+  <p>
+    <a href="https://github.com/wrouhli/bobine/stargazers"><img src="https://img.shields.io/github/stars/wrouhli/bobine?style=for-the-badge&label=%E2%AD%90%20Mets%20une%20%C3%A9toile&color=6C4DFF&logo=github&logoColor=white" alt="⭐ Mets une étoile"></a>
   </p>
 </div>
 
