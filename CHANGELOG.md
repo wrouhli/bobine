@@ -1,5 +1,15 @@
 # Journal des versions
 
+## Non publié
+
+En préparation 🚧
+
+- **Page « Galerie »** : refonte de `vault.html` : trois modes clair, sombre, système (choix mémorisé), dates des fiches, tri des plus récentes d'abord, séparateurs de mois, glyphes de plateforme (YouTube, Instagram, TikTok), carte entière cliquable, surlignage de recherche avec raccourci « / », favicon. Toujours lisible sans JavaScript.
+- **Carte v2** : `graph.html` devient une carte de navigation : clic sur un thème pour filtrer la liste, clic sur une vidéo pour l'aperçu (résumé, date, boutons), survol qui met au point, nombre de fiches par bulle, points colorés par date avec légende, thèmes fusionnés automatiquement. Les points se glissent, et l'aimant 🧲 (près du zoom) choisit entre retour en place et points posés librement. `vault.html?theme=…` pré-filtre la liste.
+- **Sans clé API** : les nouvelles fiches sont indexées « résumé en attente » et visibles dans les pages ; dès l'ajout d'une clé, les résumés en attente se remplissent tout seuls, sans doublon.
+- **Corrections** : les dates des fiches sont retrouvées même quand les liens de la fiche et de l'index diffèrent par leurs paramètres de suivi.
+- **Documentation et projet** : README anglais par défaut (`README.fr.md` pour le français), guide Linux aussi en anglais, explications de confidentialité précisées (copie iCloud optionnelle, envois au fournisseur choisi), licence MIT standard reconnue par GitHub, modèles d'issues et de pull request, `SECURITY.md`.
+
 ## v1.2.0 (7 octobre 2026)
 
 L'édition Linux 🐧
