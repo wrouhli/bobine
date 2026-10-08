@@ -248,7 +248,7 @@ Windows : non. Bobine est pensé et testé pour Mac + iPhone, c'est un choix ass
 Bobine garde ta base de connaissances sur ta machine : aucun compte, aucun serveur à nous, aucune télémétrie. Quelques choses sortent de ta machine, toutes transparentes : le téléchargement des vidéos (Instagram, TikTok, YouTube, comme n'importe quel téléchargeur) ; les téléchargements uniques des dépendances Python et du modèle de transcription ; et, uniquement si tu actives l'IA (résumés, questions à Crush), les textes concernés (transcriptions, fiches, tes questions) envoyés au fournisseur que tu as choisi (DeepSeek, OpenAI, OpenRouter…) avec ta propre clé API. Sur l'édition Mac, la page générée peut aussi être synchronisée via iCloud (proposé à l'installation, désactivable).
 
 **Et si je ne mets pas de clé API ?**
-Tout tourne très bien : chaque fiche est quand même créée avec sa transcription et sa description, dans `raw/`, en Markdown lisible à tout moment. Une nuance : la page web de recherche est générée à partir des résumés, donc sans clé elle n'affichera pas encore tes nouvelles fiches ; ajoute une clé quand tu veux, Bobine rattrape alors tout ce qui attend (rien n'est jamais perdu).
+Tout tourne très bien : chaque fiche est quand même créée avec sa transcription et sa description, dans `raw/`, et elle apparaît tout de suite dans ta page, marquée « résumé en attente ». Ajoute une clé quand tu veux : Bobine remplace alors ces entrées par les vrais résumés et thèmes, automatiquement.
 
 **En quoi c'est différent d'Obsidian ou Notion ?**
 Ce n'est pas un remplaçant : Bobine **fabrique** ta bibliothèque. Les fiches sont de simples fichiers Markdown (`raw/`), que tu peux ouvrir avec n'importe quel outil, y compris Obsidian.

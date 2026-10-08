@@ -6,11 +6,13 @@ Résume les nouvelles fiches de raw/ et met à jour index.md.
 
 Pour chaque fiche qui n'est pas encore dans l'index, ce script demande à un
 modèle (via une API compatible OpenAI : DeepSeek, OpenAI, OpenRouter…) un
-titre, des thèmes et un résumé concret, puis les ajoute à index.md et
-régénère les pages (vault.html / graph.html).
+titre, des thèmes et un résumé concret, puis met à jour index.md et régénère
+les pages (vault.html / graph.html).
 
-Sans clé API configurée (voir config.example.env), l'étape est simplement
-sautée : la transcription et tout le reste fonctionnent sans.
+Sans clé API configurée (voir config.example.env), les nouvelles fiches sont
+quand même ajoutées à l'index en « résumé en attente », et les pages sont
+régénérées : dès qu'une clé sera configurée, ces entrées seront remplacées
+par les vrais résumés, automatiquement.
 
 Usage :
   python enrichir.py                 # traite les nouvelles fiches du dossier courant
@@ -56,6 +58,14 @@ Règles :
 - "themes" : 2 à 4 thèmes courts en minuscules (exemples : "ia", "open source", "seo").
 - "contenu" : 3 à 5 phrases en français. Garde les noms d'outils, les chiffres et les idées concrètes ; pas de blabla.
 - Si la fiche ne contient pas d'information utile (vidéo sans parole), dis-le sobrement dans "contenu"."""
+
+
+# Entrées « en attente » : ajoutées quand aucune clé n'est configurée, puis
+# remplacées par le vrai résumé dès qu'une clé est disponible.
+MARQUEUR_ATTENTE = "(résumé en attente"
+CONTENU_ATTENTE = ("(résumé en attente : ajoute une clé API dans config.env — "
+                   "Bobine remplacera cette entrée automatiquement)")
+THEMES_ATTENTE = "(en attente)"
 
 
 # ------------------------------------------------------------------ outils
@@ -111,17 +121,59 @@ def lire_fiche(chemin):
     return texte, champs
 
 
+def decouper_index(chemin_index):
+    """Découpe index.md en (entête, blocs d'entrée).
+
+    Un bloc d'entrée commence par « ### » ; tout ce qui précède est l'entête.
+    """
+    if not chemin_index.is_file():
+        return "", []
+    texte = chemin_index.read_text(encoding="utf-8")
+    if not texte.strip():
+        return "", []
+    morceaux = re.split(r"(?m)^### ", texte)
+    return morceaux[0], ["### " + m for m in morceaux[1:]]
+
+
+def est_en_attente(bloc):
+    """Vrai si le bloc d'entrée attend encore son résumé."""
+    return MARQUEUR_ATTENTE in bloc
+
+
+def _urls_d_un_bloc(bloc):
+    urls = []
+    for ligne in bloc.splitlines():
+        if ligne.strip().startswith("- lien :"):
+            urls.append(ligne.split("- lien :", 1)[1].strip())
+    return urls
+
+
+def liens_en_attente(chemin_index):
+    """URLs des entrées « résumé en attente » déjà présentes dans l'index."""
+    _, blocs = decouper_index(chemin_index)
+    urls = set()
+    for bloc in blocs:
+        if est_en_attente(bloc):
+            urls.update(_urls_d_un_bloc(bloc))
+    return urls
+
+
 def liens_deja_indexes(chemin_index):
-    """Retourne (codes courts, URL complètes) déjà présents dans index.md."""
+    """Retourne (codes courts, URL complètes) déjà indexés (hors entrées en attente).
+
+    Les entrées « résumé en attente » sont ignorées exprès : elles doivent
+    être re-traitées (et remplacées) dès qu'une clé API sera disponible.
+    """
     codes, urls = set(), set()
-    if chemin_index.is_file():
-        for ligne in chemin_index.read_text(encoding="utf-8").splitlines():
-            if ligne.strip().startswith("- lien :"):
-                url = ligne.split("- lien :", 1)[1].strip()
-                urls.add(url)
-                code = code_court(url)
-                if code:
-                    codes.add(code)
+    _, blocs = decouper_index(chemin_index)
+    for bloc in blocs:
+        if est_en_attente(bloc):
+            continue
+        for url in _urls_d_un_bloc(bloc):
+            urls.add(url)
+            code = code_court(url)
+            if code:
+                codes.add(code)
     return codes, urls
 
 
@@ -132,6 +184,52 @@ def ajouter_entree(chemin_index, entree):
         base += "\n"
     base += "\n" + entree.rstrip() + "\n"
     chemin_index.write_text(base, encoding="utf-8")
+
+
+def remplacer_entree_en_attente(chemin_index, url, entree):
+    """Remplace l'entrée « en attente » d'une URL par sa version résumée.
+
+    Retourne True si une entrée en attente a été remplacée ; False sinon
+    (la fiche n'était pas indexée : à ajouter normalement).
+    """
+    entete, blocs = decouper_index(chemin_index)
+    remplace = False
+    nouveaux = []
+    for bloc in blocs:
+        if (not remplace and est_en_attente(bloc)
+                and url in _urls_d_un_bloc(bloc)):
+            nouveaux.append(entree.rstrip() + "\n")
+            remplace = True
+        else:
+            nouveaux.append(bloc)
+    if not remplace:
+        return False
+    contenu = entete + "".join(nouveaux)
+    if not contenu.endswith("\n"):
+        contenu += "\n"
+    chemin_index.write_text(contenu, encoding="utf-8")
+    return True
+
+
+def titre_provisoire(fiche, texte):
+    """Un titre lisible en attendant le résumé : le premier « # … » de la fiche."""
+    for ligne in texte.splitlines():
+        if ligne.startswith("# "):
+            titre = ligne[2:].strip()
+            if titre:
+                return titre[:80]
+    return fiche.stem
+
+
+def regenerer_pages(script, racine):
+    """Régénère vault.html / graph.html via generate_page.py (si présent)."""
+    page_script = script / "generate_page.py"
+    if not page_script.is_file():
+        return
+    print("Régénération des pages…")
+    sous = subprocess.run([sys.executable, str(page_script), "--vault", str(racine)])
+    if sous.returncode != 0:
+        print("(les pages n'ont pas pu être régénérées — relance generate_page.py)")
 
 
 # ------------------------------------------------------------------ modèle
@@ -225,8 +323,35 @@ def main():
         return 0
 
     if not cle:
-        print("Aucune clé API configurée (voir config.example.env) — étape résumé sautée.")
-        print("(" + str(len(en_attente)) + " fiche(s) attendent un résumé.)")
+        # Sans clé : on indexe quand même les nouvelles fiches, marquées
+        # « résumé en attente ». Elles seront remplacées automatiquement dès
+        # qu'une clé API sera configurée (rattrapage).
+        deja_en_attente = liens_en_attente(chemin_index)
+        ajoutees = 0
+        for fiche, champs in en_attente:
+            if args.limite and ajoutees >= args.limite:
+                break
+            url = champs.get("source", "")
+            if url and url in deja_en_attente:
+                continue
+            texte = fiche.read_text(encoding="utf-8", errors="ignore")
+            entree = ("### " + titre_provisoire(fiche, texte) + "\n"
+                      "- lien : " + url + "\n"
+                      "- auteur : " + champs.get("auteur", "") + "\n"
+                      "- thèmes : " + THEMES_ATTENTE + "\n"
+                      "- contenu : " + CONTENU_ATTENTE + "\n")
+            ajouter_entree(chemin_index, entree)
+            deja_en_attente.add(url)
+            ajoutees += 1
+        if ajoutees:
+            print("Aucune clé API configurée (voir config.example.env) — "
+                  + str(ajoutees) + " fiche(s) indexée(s) en attente de résumé.")
+            if not args.no_pages:
+                regenerer_pages(script, racine)
+        else:
+            print("Aucune clé API configurée — rien de nouveau à indexer.")
+            print("(" + str(len(en_attente)) + " fiche(s) attendent leur résumé ; "
+                  "elles sont déjà dans l'index.)")
         return 0
     if not modele:
         print("API_MODEL n'est pas défini pour ce fournisseur — voir config.example.env.")
@@ -255,17 +380,13 @@ def main():
                   "- auteur : " + auteur + "\n"
                   "- thèmes : " + ", ".join(themes) + "\n"
                   "- contenu : " + resume + "\n")
-        ajouter_entree(chemin_index, entree)
+        if not remplacer_entree_en_attente(chemin_index, url, entree):
+            ajouter_entree(chemin_index, entree)
         traitees += 1
         print("  ✓ " + fiche.name + " → « " + titre + " »")
 
     if traitees and not args.no_pages:
-        page_script = script / "generate_page.py"
-        if page_script.is_file():
-            print("Régénération des pages…")
-            sous = subprocess.run([sys.executable, str(page_script), "--vault", str(racine)])
-            if sous.returncode != 0:
-                print("(les pages n'ont pas pu être régénérées — relance generate_page.py)")
+        regenerer_pages(script, racine)
 
     print("Terminé — " + str(traitees) + " fiche(s) résumée(s).")
     return 0
