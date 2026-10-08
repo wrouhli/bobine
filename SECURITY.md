@@ -2,7 +2,7 @@
 
 ## Signaler une vulnérabilité
 
-Bobine est un outil **100 % local** : pas de serveur à nous, pas de compte, pas de télémétrie. Les risques concernent surtout ta machine, ton vault, et les briques que tu exposes volontairement (page servie à distance, serveur de liens).
+Bobine est un outil **local-first** : pas de serveur à nous, pas de compte, pas de télémétrie. Les risques concernent surtout ta machine, ton vault, et les briques que tu exposes volontairement (page servie à distance, serveur de liens).
 
 Si tu penses avoir trouvé un problème de sécurité, merci de **ne pas ouvrir d'issue publique** :
 

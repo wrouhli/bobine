@@ -2,7 +2,7 @@
 
 <sub>🌍 <a href="README.md">Français</a> · <b>English</b></sub>
 
-**Your saved Reels, and any TikTok/YouTube video, become a local, searchable, askable knowledge base. On your machine, at home.**
+**Your saved Reels, and any TikTok/YouTube video, become a local knowledge base you can search and question. On your machine, at home.**
 
 The Linux/VPS edition of the [Bobine](https://github.com/wrouhli/bobine) project: it lives in the `linux/` folder of the repository and shares its core (ingestion, transcription, summaries, pages) with the Mac edition. Here, Bobine lives on a server: a small VPS, a machine at home, an old Linux laptop. No iCloud, no double-click: a systemd timer and a local inbox.
 
@@ -16,6 +16,8 @@ The Linux/VPS edition of the [Bobine](https://github.com/wrouhli/bobine) project
 2. Every 15 minutes, Bobine checks the inbox: downloads, transcribes, writes a card into `raw/`;
 3. With an API key: summary + topics → `index.md`;
 4. `vault.html` (list) and `graph.html` (topic map) are regenerated.
+
+*Without an API key: cards still land in `raw/` (readable as plain Markdown), and the index and pages fill in as soon as you add a key; Bobine catches up on everything pending.*
 
 ## Requirements
 
