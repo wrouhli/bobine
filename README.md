@@ -245,7 +245,7 @@ Bobine/
 Windows: no. Bobine is designed and tested for Mac + iPhone, and that's a deliberate choice. **Linux: yes.** A complete Linux/VPS edition exists (installer, systemd wake-up, HTTPS page, local inbox) → **[linux/](linux/README.en.md)**. Same core, same license, same philosophy: everything at home.
 
 **Where does my data go?**
-Nowhere: everything stays in your vault folder. No account, no server, no telemetry. The only exchanges with the outside world: the video downloads, and the call to **your** API key for the summaries (if you enable it).
+Everything stays in your vault folder. No account, no server of ours, no telemetry. Two things do leave your machine: the video downloads (Instagram, TikTok, YouTube, like any downloader), and, only if you turn on the AI features (summaries, asking questions with Crush), the relevant texts (transcripts, cards, your questions) sent to the provider you chose (DeepSeek, OpenAI, OpenRouter…) with your own API key. No AI features? Nothing leaves except the downloads.
 
 **What if I don't use an API key?**
 Everything still works: each card keeps the transcription and the description. Only the summaries and topics wait for a key; you can add one later, and Bobine will catch up on the pending cards.

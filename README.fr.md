@@ -245,7 +245,7 @@ Bobine/
 Windows : non. Bobine est pensé et testé pour Mac + iPhone, c'est un choix assumé. **Linux, oui** : une édition Linux/VPS complète existe (installeur, réveil systemd, page en HTTPS, boîte de réception locale) → **[linux/](linux/README.md)**. Même cœur, même licence, même philosophie : tout chez toi.
 
 **Où vont mes données ?**
-Nulle part : tout reste dans ton dossier de vault. Aucun compte, aucun serveur, aucune télémétrie. Les seuls échanges avec l'extérieur : le téléchargement des vidéos, et l'appel à **ta** clé API pour les résumés (si tu l'actives).
+Tout reste dans le dossier de ton vault. Aucun compte, aucun serveur à nous, aucune télémétrie. Deux choses sortent de ta machine : le téléchargement des vidéos (Instagram, TikTok, YouTube, comme n'importe quel téléchargeur), et, uniquement si tu actives l'IA (résumés, questions à Crush), les textes concernés (transcriptions, fiches, tes questions) envoyés au fournisseur que tu as choisi (DeepSeek, OpenAI, OpenRouter…) avec ta propre clé API. Pas d'IA activée ? Rien ne sort à part les téléchargements.
 
 **Et si je ne mets pas de clé API ?**
 Tout fonctionne quand même : chaque fiche garde la transcription et la description. Seuls les résumés et les thèmes attendent une clé. Tu peux l'ajouter plus tard, Bobine rattrapera les fiches en attente.
