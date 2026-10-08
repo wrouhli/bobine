@@ -442,6 +442,8 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
   #zoom button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);
                background:var(--panel);color:var(--ink2);font-size:17px;cursor:pointer}
   #zoom button:hover{color:var(--ink)}
+  #aimant{margin-bottom:6px}
+  #aimant.on{background:var(--btnactive);color:var(--violet)}
   #legende{position:fixed;left:16px;bottom:46px;z-index:2;pointer-events:none;
            color:var(--muted);font-size:12px;line-height:1.9}
   #legende .puce{display:inline-block;width:9px;height:9px;border-radius:50%;
@@ -486,12 +488,12 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
   </div>
   <a class="lien" href="vault.html">← Liste</a>
 </header>
-<div id="zoom"><button id="zi" aria-label="Zoom avant">+</button><button id="zo" aria-label="Zoom arrière">−</button></div>
+<div id="zoom"><button id="aimant" aria-label="Aimant : les points reviennent en place" aria-pressed="true" title="Aimant : les points reviennent en place"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v8a6 6 0 0 0 12 0V3"/><rect x="6" y="3" width="4" height="3.2" rx="0.8" fill="currentColor" stroke="none"/><rect x="14" y="3" width="4" height="3.2" rx="0.8" fill="currentColor" stroke="none"/></svg></button><button id="zi" aria-label="Zoom avant">+</button><button id="zo" aria-label="Zoom arrière">−</button></div>
 <div id="legende">
   <div><span class="puce"></span>vidéo · <span class="puce theme"></span>thème (taille = nombre de fiches)</div>
   <div>date : ancien <span id="degrade"></span> récent</div>
 </div>
-<div id="hint">Clique un thème pour filtrer la liste · une vidéo pour l'aperçu · glisse pour déplacer · pince pour zoomer</div>
+<div id="hint">Clique un thème pour filtrer la liste · une vidéo pour l'aperçu · glisse pour déplacer (🧲 règle le retour) · pince pour zoomer</div>
 <div id="signature">🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></div>
 <div id="apercu" role="dialog" aria-label="Aperçu de la fiche">
   <button id="fermer" aria-label="Fermer">✕</button>
@@ -546,6 +548,26 @@ const THEMES = __THEMES__;
   else { try { var v = localStorage.getItem(CLE); if (v === "light" || v === "dark" || v === "system") { initial = v; } } catch (e) {} }
   tbtns.forEach(function(b){ b.addEventListener("click", function(){ choisirTheme(b.dataset.m, true); }); });
   if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", appliquerTheme); } catch (e) {} }
+
+  /* ---- aimant : les points reviennent en place, ou restent posés ---- */
+  var aimant = true;
+  try { if (localStorage.getItem("bobine-carte-aimant") === "0") { aimant = false; } } catch (e) {}
+  var poses = {};
+  var btnAimant = document.getElementById("aimant");
+  function majAimant(){
+    btnAimant.classList.toggle("on", aimant);
+    var texte = aimant ? "Aimant allumé : les points reviennent en place" : "Libre : les points restent où tu les poses";
+    btnAimant.title = texte;
+    btnAimant.setAttribute("aria-label", texte);
+    btnAimant.setAttribute("aria-pressed", aimant ? "true" : "false");
+  }
+  btnAimant.addEventListener("click", function(){
+    aimant = !aimant;
+    try { localStorage.setItem("bobine-carte-aimant", aimant ? "1" : "0"); } catch (e) {}
+    majAimant();
+    if (aimant) { poses = {}; lancerRetour(null); }
+  });
+  majAimant();
 
   /* ---- données : fiches, thèmes, liens, couleurs de date ---- */
   var nf = FICHES.length;
@@ -726,7 +748,7 @@ const THEMES = __THEMES__;
       o.y += (n.y + dy / d * 115 - o.y) * 0.22;
     });
   }
-  function lancerRetour(){
+  function lancerRetour(sauf){
     if (!POS || POS.length !== nodes.length) { return; }
     var depuis = nodes.map(function(n){ return [n.x, n.y]; });
     var mon = ++tokenAnim;
@@ -737,6 +759,7 @@ const THEMES = __THEMES__;
       var k = Math.min(1, (maintenant - debut) / duree);
       var e = 1 - Math.pow(1 - k, 3);
       nodes.forEach(function(n, i){
+        if (sauf && sauf[i]) { return; }   /* point « posé » : il reste là */
         n.x = depuis[i][0] + (POS[i][0] - depuis[i][0]) * e;
         n.y = depuis[i][1] + (POS[i][1] - depuis[i][1]) * e;
       });
@@ -829,7 +852,10 @@ const THEMES = __THEMES__;
     if (!pointers.has(e.pointerId)) { return; }
     pointers.delete(e.pointerId);
     if (dragNode !== null) {
-      if (bouge) { lancerRetour(); } else { cliquer(dragNode); }
+      if (bouge) {
+        if (aimant) { lancerRetour(null); }
+        else { poses[dragNode] = true; lancerRetour(poses); }
+      } else { cliquer(dragNode); }
     }
     if (pointers.size === 0) {
       dragNode = null; panning = false; pinchPrev = null;
