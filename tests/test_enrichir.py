@@ -152,5 +152,19 @@ class TitreProvisoire(unittest.TestCase):
             enrichir.titre_provisoire(Path("/tmp/yt_abc.md"), "pas de titre"), "yt_abc")
 
 
+class Pluriel(unittest.TestCase):
+    """pluriel : singulier pour 0 et 1, pluriel à partir de 2."""
+
+    def test_singulier_pour_zero_et_un(self):
+        self.assertEqual(enrichir.pluriel(0, "échec"), "0 échec")
+        self.assertEqual(enrichir.pluriel(1, "fiche"), "1 fiche")
+        self.assertEqual(enrichir.pluriel(1, "réussite"), "1 réussite")
+
+    def test_pluriel_a_partir_de_deux(self):
+        self.assertEqual(enrichir.pluriel(2, "fiche"), "2 fiches")
+        self.assertEqual(enrichir.pluriel(3, "lien"), "3 liens")
+        self.assertEqual(enrichir.pluriel(12, "thème"), "12 thèmes")
+
+
 if __name__ == "__main__":
     unittest.main()

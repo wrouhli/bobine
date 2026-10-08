@@ -46,6 +46,12 @@ def log(message):
     print(f"[{datetime.now():%H:%M:%S}] {message}", flush=True)
 
 
+def pluriel(n, mot):
+    """Accord simple : singulier pour 0 et 1 (« 0 échec », « 1 fiche »),
+    pluriel à partir de 2 (« 2 fiches »)."""
+    return f"{n} {mot}" if n < 2 else f"{n} {mot}s"
+
+
 def verifier_outils():
     """Verifie que yt-dlp et ffmpeg repondent avant de commencer."""
     manquants = []
@@ -400,7 +406,8 @@ def main():
     if args.limite:
         a_faire = a_faire[: args.limite]
 
-    log(f"{len(liens)} liens trouvés, {len(a_faire)} à traiter.")
+    log(f"{pluriel(len(liens), 'lien')} trouvé{'' if len(liens) < 2 else 's'}, "
+        f"{len(a_faire)} à traiter.")
     if not a_faire:
         return
 
@@ -493,7 +500,7 @@ def main():
         sauver_journal(chemin_journal, journal)
         time.sleep(PAUSE_ENTRE_VIDEOS)
 
-    log(f"Terminé — {reussites} réussites, {echecs} échecs.")
+    log(f"Terminé — {pluriel(reussites, 'réussite')}, {pluriel(echecs, 'échec')}.")
     log(f"Fiches disponibles dans : {dossier_raw}")
     if echecs:
         log("Relance le script pour retenter uniquement les échecs.")

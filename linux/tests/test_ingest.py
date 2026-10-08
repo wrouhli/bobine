@@ -130,5 +130,19 @@ class ExtraireLiens(unittest.TestCase):
                                  "https://youtu.be/BBB222?t=1"])
 
 
+class Pluriel(unittest.TestCase):
+    """pluriel : singulier pour 0 et 1, pluriel à partir de 2."""
+
+    def test_singulier_pour_zero_et_un(self):
+        self.assertEqual(ingest.pluriel(0, "échec"), "0 échec")
+        self.assertEqual(ingest.pluriel(1, "fiche"), "1 fiche")
+        self.assertEqual(ingest.pluriel(1, "réussite"), "1 réussite")
+
+    def test_pluriel_a_partir_de_deux(self):
+        self.assertEqual(ingest.pluriel(2, "fiche"), "2 fiches")
+        self.assertEqual(ingest.pluriel(3, "lien"), "3 liens")
+        self.assertEqual(ingest.pluriel(12, "thème"), "12 thèmes")
+
+
 if __name__ == "__main__":
     unittest.main()

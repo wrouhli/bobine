@@ -70,6 +70,12 @@ THEMES_ATTENTE = "(en attente)"
 
 # ------------------------------------------------------------------ outils
 
+def pluriel(n, mot):
+    """Accord simple : singulier pour 0 et 1 (« 0 échec », « 1 fiche »),
+    pluriel à partir de 2 (« 2 fiches »)."""
+    return f"{n} {mot}" if n < 2 else f"{n} {mot}s"
+
+
 def charger_config(*dossiers):
     """Lit les fichiers config.env (format clé=valeur, # commentaires)."""
     cfg = {}
@@ -313,7 +319,7 @@ def main():
         return 0
 
     if args.dry_run:
-        print(str(len(en_attente)) + " fiche(s) en attente de résumé :")
+        print(pluriel(len(en_attente), "fiche") + " en attente de résumé :")
         for fiche, champs in en_attente:
             print("  - " + fiche.name + "  (" + champs.get("auteur", "?") + ")")
         fiche, _ = en_attente[0]
@@ -345,13 +351,19 @@ def main():
             ajoutees += 1
         if ajoutees:
             print("Aucune clé API configurée (voir config.example.env) — "
-                  + str(ajoutees) + " fiche(s) indexée(s) en attente de résumé.")
+                  + pluriel(ajoutees, "fiche")
+                  + (" indexée" if ajoutees < 2 else " indexées")
+                  + " en attente de résumé.")
             if not args.no_pages:
                 regenerer_pages(script, racine)
         else:
             print("Aucune clé API configurée — rien de nouveau à indexer.")
-            print("(" + str(len(en_attente)) + " fiche(s) attendent leur résumé ; "
-                  "elles sont déjà dans l'index.)")
+            if len(en_attente) > 1:
+                print("(" + pluriel(len(en_attente), "fiche")
+                      + " attendent leur résumé ; elles sont déjà dans l'index.)")
+            else:
+                print("(" + pluriel(len(en_attente), "fiche")
+                      + " attend son résumé ; elle est déjà dans l'index.)")
         return 0
     if not modele:
         print("API_MODEL n'est pas défini pour ce fournisseur — voir config.example.env.")
@@ -388,7 +400,8 @@ def main():
     if traitees and not args.no_pages:
         regenerer_pages(script, racine)
 
-    print("Terminé — " + str(traitees) + " fiche(s) résumée(s).")
+    print("Terminé — " + pluriel(traitees, "fiche")
+          + (" résumée." if traitees < 2 else " résumées."))
     return 0
 
 
