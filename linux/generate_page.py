@@ -369,6 +369,18 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   document.addEventListener("keydown", function(ev){
     if (ev.key === "/" && document.activeElement !== q) { ev.preventDefault(); q.focus(); }
   });
+  /* filtre pré-appliqué depuis un lien (ex. la Carte : vault.html?theme=ia) */
+  try {
+    var parametreTheme = new URLSearchParams(location.search).get("theme");
+    if (parametreTheme) {
+      var cibleChip = null;
+      pastilles.forEach(function(p){ if (!cibleChip && p.dataset.t.toLowerCase() === parametreTheme.toLowerCase()) { cibleChip = p; } });
+      if (cibleChip) {
+        actifs[cibleChip.dataset.t] = true;
+        try { cibleChip.scrollIntoView({ inline: "center", block: "nearest" }); } catch (e2) {}
+      }
+    }
+  } catch (e) {}
   appliquer();
 })();
 </script>
@@ -383,275 +395,426 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Vault — la carte</title>
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f5f2">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14111f">
 <style>
-  html, body { margin:0; height:100%; background:#14161d; overflow:hidden;
-               font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-  canvas { display:none; touch-action:none; }
-  #statique { position:fixed; inset:0; width:100%; height:100%; }
-  header { position:fixed; top:0; left:0; right:0; display:flex; align-items:baseline;
-           gap:10px; padding:12px 16px; color:#e7eaf1; z-index:2; pointer-events:none; }
-  header h1 { font-size:16px; margin:0; font-weight:600; }
-  header span { color:#8b93a5; font-size:13px; flex:1; }
-  header a { pointer-events:auto; color:#5ea3ff; text-decoration:none; font-size:14px; font-weight:600; }
-  #hint { position:fixed; bottom:28px; left:0; right:0; text-align:center; color:#6b7285;
-          font-size:12px; z-index:2; pointer-events:none; }
-  #signature { position:fixed; bottom:8px; left:0; right:0; text-align:center; color:#6b7285;
-               font-size:11px; z-index:2; pointer-events:none; }
-  #signature a { pointer-events:auto; color:#5ea3ff; text-decoration:none; }
-  #zoom { position:fixed; right:14px; bottom:44px; display:flex; flex-direction:column;
-          gap:8px; z-index:3; }
-  #zoom button { width:34px; height:34px; border-radius:8px; border:1px solid #2a2f3d;
-                 background:rgba(30,34,46,.85); color:#cfd5e2; font-size:18px; cursor:pointer; }
+  :root{
+    --bg:#f6f5f2; --ink:#1d1a24; --ink2:#57535f; --muted:#8b8694; --line:#e9e4dc;
+    --panel:#ffffff; --violet:#6c4dff; --btnactive:rgba(29,26,36,.08);
+    --grad-old:#a9a4c0; --grad-new:#6c4dff; --statique-bg:#14161d; --sur-bouton:#ffffff;
+    --ombre:0 12px 40px rgba(29,26,36,.18);
+  }
+  :root[data-theme="dark"]{
+    --bg:#14111f; --ink:#efeaf9; --ink2:#b9b0d8; --muted:#8079a2; --line:rgba(255,255,255,.075);
+    --panel:rgba(23,19,36,.94); --violet:#8b6dff; --btnactive:rgba(255,255,255,.12);
+    --grad-old:#79809f; --grad-new:#c9b8ff; --sur-bouton:#0f0c1d;
+    --ombre:0 12px 40px rgba(0,0,0,.45);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14111f; --ink:#efeaf9; --ink2:#b9b0d8; --muted:#8079a2; --line:rgba(255,255,255,.075);
+      --panel:rgba(23,19,36,.94); --violet:#8b6dff; --btnactive:rgba(255,255,255,.12);
+      --grad-old:#79809f; --grad-new:#c9b8ff; --sur-bouton:#0f0c1d;
+      --ombre:0 12px 40px rgba(0,0,0,.45);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--ink);
+       font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,Roboto,sans-serif;
+       -webkit-font-smoothing:antialiased}
+  canvas{display:none;touch-action:none}
+  #statique{position:fixed;inset:0;width:100%;height:100%;background:var(--statique-bg)}
+  header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:14px;
+         padding:14px 16px;z-index:2;pointer-events:none;flex-wrap:wrap}
+  .brand{font-size:15px;font-weight:650}
+  .brand .reel{color:var(--violet);margin-right:6px;position:relative;top:2px}
+  header #stats{color:var(--muted);font-size:13px;flex:1;white-space:nowrap}
+  header a.lien{pointer-events:auto;color:var(--violet);text-decoration:none;font-weight:500}
+  header a.lien:hover{text-decoration:underline;text-underline-offset:3px}
+  .theme{pointer-events:auto;display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);
+         border-radius:9px;padding:2px}
+  .tbtn{width:27px;height:24px;display:grid;place-items:center;border:0;background:transparent;
+        border-radius:7px;color:var(--muted);cursor:pointer;padding:0}
+  .tbtn:hover{color:var(--ink)}
+  .tbtn.on{background:var(--btnactive);color:var(--ink)}
+  #zoom{position:fixed;right:14px;bottom:64px;display:flex;flex-direction:column;gap:8px;z-index:3}
+  #zoom button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);
+               background:var(--panel);color:var(--ink2);font-size:17px;cursor:pointer}
+  #zoom button:hover{color:var(--ink)}
+  #legende{position:fixed;left:16px;bottom:46px;z-index:2;pointer-events:none;
+           color:var(--muted);font-size:12px;line-height:1.9}
+  #legende .puce{display:inline-block;width:9px;height:9px;border-radius:50%;
+                 background:var(--grad-old);margin-right:6px;vertical-align:-1px}
+  #legende .puce.theme{width:12px;height:12px;background:var(--violet);
+                       box-shadow:0 0 8px var(--violet);margin-right:6px}
+  #degrade{display:inline-block;width:72px;height:8px;border-radius:4px;margin:0 6px;vertical-align:-1px;
+           background:linear-gradient(90deg, var(--grad-old), var(--grad-new))}
+  #hint{position:fixed;bottom:34px;left:0;right:0;text-align:center;color:var(--muted);
+        font-size:12px;z-index:2;pointer-events:none;padding:0 16px}
+  #signature{position:fixed;bottom:10px;left:0;right:0;text-align:center;color:var(--muted);
+             font-size:11.5px;z-index:2;pointer-events:none}
+  #signature a{pointer-events:auto;color:var(--violet);text-decoration:none}
+  #apercu{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;
+          width:min(520px, calc(100vw - 28px));background:var(--panel);
+          border:1px solid var(--line);border-radius:16px;padding:16px 18px 14px;
+          z-index:4;display:none;box-shadow:var(--ombre);backdrop-filter:blur(10px);
+          -webkit-backdrop-filter:blur(10px)}
+  #apercu h2{font-size:16px;margin:0 24px 4px 0;line-height:1.4;font-weight:620}
+  #apercu .meta{color:var(--muted);font-size:12.5px;margin-bottom:8px}
+  #apercu p{margin:0 0 12px;color:var(--ink2);font-size:13.5px;line-height:1.55;
+            max-height:5.6em;overflow:hidden}
+  #apercu .actions{display:flex;gap:10px;flex-wrap:wrap}
+  #apercu .actions a{text-decoration:none;font-size:13px;font-weight:600;padding:7px 12px;
+                     border-radius:9px;border:1px solid var(--line);color:var(--ink2)}
+  #apercu .actions a:hover{border-color:var(--violet);color:var(--ink)}
+  #apercu .actions a.premier{background:var(--violet);border-color:transparent;
+                             color:var(--sur-bouton)}
+  #fermer{position:absolute;top:8px;right:10px;border:0;background:transparent;
+          color:var(--muted);font-size:15px;cursor:pointer;padding:4px 6px;line-height:1}
+  #fermer:hover{color:var(--ink)}
 </style>
 </head>
 <body>
 <header>
-  <h1>La carte du Vault</h1><span id="stats">__STATS_G__</span>
-  <a href="vault.html">← Liste</a>
+  <span class="brand"><svg class="reel" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none"/><circle cx="12" cy="5.7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="18.3" r="1.5" fill="currentColor" stroke="none"/><circle cx="5.7" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18.3" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>La carte du Vault</span>
+  <span id="stats">__STATS_G__</span>
+  <div class="theme" role="group" aria-label="Thème">
+    <button type="button" class="tbtn" data-m="light" title="Clair" aria-label="Thème clair"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg></button>
+    <button type="button" class="tbtn" data-m="dark" title="Sombre" aria-label="Thème sombre"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11Z"/></svg></button>
+    <button type="button" class="tbtn" data-m="system" title="Système" aria-label="Thème système"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17Z" fill="currentColor" stroke="none"/></svg></button>
+  </div>
+  <a class="lien" href="vault.html">← Liste</a>
 </header>
-<div id="zoom"><button id="zi">+</button><button id="zo">−</button></div>
-<div id="hint">Glisse les points · pince pour zoomer · touche un point pour ouvrir la vidéo</div>
+<div id="zoom"><button id="zi" aria-label="Zoom avant">+</button><button id="zo" aria-label="Zoom arrière">−</button></div>
+<div id="legende">
+  <div><span class="puce"></span>vidéo · <span class="puce theme"></span>thème (taille = nombre de fiches)</div>
+  <div>date : ancien <span id="degrade"></span> récent</div>
+</div>
+<div id="hint">Clique un thème pour filtrer la liste · une vidéo pour l'aperçu · glisse pour déplacer · pince pour zoomer</div>
 <div id="signature">🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></div>
+<div id="apercu" role="dialog" aria-label="Aperçu de la fiche">
+  <button id="fermer" aria-label="Fermer">✕</button>
+  <h2 id="ap-titre"></h2>
+  <div class="meta" id="ap-meta"></div>
+  <p id="ap-contenu"></p>
+  <div class="actions">
+    <a id="ap-video" class="premier" href="#" target="_blank" rel="noopener">Ouvrir la vidéo ↗</a>
+    <a id="ap-theme" href="#">Explorer ce thème</a>
+  </div>
+</div>
 <canvas id="c"></canvas>
 __SVG__
 <script>
 const FICHES = __ENTREES__;
-const canvas = document.getElementById("c");
-const ctx = canvas.getContext("2d");
-/* JavaScript actif : la carte interactive remplace le rendu statique */
-document.getElementById("statique").style.display = "none";
-canvas.style.display = "block";
-let dpr = 1, W = 0, H = 0;
-let interacted = false;
+const THEMES = __THEMES__;
+(function(){
+  /* ---- thème clair / sombre / système (même clé que la liste) ---- */
+  var racine = document.documentElement;
+  var tbtns = [].slice.call(document.querySelectorAll(".tbtn"));
+  var CLE = "bobine-theme";
+  var force = null;
+  try { force = new URLSearchParams(location.search).get("theme"); } catch (e) {}
+  var PALETTES = {
+    light: { fond:"#f6f5f2", halo:null, theme:"#6c4dff", themeLabel:"#4a3fd0",
+             fiche:"#9aa0b8", ficheLabel:"#6b6b7d", lien:"rgba(70,70,100,.16)",
+             lienFort:"rgba(108,77,255,.55)", ancien:"#a9a4c0", recent:"#6c4dff" },
+    dark:  { fond:"#14111f", halo:"rgba(108,77,255,.16)", theme:"#8b6dff", themeLabel:"#cfc6ff",
+             fiche:"#8d95a8", ficheLabel:"#8d95a8", lien:"rgba(150,160,180,.20)",
+             lienFort:"rgba(185,166,255,.65)", ancien:"#79809f", recent:"#c9b8ff" }
+  };
+  var pal = PALETTES.light;
+  function themeEffectif(){
+    var m = racine.getAttribute("data-theme");
+    if (m === "dark" || m === "light") { return m; }
+    return (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  }
+  function choisirTheme(mode, sauver){
+    if (mode === "system") { racine.removeAttribute("data-theme"); }
+    else { racine.setAttribute("data-theme", mode); }
+    tbtns.forEach(function(b){
+      var on = b.dataset.m === mode;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    if (sauver) { try { localStorage.setItem(CLE, mode); } catch (e) {} }
+    appliquerTheme();
+  }
+  function appliquerTheme(){ pal = PALETTES[themeEffectif()]; dessiner(); }
+  var initial = "system";
+  if (force === "light" || force === "dark") { initial = force; }
+  else { try { var v = localStorage.getItem(CLE); if (v === "light" || v === "dark" || v === "system") { initial = v; } } catch (e) {} }
+  tbtns.forEach(function(b){ b.addEventListener("click", function(){ choisirTheme(b.dataset.m, true); }); });
+  if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", appliquerTheme); } catch (e) {} }
 
-/* ---- le graphe : une fiche = un petit point, un theme = un gros point ---- */
-const nodes = [], edges = [], themeIdx = new Map();
-FICHES.forEach(f => nodes.push({ label: f.titre, type: "fiche", url: f.lien,
-                                 x: 0, y: 0, vx: 0, vy: 0, r: 6 }));
-FICHES.forEach((f, i) => {
-  (f.themes || []).forEach(t => {
-    let j = themeIdx.get(t);
-    if (j === undefined) {
-      j = nodes.length; themeIdx.set(t, j);
-      nodes.push({ label: t, type: "theme", x: 0, y: 0, vx: 0, vy: 0, r: 13 });
-    }
-    edges.push({ s: i, t: j });
+  /* ---- données : fiches, thèmes, liens, couleurs de date ---- */
+  var nf = FICHES.length;
+  var nodes = [], edges = [], themeIdx = new Map();
+  FICHES.forEach(function(f, i){
+    nodes.push({ type: "fiche", fiche: f, x: 0, y: 0, r: 5, t: null });
   });
-});
-
-/* ---- position de départ : equilibre calcule a la generation (Python),
-        sinon disposition en deux cercles ---- */
-const POS = __POS__;
-if (POS && POS.length === nodes.length) {
-  nodes.forEach((n, i) => { n.x = POS[i][0]; n.y = POS[i][1]; });
-} else {
-  const nf = FICHES.length, nt = nodes.length - nf;
-  nodes.forEach((n, i) => {
-    const isTheme = n.type === "theme";
-    const k = isTheme ? (i - nf) : i;
-    const total = Math.max(1, isTheme ? nt : nf);
-    const a = (k / total) * Math.PI * 2;
-    const rad = isTheme ? 160 : 320;
-    n.x = Math.cos(a) * rad;
-    n.y = Math.sin(a) * rad;
+  THEMES.forEach(function(t, k){
+    themeIdx.set(t.nom, nf + k);
+    nodes.push({ type: "theme", label: t.nom, n: t.n, x: 0, y: 0, r: 9 + 3 * Math.sqrt(t.n) });
   });
-}
-document.getElementById("stats").textContent =
-  FICHES.length + " fiches · " + themeIdx.size + " thèmes";
+  FICHES.forEach(function(f, i){
+    (f.themes || []).forEach(function(t){
+      var j = themeIdx.get(t);
+      if (j !== undefined) { edges.push({ s: i, t: j }); }
+    });
+  });
+  var dates = FICHES.map(function(f){ return f.date || ""; }).filter(function(d){ return d; }).sort();
+  function jours(d){ var p = d.split("-"); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
+  var tMin = dates.length ? jours(dates[0]) : 0;
+  var tMax = dates.length ? jours(dates[dates.length - 1]) : 0;
+  FICHES.forEach(function(f, i){
+    if (f.date && tMax > tMin) { nodes[i].t = (jours(f.date) - tMin) / (tMax - tMin); }
+  });
+  function melange(a, b, t){
+    function c(h){ return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+    var A = c(a), B = c(b);
+    return "rgb(" + Math.round(A[0] + (B[0] - A[0]) * t) + ","
+                  + Math.round(A[1] + (B[1] - A[1]) * t) + ","
+                  + Math.round(A[2] + (B[2] - A[2]) * t) + ")";
+  }
+  function couleurFiche(n){
+    if (n.t === null) { return pal.fiche; }
+    return melange(pal.ancien, pal.recent, n.t);
+  }
+  /* position de départ : précalculée en Python (stable d'une génération à l'autre) */
+  var POS = __POS__;
+  if (POS && POS.length === nodes.length) {
+    nodes.forEach(function(n, i){ n.x = POS[i][0]; n.y = POS[i][1]; });
+  } else {
+    var nbt = nodes.length - nf;
+    nodes.forEach(function(n, i){
+      var isTheme = n.type === "theme";
+      var k = isTheme ? (i - nf) : i;
+      var total = Math.max(1, isTheme ? nbt : nf);
+      var a = (k / total) * Math.PI * 2;
+      var rad = isTheme ? 160 : 320;
+      n.x = Math.cos(a) * rad; n.y = Math.sin(a) * rad;
+    });
+  }
+  var sansTheme = FICHES.filter(function(f){ return !(f.themes || []).length; }).length;
+  document.getElementById("stats").textContent = nf + " fiches · " + THEMES.length + " thèmes"
+    + (sansTheme ? " · " + sansTheme + " sans thème" : "");
 
-/* ---- physique (leger : l'equilibre est deja calcule cote Python) ---- */
-function step() {
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      const a = nodes[i], b = nodes[j];
-      let dx = b.x - a.x, dy = b.y - a.y;
-      let d2 = dx * dx + dy * dy;
-      if (d2 < 1) { d2 = 1; dx = 0.7; dy = 0.4; }
-      const d = Math.sqrt(d2), f = 4200 / d2;
-      const fx = dx / d * f, fy = dy / d * f;
-      a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy;
+  /* ---- toile ---- */
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  document.getElementById("statique").style.display = "none";
+  canvas.style.display = "block";
+  var dpr = 1, W = 0, H = 0, zoom = 1, panX = 0, panY = 0, survol = null;
+
+  function voisins(i){
+    var s = [i];
+    edges.forEach(function(e){
+      if (e.s === i && s.indexOf(e.t) === -1) { s.push(e.t); }
+      if (e.t === i && s.indexOf(e.s) === -1) { s.push(e.s); }
+    });
+    return s;
+  }
+  function dessiner(){
+    if (!W) { return; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = pal.fond;
+    ctx.fillRect(0, 0, W, H);
+    if (pal.halo) {
+      var g = ctx.createRadialGradient(W / 2, -80, 40, W / 2, -80, Math.max(W, 700));
+      g.addColorStop(0, pal.halo);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
     }
+    ctx.save();
+    ctx.translate(W / 2 + panX, H / 2 + panY);
+    ctx.scale(zoom, zoom);
+    var foyer = survol === null ? null : voisins(survol);
+    edges.forEach(function(e){
+      var actif = foyer && foyer.indexOf(e.s) !== -1 && foyer.indexOf(e.t) !== -1;
+      ctx.globalAlpha = foyer && !actif ? 0.22 : 1;
+      ctx.strokeStyle = actif ? pal.lienFort : pal.lien;
+      var a = nodes[e.s], b = nodes[e.t];
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+    nodes.forEach(function(n, i){
+      var actif = !foyer || foyer.indexOf(i) !== -1;
+      ctx.globalAlpha = actif ? 1 : 0.14;
+      if (n.type === "theme") {
+        ctx.shadowColor = pal.theme;
+        ctx.shadowBlur = foyer && actif ? 22 : 13;
+        ctx.fillStyle = pal.theme;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        var col = couleurFiche(n);
+        if (n.t !== null && n.t > 0.66) { ctx.shadowColor = col; ctx.shadowBlur = 7; }
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    });
+    ctx.textAlign = "center";
+    var assez = zoom > 0.5 || nodes.length <= 16;
+    nodes.forEach(function(n, i){
+      var actif = !foyer || foyer.indexOf(i) !== -1;
+      ctx.globalAlpha = actif ? 1 : 0.14;
+      if (n.type === "theme") {
+        ctx.fillStyle = pal.themeLabel;
+        ctx.font = "600 13px -apple-system,sans-serif";
+        ctx.fillText(n.label + " · " + n.n, n.x, n.y - n.r - 8);
+      } else if (assez || (foyer && foyer.indexOf(i) !== -1)) {
+        ctx.fillStyle = pal.ficheLabel;
+        ctx.font = "11px -apple-system,sans-serif";
+        var t = n.fiche.titre || "";
+        if (t.length > 44) { t = t.slice(0, 43) + "…"; }
+        ctx.fillText(t, n.x, n.y + n.r + 14);
+      }
+    });
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
-  for (const e of edges) {
-    const a = nodes[e.s], b = nodes[e.t];
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-    const f = (d - 115) * 0.028;
-    const fx = dx / d * f, fy = dy / d * f;
-    a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
-  }
-  for (const n of nodes) {
-    n.vx += -n.x * 0.006; n.vy += -n.y * 0.006;
-    n.vx *= 0.84; n.vy *= 0.84;
-    n.x += n.vx; n.y += n.vy;
-  }
-}
 
-/* ---- camera ---- */
-let zoom = 1, panX = 0, panY = 0;
-function applyZoom(f, cx, cy) {
-  const nz = Math.min(2.6, Math.max(0.3, zoom * f));
-  if (nz === zoom) return;
-  const wx = (cx - W / 2 - panX) / zoom, wy = (cy - H / 2 - panY) / zoom;
-  zoom = nz;
-  panX = cx - W / 2 - wx * zoom;
-  panY = cy - H / 2 - wy * zoom;
-}
-function fitTargets() {
-  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
-  for (const n of nodes) {
-    minX = Math.min(minX, n.x - n.r); maxX = Math.max(maxX, n.x + n.r);
-    minY = Math.min(minY, n.y - n.r - 22); maxY = Math.max(maxY, n.y + n.r + 36);
+  /* ---- caméra ---- */
+  function applyZoom(f, cx, cy){
+    var nz = Math.min(3, Math.max(0.3, zoom * f));
+    if (nz === zoom) { return; }
+    var wx = (cx - W / 2 - panX) / zoom, wy = (cy - H / 2 - panY) / zoom;
+    zoom = nz;
+    panX = cx - W / 2 - wx * zoom;
+    panY = cy - H / 2 - wy * zoom;
+    dessiner();
   }
-  const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
-  const tz = Math.min(2.2, Math.max(0.35, Math.min((W - 100) / bw, (H - 200) / bh)));
-  return [tz, -((minX + maxX) / 2) * tz, -((minY + maxY) / 2) * tz];
-}
-function fitView() {
-  const t = fitTargets();
-  zoom = t[0]; panX = t[1]; panY = t[2];
-}
-function toWorld(sx, sy) { return { x: (sx - W / 2 - panX) / zoom, y: (sy - H / 2 - panY) / zoom }; }
-function hit(sx, sy) {
-  const p = toWorld(sx, sy);
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    const n = nodes[i], dx = n.x - p.x, dy = n.y - p.y, rr = n.r + 9;
-    if (dx * dx + dy * dy < rr * rr) return n;
+  function fitTargets(){
+    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+    nodes.forEach(function(n){
+      minX = Math.min(minX, n.x - n.r); maxX = Math.max(maxX, n.x + n.r);
+      minY = Math.min(minY, n.y - n.r - 24); maxY = Math.max(maxY, n.y + n.r + 38);
+    });
+    var bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+    var tz = Math.min(2.2, Math.max(0.3, Math.min((W - 100) / bw, (H - 190) / bh)));
+    return [tz, -((minX + maxX) / 2) * tz, -((minY + maxY) / 2) * tz];
   }
-  return null;
-}
+  function fitView(){ var t = fitTargets(); zoom = t[0]; panX = t[1]; panY = t[2]; }
+  function toWorld(sx, sy){ return { x: (sx - W / 2 - panX) / zoom, y: (sy - H / 2 - panY) / zoom }; }
+  function hit(sx, sy){
+    var p = toWorld(sx, sy);
+    for (var i = nodes.length - 1; i >= 0; i--) {
+      var n = nodes[i], dx = n.x - p.x, dy = n.y - p.y, rr = n.r + 9;
+      if (dx * dx + dy * dy < rr * rr) { return i; }
+    }
+    return null;
+  }
 
-/* ---- dessin ---- */
-function draw() {
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = "#14161d";
-  ctx.fillRect(0, 0, W, H);
-  ctx.save();
-  ctx.translate(W / 2 + panX, H / 2 + panY);
-  ctx.scale(zoom, zoom);
-  ctx.strokeStyle = "rgba(150,160,180,0.22)";
-  ctx.lineWidth = 1;
-  for (const e of edges) {
-    const a = nodes[e.s], b = nodes[e.t];
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-  }
-  for (const n of nodes) {
-    if (n.type === "theme") {
-      ctx.shadowColor = "rgba(94,163,255,.85)"; ctx.shadowBlur = 18;
-      ctx.fillStyle = "#5ea3ff";
+  /* ---- aperçu (surimpression) ---- */
+  var apercu = document.getElementById("apercu");
+  function ouvrirApercu(f){
+    document.getElementById("ap-titre").textContent = f.titre || "";
+    var meta = [];
+    if (f.auteur) { meta.push(f.auteur); }
+    if (f.date_fr) { meta.push(f.date_fr); }
+    if (f.plateforme) { meta.push(f.plateforme.charAt(0).toUpperCase() + f.plateforme.slice(1)); }
+    document.getElementById("ap-meta").textContent = meta.join(" · ");
+    document.getElementById("ap-contenu").textContent = f.contenu || "";
+    document.getElementById("ap-video").href = f.lien || "#";
+    var th = document.getElementById("ap-theme");
+    if ((f.themes || []).length) {
+      th.style.display = "";
+      th.href = "vault.html?theme=" + encodeURIComponent(f.themes[0]);
+      th.textContent = "Explorer « " + f.themes[0] + " »";
     } else {
-      ctx.shadowColor = "rgba(220,228,240,.45)"; ctx.shadowBlur = 8;
-      ctx.fillStyle = "#d9dee8";
+      th.style.display = "none";
     }
-    ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowBlur = 0;
+    apercu.style.display = "block";
   }
-  ctx.textAlign = "center";
-  for (const n of nodes) {
+  function fermerApercu(){ apercu.style.display = "none"; }
+  document.getElementById("fermer").addEventListener("click", fermerApercu);
+  document.addEventListener("keydown", function(ev){ if (ev.key === "Escape") { fermerApercu(); } });
+  function cliquer(i){
+    var n = nodes[i];
     if (n.type === "theme") {
-      ctx.fillStyle = "#a5caff";
-      ctx.font = "600 13px -apple-system,sans-serif";
-      ctx.fillText(n.label, n.x, n.y - n.r - 7);
-    } else if (zoom > 0.5 || nodes.length <= 14) {
-      ctx.fillStyle = "#8d95a8";
-      ctx.font = "11px -apple-system,sans-serif";
-      const t = n.label.length > 44 ? n.label.slice(0, 43) + "…" : n.label;
-      ctx.fillText(t, n.x, n.y + n.r + 15);
+      window.location.href = "vault.html?theme=" + encodeURIComponent(n.label);
+      return;
     }
+    ouvrirApercu(n.fiche);
   }
-  ctx.restore();
-}
 
-/* ---- interactions ---- */
-const pointers = new Map();
-let dragNode = null, panning = false, pinchPrev = null, downX = 0, downY = 0;
-
-canvas.addEventListener("pointerdown", e => {
-  interacted = true;
-  canvas.setPointerCapture(e.pointerId);
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  downX = e.clientX; downY = e.clientY;
-  if (pointers.size === 2) { dragNode = null; pinchPrev = null; }
-  else {
-    const n = hit(e.clientX, e.clientY);
-    if (n) { dragNode = n; }
-    else { panning = true; }
-  }
-});
-canvas.addEventListener("pointermove", e => {
-  if (!pointers.has(e.pointerId)) return;
-  const prev = pointers.get(e.pointerId);
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (pointers.size === 2) {
-    const pts = [...pointers.values()];
-    const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-    const cx = (pts[0].x + pts[1].x) / 2, cy = (pts[0].y + pts[1].y) / 2;
-    if (pinchPrev && pinchPrev.d > 0) applyZoom(d / pinchPrev.d, cx, cy);
-    pinchPrev = { d: d };
-    return;
-  }
-  if (dragNode) {
-    const p = toWorld(e.clientX, e.clientY);
-    dragNode.x = p.x; dragNode.y = p.y;
-    dragNode.vx = 0; dragNode.vy = 0;
-  } else if (panning) {
-    panX += e.clientX - prev.x;
-    panY += e.clientY - prev.y;
-  }
-});
-function endPointer(e) {
-  if (!pointers.has(e.pointerId)) return;
-  pointers.delete(e.pointerId);
-  if (dragNode) {
-    const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
-    if (moved < 6 && dragNode.type === "fiche" && dragNode.url) {
-      window.open(dragNode.url, "_blank");
+  /* ---- interactions ---- */
+  var pointers = new Map();
+  var dragNode = null, panning = false, pinchPrev = null, downX = 0, downY = 0, bouge = false;
+  canvas.addEventListener("pointerdown", function(e){
+    fermerApercu();
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    downX = e.clientX; downY = e.clientY; bouge = false;
+    if (pointers.size === 2) { dragNode = null; panning = false; pinchPrev = null; }
+    else {
+      var i = hit(e.clientX, e.clientY);
+      if (i !== null) { dragNode = i; }
+      else { panning = true; }
     }
-    dragNode = null;
+  });
+  canvas.addEventListener("pointermove", function(e){
+    var prev = pointers.get(e.pointerId);
+    if (prev) {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        var pts = []; pointers.forEach(function(v){ pts.push(v); });
+        var d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        var cx = (pts[0].x + pts[1].x) / 2, cy = (pts[0].y + pts[1].y) / 2;
+        if (pinchPrev && pinchPrev.d > 0) { applyZoom(d / pinchPrev.d, cx, cy); }
+        pinchPrev = { d: d };
+        return;
+      }
+      if (dragNode !== null) {
+        var p = toWorld(e.clientX, e.clientY);
+        nodes[dragNode].x = p.x; nodes[dragNode].y = p.y;
+        if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) { bouge = true; }
+        dessiner();
+      } else if (panning) {
+        panX += e.clientX - prev.x; panY += e.clientY - prev.y;
+        dessiner();
+      }
+      return;
+    }
+    var i = hit(e.clientX, e.clientY);
+    if (i !== survol) { survol = i; dessiner(); }
+  });
+  function finPointer(e){
+    if (!pointers.has(e.pointerId)) { return; }
+    pointers.delete(e.pointerId);
+    if (dragNode !== null && !bouge) { cliquer(dragNode); }
+    if (pointers.size === 0) { dragNode = null; panning = false; pinchPrev = null; }
   }
-  if (pointers.size === 0) { panning = false; pinchPrev = null; }
-}
-canvas.addEventListener("pointerup", endPointer);
-canvas.addEventListener("pointercancel", endPointer);
-canvas.addEventListener("wheel", e => {
-  e.preventDefault();
-  interacted = true;
-  applyZoom(Math.exp(-e.deltaY * 0.0012), e.clientX, e.clientY);
-}, { passive: false });
-document.getElementById("zi").onclick = () => {
-  interacted = true;
-  applyZoom(1.35, W / 2, H / 2);
-};
-document.getElementById("zo").onclick = () => {
-  interacted = true;
-  applyZoom(1 / 1.35, W / 2, H / 2);
-};
+  canvas.addEventListener("pointerup", finPointer);
+  canvas.addEventListener("pointercancel", function(e){
+    pointers.delete(e.pointerId);
+    if (pointers.size === 0) { dragNode = null; panning = false; pinchPrev = null; }
+  });
+  canvas.addEventListener("pointerleave", function(){
+    if (survol !== null) { survol = null; dessiner(); }
+  });
+  canvas.addEventListener("wheel", function(e){
+    e.preventDefault();
+    applyZoom(Math.exp(-e.deltaY * 0.0012), e.clientX, e.clientY);
+  }, { passive: false });
+  document.getElementById("zi").addEventListener("click", function(){ applyZoom(1.35, W / 2, H / 2); });
+  document.getElementById("zo").addEventListener("click", function(){ applyZoom(1 / 1.35, W / 2, H / 2); });
 
-/* ---- demarrage ---- */
-function resize() {
-  dpr = window.devicePixelRatio || 1;
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  canvas.style.width = W + "px"; canvas.style.height = H + "px";
-}
-window.addEventListener("resize", resize);
-resize();
-zoom = Math.max(0.5, Math.min(1, W / 800));
-fitView();
-
-let frames = 0;
-function loop() {
-  step(); draw();
-  frames += 1;
-  if (!interacted) {
-    const t = fitTargets();
-    zoom += (t[0] - zoom) * 0.12;
-    panX += (t[1] - panX) * 0.12;
-    panY += (t[2] - panY) * 0.12;
+  /* ---- démarrage ---- */
+  function resize(){
+    dpr = window.devicePixelRatio || 1;
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
   }
-  requestAnimationFrame(loop);
-}
-loop();
+  window.addEventListener("resize", function(){ resize(); dessiner(); });
+  resize();
+  fitView();
+  choisirTheme(initial, false);
+})();
 </script>
 </body>
 </html>
@@ -753,12 +916,41 @@ def formater_date(date_iso):
         return ""
 
 
+def canonicaliser_themes(entrees):
+    """Fusionne les variantes d'un même thème (« SEO » = « seo ») et nettoie.
+
+    Le libellé retenu est la variante la plus fréquente (à égalité : la
+    minuscule), et chaque fiche est dédoublonnée en conséquence. Appliqué aux
+    entrées AVANT tout rendu : pastilles, cartes et carte du graphe restent
+    ainsi parfaitement cohérents.
+    """
+    comptes = {}
+    for e in entrees:
+        for t in e["themes"]:
+            propret = t.strip()
+            if propret:
+                variantes = comptes.setdefault(propret.lower(), {})
+                variantes[propret] = variantes.get(propret, 0) + 1
+    libelles = {}
+    for cle, variantes in comptes.items():
+        libelles[cle] = sorted(variantes.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+    for e in entrees:
+        vus = []
+        for t in e["themes"]:
+            libelle = libelles.get(t.strip().lower())
+            if libelle and libelle not in vus:
+                vus.append(libelle)
+        e["themes"] = vus
+    return entrees
+
+
 def preparer_entrees(entrees, vault):
     """Ajoute date + plateforme à chaque entrée, puis trie : récentes d'abord."""
     dates = dates_des_fiches(vault)
     for e in entrees:
         e["date"] = dates.get(normaliser_lien(e["lien"]), "")
         e["plateforme"] = plateforme_de(e["lien"])
+        e["date_fr"] = formater_date(e["date"])   # pour l'aperçu de la Carte
     entrees.sort(key=lambda e: e["date"] or "", reverse=True)
     return entrees
 
@@ -891,6 +1083,7 @@ def main():
 
     entrees = lire_index(vault / "index.md")
     entrees = preparer_entrees(entrees, vault)   # dates (via raw/), plateforme, tri récentes d'abord
+    entrees = canonicaliser_themes(entrees)      # fusionne « SEO »/« seo », dédoublonne
     donnees = json.dumps(entrees, ensure_ascii=False).replace("<", "\\u003c")
 
     lien_carte = '<a href="graph.html">Carte</a>'
@@ -909,10 +1102,16 @@ def main():
 
     if carte and entrees:
         pos = positions_initiales(entrees)
-        nb_themes = len({t for e in entrees for t in e["themes"]})
+        vus_themes = {}
+        for e in entrees:
+            for t in e["themes"]:
+                vus_themes[t] = vus_themes.get(t, 0) + 1
+        themes_graphe = [{"nom": t, "n": n} for t, n in vus_themes.items()]
+        nb_themes = len(themes_graphe)
         graphe = (TEMPLATE_GRAPHE
                   .replace("__ENTREES__", donnees)
                   .replace("__POS__", json.dumps(pos))
+                  .replace("__THEMES__", json.dumps(themes_graphe, ensure_ascii=False))
                   .replace("__SVG__", svg_statique(entrees, pos))
                   .replace("__STATS_G__", str(len(entrees)) + " fiches · "
                            + str(nb_themes) + " thèmes")
