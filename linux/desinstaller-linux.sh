@@ -66,9 +66,10 @@ etape "1/3 — Le réveil automatique (systemd)"
 UNIT_DIR="$HOME/.config/systemd/user"
 if [ -f "$UNIT_DIR/bobine-watch.service" ] && grep -qF "$VAULT" "$UNIT_DIR/bobine-watch.service" 2>/dev/null; then
   systemctl --user disable --now bobine-watch.timer 2>/dev/null || true
-  rm -f "$UNIT_DIR/bobine-watch.service" "$UNIT_DIR/bobine-watch.timer"
+  systemctl --user disable --now bobine-watch.path 2>/dev/null || true
+  rm -f "$UNIT_DIR/bobine-watch.service" "$UNIT_DIR/bobine-watch.timer" "$UNIT_DIR/bobine-watch.path"
   systemctl --user daemon-reload 2>/dev/null || true
-  ok "Réveil retiré (il ne tournera plus toutes les 15 minutes)."
+  ok "Réveil retiré (plus de passage automatique ni instantané)."
 elif [ -f "$UNIT_DIR/bobine-watch.service" ]; then
   note "Un réveil existe, mais il surveille un autre dossier — je n'y touche pas."
 else

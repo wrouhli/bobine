@@ -10,7 +10,7 @@ L'édition Linux/VPS du projet [Bobine](https://github.com/wrouhli/bobine).
 Elle vit dans le dossier `linux/` du dépôt et partage son cœur (ingestion,
 transcription, résumés, pages) avec l'édition Mac. Ici, Bobine vit sur un serveur : un petit VPS, une
 machine à la maison, un vieux portable sous Linux. Pas d'iCloud, pas de
-double-clic : un minuteur systemd et une boîte de réception locale.
+double-clic : un minuteur systemd, une relève immédiate dès qu'un lien arrive, et une boîte de réception locale.
 
 > **Statut : premier portage.** Le cœur (ingestion, transcription, résumés,
 > pages, carte) est le même code que la version Mac ; seuls l'installation et
@@ -18,11 +18,12 @@ double-clic : un minuteur systemd et une boîte de réception locale.
 
 ## Comment ça marche
 
-    liens → inbox.txt → réveil (15 min) → fiches (raw/) → résumés → vault.html
+    liens → inbox.txt → relève (tout de suite, sinon 15 min) → fiches (raw/) → résumés → vault.html
 
 1. Tu déposes un lien dans `inbox.txt` (à la main, par `ssh`, ou via le petit
    serveur HTTP optionnel) ;
-2. Toutes les 15 minutes, Bobine relève la boîte : télécharge, transcrit,
+2. Dès qu'un lien arrive dans la boîte (sinon au plus tard 15 minutes plus
+   tard, en filet de sécurité), Bobine relève : télécharge, transcrit,
    écrit une fiche dans `raw/` ;
 3. S'il y a une clé API : résumé + thèmes → `index.md` ;
 4. `vault.html` (liste) et `graph.html` (carte des thèmes) sont régénérés.
@@ -71,6 +72,12 @@ peuvent rester dans la boîte.
     systemctl --user list-timers bobine-watch.timer   # prochain passage
     systemctl --user start bobine-watch.service       # déclencher tout de suite
     tail -f ~/Bobine/logs/watch.log                   # ce qui se passe
+
+Pas besoin d'attendre le prochain quart d'heure : dès qu'un lien est poussé
+ou déposé dans la boîte, la relève part tout de suite (unité systemd
+`bobine-watch.path`, activée à l'installation). Le minuteur de 15 minutes
+reste en filet de sécurité (dépôt pendant un passage en cours, redémarrage…).
+État de la relève instantanée :  `systemctl --user status bobine-watch.path`
 
 Sans systemd (ou en cas de souci), l'équivalent en cron :
 

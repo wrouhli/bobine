@@ -1,0 +1,20 @@
+# Modèle de référence — install-linux.sh écrit ta version (avec tes vrais
+# chemins) dans ~/.config/systemd/user/bobine-watch.path.
+#
+# Compagnon du minuteur : dès qu'un lien est poussé ou déposé dans la boîte
+# de réception (Raccourci du téléphone, curl, dépôt à la main), systemd
+# déclenche la relève tout de suite, sans attendre le prochain quart d'heure.
+# Le minuteur reste en filet de sécurité (dépôt pendant un passage en cours,
+# redémarrage…) et le verrou de watch-linux.sh évite tout doublon.
+#
+# Si tu as personnalisé INBOX dans config.env, ajuste PathModified= en
+# conséquence (par défaut : la boîte du vault).
+[Unit]
+Description=Bobine — déclenche la relève dès qu'un lien arrive
+
+[Path]
+PathModified=%h/Bobine/inbox.txt
+Unit=bobine-watch.service
+
+[Install]
+WantedBy=paths.target
