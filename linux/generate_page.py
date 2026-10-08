@@ -691,8 +691,22 @@ def dates_des_fiches(vault):
             elif ligne.startswith("traite_le:"):
                 traite = ligne.split(":", 1)[1].strip()
         if source and traite:
-            dates[source] = traite
+            dates[normaliser_lien(source)] = traite
     return dates
+
+
+def normaliser_lien(lien):
+    """Clé de rapprochement fiche ↔ index : sans paramètres de suivi ni ancre.
+
+    Instagram ajoute des paramètres (?stkn=…) qui changent d'un partage à
+    l'autre : on les ignore des deux côtés pour que la bonne fiche (et donc
+    la bonne date) soit toujours retrouvée.
+    """
+    l = (lien or "").strip()
+    for coupe in ("?", "#"):
+        if coupe in l:
+            l = l.split(coupe, 1)[0]
+    return l.rstrip("/")
 
 
 def plateforme_de(lien):
@@ -743,7 +757,7 @@ def preparer_entrees(entrees, vault):
     """Ajoute date + plateforme à chaque entrée, puis trie : récentes d'abord."""
     dates = dates_des_fiches(vault)
     for e in entrees:
-        e["date"] = dates.get(e["lien"], "")
+        e["date"] = dates.get(normaliser_lien(e["lien"]), "")
         e["plateforme"] = plateforme_de(e["lien"])
     entrees.sort(key=lambda e: e["date"] or "", reverse=True)
     return entrees
