@@ -313,7 +313,7 @@ fi
 # ---------------------------------------------------------------- 5. options
 etape "5/7 — Les options"
 REVEIL="non"; CARTE="oui"
-if confirmer "Installer le réveil automatique (systemd, toutes les 15 minutes) ?" "o"; then
+if confirmer "Installer le réveil automatique (systemd : toutes les 15 minutes, et dès qu'un lien arrive) ?" "o"; then
   REVEIL="oui"
 fi
 if confirmer "Générer aussi la carte des thèmes (graph.html) ?" "o"; then
@@ -411,8 +411,24 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF
+  cat > "$UNIT_DIR/bobine-watch.path" <<EOF
+[Unit]
+Description=Bobine — déclenche la relève dès qu'un lien arrive
+
+[Path]
+PathModified=$SCRIPT_DIR/inbox.txt
+Unit=bobine-watch.service
+
+[Install]
+WantedBy=paths.target
+EOF
   if systemctl --user daemon-reload 2>/dev/null && systemctl --user enable --now bobine-watch.timer 2>/dev/null; then
     ok "Réveil installé (minuteur systemd) — premier passage imminent"
+    if systemctl --user enable --now bobine-watch.path 2>/dev/null; then
+      ok "Relève instantanée activée — un lien poussé part tout de suite"
+    else
+      avis "Relève instantanée indisponible ici — le minuteur reste (15 minutes)."
+    fi
     linger="$(loginctl show-user "$USER" -p Linger 2>/dev/null | cut -d= -f2 || true)"
     if [ "${linger:-}" != "yes" ]; then
       if loginctl enable-linger "$USER" 2>/dev/null; then

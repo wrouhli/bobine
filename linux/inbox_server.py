@@ -3,7 +3,8 @@
 
 Pensé pour un serveur : depuis ton téléphone, un raccourci, ou n'importe où,
 tu envoies un lien par une requête POST — il atterrit dans la boîte de
-réception de Bobine, que le réveil lit toutes les 15 minutes.
+réception de Bobine, que la relève lit dès qu'il arrive (au plus tard toutes
+les 15 minutes, en filet de sécurité).
 
     curl -X POST -H "Authorization: Bearer MONJETON" \\
          -d 'https://www.instagram.com/reel/Cxyz123AbCd/' http://127.0.0.1:8785/push

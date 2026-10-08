@@ -4,16 +4,16 @@
 
 **Your saved Reels, and any TikTok/YouTube video, become a local knowledge base you can search and question. On your machine, at home.**
 
-The Linux/VPS edition of the [Bobine](https://github.com/wrouhli/bobine) project: it lives in the `linux/` folder of the repository and shares its core (ingestion, transcription, summaries, pages) with the Mac edition. Here, Bobine lives on a server: a small VPS, a machine at home, an old Linux laptop. No iCloud, no double-click: a systemd timer and a local inbox.
+The Linux/VPS edition of the [Bobine](https://github.com/wrouhli/bobine) project: it lives in the `linux/` folder of the repository and shares its core (ingestion, transcription, summaries, pages) with the Mac edition. Here, Bobine lives on a server: a small VPS, a machine at home, an old Linux laptop. No iCloud, no double-click: a systemd timer, an instant run when a link arrives, and a local inbox.
 
 > **Status: first port.** The core (ingestion, transcription, summaries, pages, map) is the same code as the Mac version; only the installation and the wake-up differ. Tested primarily on Debian (aarch64 included).
 
 ## How it works
 
-    links → inbox.txt → wake-up (15 min) → cards (raw/) → summaries → vault.html
+    links → inbox.txt → wake-up (right away, otherwise 15 min) → cards (raw/) → summaries → vault.html
 
 1. You drop a link into `inbox.txt` (by hand, over `ssh`, or via the small optional HTTP server);
-2. Every 15 minutes, Bobine checks the inbox: downloads, transcribes, writes a card into `raw/`;
+2. As soon as a link lands in the inbox (otherwise every 15 minutes, as a safety net), Bobine checks it: downloads, transcribes, writes a card into `raw/`;
 3. With an API key: summary + topics → `index.md`;
 4. `vault.html` (list) and `graph.html` (topic map) are regenerated.
 
@@ -57,6 +57,12 @@ Anything already processed is ignored automatically: old links can stay in the i
     systemctl --user list-timers bobine-watch.timer   # next run
     systemctl --user start bobine-watch.service       # trigger it right now
     tail -f ~/Bobine/logs/watch.log                   # what's happening
+
+No need to wait for the next quarter hour: as soon as a link is pushed or
+dropped into the inbox, the wake-up runs right away (systemd unit
+`bobine-watch.path`, enabled at install time). The 15-minute timer stays as a
+safety net (a drop while a run is in progress, a reboot...). Status:
+`systemctl --user status bobine-watch.path`
 
 Without systemd (or if in doubt), the cron equivalent:
 

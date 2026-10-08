@@ -1,8 +1,9 @@
 #!/bin/bash
 # Bobine — relève automatique de la boîte de réception (Linux / serveur).
-# Lancé par systemd (minuteur bobine-watch.timer) toutes les 15 minutes —
-# install-linux.sh s'en charge. Si la machine était éteinte, systemd rattrape
-# au redémarrage (Persistent=true).
+# Lancé par systemd : tout de suite quand un lien arrive (bobine-watch.path),
+# et sinon toutes les 15 minutes (bobine-watch.timer) — install-linux.sh s'en
+# charge. Si la machine était éteinte, systemd rattrape au redémarrage
+# (Persistent=true).
 #
 # Configuration (facultatif) : fichier config.env à côté de ce script :
 #   VAULT       dossier des données (défaut : le dossier de ce projet)
