@@ -10,6 +10,7 @@ import argparse
 import html
 import json
 import sys
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -119,102 +120,257 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vault — mes vidéos sauvegardées</title>
+<link rel="icon" href="__FAVICON__">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f5f2">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14111f">
 <style>
-  :root { --bg:#f5f6f8; --card:#fff; --txt:#1b1e24; --muted:#69707d;
-          --accent:#0b7cff; --chip:#eef1f5; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-         background:var(--bg); color:var(--txt); }
-  header { position:sticky; top:0; z-index:5; padding:14px 16px 10px;
-           background:rgba(245,246,248,.93); backdrop-filter:blur(8px);
-           border-bottom:1px solid #e3e6ea; }
-  h1 { font-size:18px; margin:0 0 10px; display:flex; align-items:baseline; gap:10px; }
-  h1 span { color:var(--muted); font-weight:500; font-size:13px; flex:1; }
-  h1 a { color:var(--accent); font-size:13px; font-weight:600; text-decoration:none; }
-  #q { width:100%; padding:11px 14px; font-size:16px; border:1px solid #d7dbe1;
-       border-radius:10px; outline:none; background:var(--card); }
-  #q:focus { border-color:var(--accent); }
-  #themes { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-  .chip { border:1px solid #d7dbe1; background:var(--card); color:var(--txt);
-          border-radius:999px; padding:4px 10px; font-size:13px; cursor:pointer; }
-  .chip b { color:var(--muted); font-weight:600; }
-  .chip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
-  .chip.on b { color:#dbe9ff; }
-  main { max-width:760px; margin:0 auto; padding:16px; }
-  .card { background:var(--card); border:1px solid #e6e9ed; border-radius:12px;
-          padding:14px 16px; margin-bottom:12px; }
-  .card h2 { margin:0 0 4px; font-size:16px; }
-  .card h2 a { color:var(--txt); text-decoration:none; }
-  .card h2 a:hover { color:var(--accent); }
-  .meta { color:var(--muted); font-size:13px; margin-bottom:8px; }
-  .tags { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 8px; }
-  .tag { background:var(--chip); border-radius:999px; padding:2px 9px; font-size:12px;
-         color:var(--muted); }
-  .contenu { font-size:14.5px; line-height:1.45; margin:0; }
-  .vide { color:var(--muted); text-align:center; padding:40px 0; }
-  footer { color:var(--muted); font-size:12px; text-align:center; padding:8px 16px 28px; }
-  footer .signature { display:block; margin-top:6px; }
-  footer .signature a { color:var(--accent); text-decoration:none; }
+  /* ---- jetons de couleurs : clair par défaut ---- */
+  :root{
+    --bg:#f6f5f2; --glow:none; --sticky:rgba(246,245,242,.9);
+    --panel:#ffffff; --line:#e9e4dc;
+    --ink:#1d1a24; --ink2:#57535f; --ink3:#8b8694;
+    --violet:#6c4dff;
+    --chipbg:transparent; --chipborder:#e9e4dc; --chipcolor:#57535f;
+    --chiponbg:#1d1a24; --chiponcolor:#ffffff;
+    --tagbg:#fbfaf8; --tagborder:#e9e4dc; --tagcolor:#57535f;
+    --fieldbg:#ffffff; --fieldborder:#e9e4dc; --focusring:rgba(108,77,255,.10);
+    --btnactive:rgba(29,26,36,.08);
+    --filmdash:rgba(29,26,36,.10);
+    --cardshadow:0 8px 26px rgba(29,26,36,.07);
+    --cardhoverborder:#ded7cc;
+    --mark:rgba(108,77,255,.18);
+  }
+  /* ---- jetons : sombre explicite ---- */
+  :root[data-theme="dark"]{
+    --bg:#14111f; --glow:radial-gradient(900px 320px at 50% -140px, rgba(108,77,255,.20), transparent 70%);
+    --sticky:rgba(20,17,31,.9);
+    --panel:rgba(255,255,255,.04); --line:rgba(255,255,255,.075);
+    --ink:#efeaf9; --ink2:#b9b0d8; --ink3:#8079a2;
+    --violet:#8b6dff;
+    --chipbg:rgba(124,92,255,.13); --chipborder:rgba(139,109,255,.28); --chipcolor:#cfc6ff;
+    --chiponbg:#8b6dff; --chiponcolor:#0f0c1d;
+    --tagbg:rgba(255,255,255,.05); --tagborder:rgba(255,255,255,.075); --tagcolor:#b9b0d8;
+    --fieldbg:rgba(255,255,255,.05); --fieldborder:rgba(255,255,255,.075); --focusring:rgba(108,77,255,.18);
+    --btnactive:rgba(255,255,255,.12);
+    --filmdash:rgba(255,255,255,.13);
+    --cardshadow:none; --cardhoverborder:rgba(139,109,255,.38);
+    --mark:rgba(139,109,255,.30);
+  }
+  /* ---- jetons : sombre système (sauf si l'utilisateur a forcé clair/sombre) ---- */
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14111f; --glow:radial-gradient(900px 320px at 50% -140px, rgba(108,77,255,.20), transparent 70%);
+      --sticky:rgba(20,17,31,.9);
+      --panel:rgba(255,255,255,.04); --line:rgba(255,255,255,.075);
+      --ink:#efeaf9; --ink2:#b9b0d8; --ink3:#8079a2;
+      --violet:#8b6dff;
+      --chipbg:rgba(124,92,255,.13); --chipborder:rgba(139,109,255,.28); --chipcolor:#cfc6ff;
+      --chiponbg:#8b6dff; --chiponcolor:#0f0c1d;
+      --tagbg:rgba(255,255,255,.05); --tagborder:rgba(255,255,255,.075); --tagcolor:#b9b0d8;
+      --fieldbg:rgba(255,255,255,.05); --fieldborder:rgba(255,255,255,.075); --focusring:rgba(108,77,255,.18);
+      --btnactive:rgba(255,255,255,.12);
+      --filmdash:rgba(255,255,255,.13);
+      --cardshadow:none; --cardhoverborder:rgba(139,109,255,.38);
+      --mark:rgba(139,109,255,.30);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--glow),var(--bg);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  ::selection{background:var(--mark)}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:8px}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
+  .wrap{max-width:1240px;margin:0 auto;padding:0 28px 64px}
+  .tete{position:sticky;top:0;z-index:5;background:var(--sticky);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:18px 0 6px}
+  header.top{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .brand{font-size:15px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+  .brand .reel{color:var(--violet);margin-right:7px;position:relative;top:2px}
+  .brand .sub{color:var(--ink3);font-weight:400;margin-left:8px}
+  .search{position:relative;flex:1 1 260px;max-width:480px}
+  .search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);opacity:.5}
+  .search input{width:100%;padding:10px 13px 10px 38px;font-family:inherit;font-size:16px;color:var(--ink);
+    background:var(--fieldbg);border:1px solid var(--fieldborder);border-radius:11px;outline:none;
+    transition:border-color .15s,box-shadow .15s}
+  .search input::placeholder{color:var(--ink3)}
+  .search input:focus{border-color:var(--violet);box-shadow:0 0 0 4px var(--focusring)}
+  .topright{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--ink3);margin-left:auto}
+  .topright a{color:var(--violet);text-decoration:none;font-weight:500}
+  .topright a:hover{text-decoration:underline;text-underline-offset:3px}
+  .theme{display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:2px}
+  .tbtn{width:27px;height:24px;display:grid;place-items:center;border:0;background:transparent;
+    border-radius:7px;color:var(--ink3);cursor:pointer;padding:0}
+  .tbtn:hover{color:var(--ink)}
+  .tbtn.on{background:var(--btnactive);color:var(--ink)}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px;margin-top:10px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;font:inherit;font-size:12.5px;color:var(--chipcolor);background:var(--chipbg);
+    border:1px solid var(--chipborder);border-radius:999px;padding:3px 11px;cursor:pointer;transition:all .12s}
+  .chip .n{opacity:.6;font-size:.85em;margin-left:2px}
+  .chip:hover{border-color:var(--violet)}
+  .chip.on{background:var(--chiponbg);border-color:transparent;color:var(--chiponcolor);font-weight:600}
+  .film{height:9px;margin:0 0 22px;
+    background-image:repeating-linear-gradient(90deg, var(--filmdash) 0 11px, transparent 11px 24px);
+    -webkit-mask:linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    mask:linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent)}
+  .mois{grid-column:1/-1;display:flex;align-items:center;gap:14px;margin:26px 0 0;
+    font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+  .mois::after{content:"";flex:1;height:1px;background:var(--line)}
+  .grid > .mois:first-child{margin-top:8px}
+  .grid > .vide{grid-column:1/-1}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:18px}
+  .carte{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:18px 20px 14px;display:flex;flex-direction:column;gap:9px;
+    transition:transform .15s,border-color .15s,box-shadow .15s}
+  .carte:hover{transform:translateY(-2px);border-color:var(--cardhoverborder);box-shadow:var(--cardshadow)}
+  .carte h2{font-size:16.5px;line-height:1.4;letter-spacing:-.008em;margin:0;font-weight:620;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .carte h2 a{color:inherit;text-decoration:none}
+  .carte h2 a:hover{color:var(--violet)}
+  .carte h2 a::after{content:"";position:absolute;inset:0;border-radius:16px}
+  .carte h2 .ext{font-size:.68em;color:var(--violet);opacity:.6;margin-left:4px;vertical-align:super}
+  .meta{font-size:12.5px;color:var(--ink3);display:flex;align-items:center;flex-wrap:wrap}
+  .meta .pf{display:inline-flex;margin-right:6px;color:var(--ink3)}
+  .meta .pf svg{display:block}
+  .meta .date{opacity:.75}
+  .meta .sep{margin:0 7px;opacity:.5}
+  .res{margin:0;color:var(--ink2);font-size:14px;line-height:1.58;
+    display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+  mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
+  .tags{margin-top:auto;padding-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+  .tag{position:relative;z-index:1;font:inherit;font-size:11.5px;color:var(--tagcolor);background:var(--tagbg);
+    border:1px solid var(--tagborder);border-radius:999px;padding:2px 9px;cursor:pointer}
+  .tag:hover{border-color:var(--violet);color:var(--violet)}
+  .vide{color:var(--ink3);padding:30px 0;font-size:14px}
+  footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);
+    color:var(--ink3);font-size:12.5px;text-align:center;line-height:2}
+  footer code{font-size:12px;background:var(--tagbg);border:1px solid var(--tagborder);padding:1px 6px;border-radius:6px}
+  footer .sig{color:var(--ink2)}
+  @media (max-width:640px){
+    .wrap{padding:0 18px 48px}
+    .tete{padding-top:14px}
+    .brand .sub{display:none}
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>Vault — mes vidéos sauvegardées <span id="stats">__STATS__</span> <a href="graph.html">Carte &#128376;</a></h1>
-  <input id="q" type="search" placeholder="Rechercher (titre, contenu, auteur)…" autocomplete="off">
-  <div id="themes">__CHIPS__</div>
-</header>
-<main id="liste">__CARTES__</main>
-<footer>Généré le __DATE__ · __COUNT__ fiches · Bobine · Régénérer : python3 generate_page.py
-<span class="signature">🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></span></footer>
+<div class="wrap">
+  <div class="tete">
+    <header class="top">
+      <div class="brand">
+        <svg class="reel" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none"/><circle cx="12" cy="5.7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="18.3" r="1.5" fill="currentColor" stroke="none"/><circle cx="5.7" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18.3" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>Bobine<span class="sub">mes vidéos sauvegardées</span>
+      </div>
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2"/></svg>
+        <input id="q" type="search" placeholder="Rechercher (titre, contenu, auteur)…" autocomplete="off" aria-label="Rechercher dans les fiches">
+      </div>
+      <div class="topright">
+        <span id="stats">__STATS__</span><a href="graph.html">Carte</a>
+        <div class="theme" role="group" aria-label="Thème">
+          <button type="button" class="tbtn" data-m="light" title="Clair" aria-label="Thème clair"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg></button>
+          <button type="button" class="tbtn" data-m="dark" title="Sombre" aria-label="Thème sombre"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11Z"/></svg></button>
+          <button type="button" class="tbtn" data-m="system" title="Système" aria-label="Thème système"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17Z" fill="currentColor" stroke="none"/></svg></button>
+        </div>
+      </div>
+    </header>
+    <div class="chips" id="chips">__CHIPS__</div>
+  </div>
+  <div class="film"></div>
+  <div id="liste" class="grid">__GROUPES__</div>
+  <p class="vide" id="vide" style="display:none">Aucune fiche ne correspond. Essaie un autre mot ou enlève le filtre.</p>
+  <footer>Généré le __DATE__ · __COUNT__ fiches · Bobine · Régénérer : <code>python3 generate_page.py</code><br>
+  <span class="sig">🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></span></footer>
+</div>
 <script>
-const ENTREES = __DATA__;
-const norm = s => (s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
-const esc = s => (s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let filtreTexte = "", themesActifs = new Set();
+(function(){
+  /* ---- thème : clair / sombre / système ---- */
+  var racine = document.documentElement;
+  var tbtns = [].slice.call(document.querySelectorAll(".tbtn"));
+  var CLE = "bobine-theme";
+  var force = null;
+  try { force = new URLSearchParams(location.search).get("theme"); } catch (e) {}
+  function choisirTheme(mode, sauver){
+    if (mode === "system") { racine.removeAttribute("data-theme"); }
+    else { racine.setAttribute("data-theme", mode); }
+    tbtns.forEach(function(b){
+      var on = b.dataset.m === mode;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    if (sauver) { try { localStorage.setItem(CLE, mode); } catch (e) {} }
+  }
+  var initial = "system";
+  if (force === "light" || force === "dark") { initial = force; }
+  else { try { var v = localStorage.getItem(CLE); if (v === "light" || v === "dark" || v === "system") { initial = v; } } catch (e) {} }
+  choisirTheme(initial, false);
+  tbtns.forEach(function(b){ b.addEventListener("click", function(){ choisirTheme(b.dataset.m, true); }); });
 
-function tousThemes(){
-  const m = new Map();
-  for (const e of ENTREES) for (const t of (e.themes||[])) m.set(t,(m.get(t)||0)+1);
-  return [...m.entries()].sort((a,b) => b[1]-a[1]);
-}
-function renderThemes(){
-  const box = document.getElementById("themes");
-  box.innerHTML = tousThemes().map(([t,n]) =>
-    '<button class="chip'+(themesActifs.has(t)?" on":"")+'" data-t="'+esc(t)+'">'+esc(t)+' <b>'+n+'</b></button>').join("");
-  box.querySelectorAll(".chip").forEach(c => c.onclick = () => {
-    const t = c.dataset.t;
-    themesActifs.has(t) ? themesActifs.delete(t) : themesActifs.add(t);
-    render();
+  /* ---- recherche, filtres, surlignage ---- */
+  var q = document.getElementById("q");
+  var stats = document.getElementById("stats");
+  var vide = document.getElementById("vide");
+  var cartes = [].slice.call(document.querySelectorAll(".carte"));
+  var moisBlocs = [].slice.call(document.querySelectorAll(".mois"));
+  var pastilles = [].slice.call(document.querySelectorAll(".chip, .tag"));
+  var actifs = {};
+  var total = cartes.length;
+  function norm(s){ return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+  function esc(s){ return (s || "").replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c]; }); }
+  function surligner(texte, requete){
+    var t = esc(texte);
+    if (!requete) { return t; }
+    var motif = esc(requete).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    try { return t.replace(new RegExp("(" + motif + ")", "gi"), "<mark>$1</mark>"); }
+    catch (e) { return t; }
+  }
+  function nombreActifs(){ var n = 0; for (var t in actifs) { if (actifs[t]) { n++; } } return n; }
+  function appliquer(){
+    var requete = (q.value || "").trim();
+    var vus = 0;
+    cartes.forEach(function(c){
+      var okTexte = !requete || norm(c.dataset.text).indexOf(norm(requete)) !== -1;
+      var themes = c.dataset.themes ? c.dataset.themes.split("|") : [];
+      var okTheme = nombreActifs() === 0 || themes.some(function(t){ return actifs[t]; });
+      var ok = okTexte && okTheme;
+      c.style.display = ok ? "" : "none";
+      if (ok) { vus++; }
+      var titre = c.querySelector("h2 .tt");
+      var res = c.querySelector(".res");
+      if (titre) { titre.innerHTML = surligner(c.dataset.titre || "", requete); }
+      if (res) { res.innerHTML = surligner(c.dataset.contenu || "", requete); }
+    });
+    moisBlocs.forEach(function(m){
+      var visible = false;
+      var n = m.nextElementSibling;
+      while (n && !n.classList.contains("mois")) {
+        if (n.classList.contains("carte") && n.style.display !== "none") { visible = true; break; }
+        n = n.nextElementSibling;
+      }
+      m.style.display = visible ? "" : "none";
+    });
+    stats.textContent = vus + " / " + total + " fiches";
+    vide.style.display = vus ? "none" : "";
+    pastilles.forEach(function(p){
+      var on = !!actifs[p.dataset.t];
+      p.classList.toggle("on", on);
+      p.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+  pastilles.forEach(function(p){
+    p.addEventListener("click", function(){
+      var t = p.dataset.t;
+      if (actifs[t]) { delete actifs[t]; } else { actifs[t] = true; }
+      appliquer();
+    });
   });
-}
-function visible(e){
-  if (themesActifs.size && !(e.themes||[]).some(t => themesActifs.has(t))) return false;
-  if (!filtreTexte) return true;
-  return norm([e.titre, e.auteur, e.contenu, (e.themes||[]).join(" ")].join(" ")).includes(filtreTexte);
-}
-function render(){
-  renderThemes();
-  const liste = ENTREES.filter(visible);
-  document.getElementById("stats").textContent = liste.length + " / " + ENTREES.length;
-  document.getElementById("liste").innerHTML = liste.length ? liste.map(e =>
-    '<article class="card">' +
-      '<h2><a href="'+esc(e.lien)+'" target="_blank" rel="noopener">'+esc(e.titre)+'</a></h2>' +
-      '<div class="meta">'+esc(e.auteur)+'</div>' +
-      '<div class="tags">'+(e.themes||[]).map(t => '<span class="tag">'+esc(t)+'</span>').join("")+'</div>' +
-      '<p class="contenu">'+esc(e.contenu)+'</p>' +
-    '</article>').join("") : '<p class="vide">Rien ne correspond…</p>';
-}
-document.getElementById("q").addEventListener("input", ev => {
-  filtreTexte = norm(ev.target.value.trim());
-  render();
-});
-// Le contenu est déjà en HTML statique (visible même sans JavaScript, ex.
-// dans l'aperçu Fichiers d'iOS) : ici on ne fait qu'activer les interactions.
-document.querySelectorAll("#themes .chip").forEach(c => c.onclick = () => {
-  const t = c.dataset.t;
-  themesActifs.has(t) ? themesActifs.delete(t) : themesActifs.add(t);
-  render();
-});
+  q.addEventListener("input", appliquer);
+  document.addEventListener("keydown", function(ev){
+    if (ev.key === "/" && document.activeElement !== q) { ev.preventDefault(); q.focus(); }
+  });
+  appliquer();
+})();
 </script>
 </body>
 </html>
@@ -502,39 +658,167 @@ loop();
 """
 
 
+MOIS_LONGS = ["janvier", "février", "mars", "avril", "mai", "juin",
+              "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin",
+               "juil.", "août", "sept.", "oct.", "nov.", "déc."]
+
+
+def dates_des_fiches(vault):
+    """{url: 'AAAA-MM-JJ'} : la date de traitement de chaque fiche, lue dans raw/.
+
+    C'est la source de la date affichée sur la page (« sauvegardée le… ») :
+    elle existe déjà dans l'en-tête de chaque fiche (traite_le), y compris
+    pour celles indexées avant l'arrivée des dates sur la page.
+    """
+    dates = {}
+    dossier = Path(vault) / "raw"
+    if not dossier.is_dir():
+        return dates
+    for fichier in sorted(dossier.glob("*.md")):
+        if fichier.name.startswith("."):
+            continue
+        try:
+            lignes = fichier.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            continue
+        source, traite = "", ""
+        for ligne in lignes[:40]:
+            if ligne.startswith("---") and (source or traite):
+                break
+            if ligne.startswith("source:"):
+                source = ligne.split(":", 1)[1].strip()
+            elif ligne.startswith("traite_le:"):
+                traite = ligne.split(":", 1)[1].strip()
+        if source and traite:
+            dates[source] = traite
+    return dates
+
+
+def plateforme_de(lien):
+    """Identifie la plateforme d'un lien (pour le petit glyphe des cartes)."""
+    l = (lien or "").lower()
+    if "youtube.com" in l or "youtu.be" in l:
+        return "youtube"
+    if "instagram.com" in l:
+        return "instagram"
+    if "tiktok.com" in l:
+        return "tiktok"
+    return ""
+
+
+GLYPHES = {
+    "youtube": '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2.6" y="5.4" width="18.8" height="13.2" rx="4"/><path d="M10.4 9.4l4.6 2.6-4.6 2.6z" fill="currentColor" stroke="none"/></svg>',
+    "instagram": '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.4" cy="6.6" r="1.2" fill="currentColor" stroke="none"/></svg>',
+    "tiktok": '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M14.8 4v9.4a3.7 3.7 0 1 1-2.8-3.57"/><path d="M14.8 4c.4 2.3 1.9 3.8 4.1 4"/></svg>',
+}
+
+
+def glyphe_plateforme(cle):
+    """Le petit glyphe de plateforme (vide si inconnue)."""
+    if cle not in GLYPHES:
+        return ""
+    return '<span class="pf" aria-hidden="true">' + GLYPHES[cle] + '</span>'
+
+
+def libelle_mois(date_iso):
+    """'2026-10-08' → 'Octobre 2026' (vide si la date manque)."""
+    try:
+        annee, mois = date_iso.split("-")[0], int(date_iso.split("-")[1])
+        return MOIS_LONGS[mois - 1].capitalize() + " " + annee
+    except (ValueError, IndexError):
+        return ""
+
+
+def formater_date(date_iso):
+    """'2026-10-08' → '8 oct. 2026' (vide si la date manque)."""
+    try:
+        annee, mois, jour = date_iso.split("-")
+        return str(int(jour)) + " " + MOIS_COURTS[int(mois) - 1] + " " + annee
+    except (ValueError, IndexError):
+        return ""
+
+
+def preparer_entrees(entrees, vault):
+    """Ajoute date + plateforme à chaque entrée, puis trie : récentes d'abord."""
+    dates = dates_des_fiches(vault)
+    for e in entrees:
+        e["date"] = dates.get(e["lien"], "")
+        e["plateforme"] = plateforme_de(e["lien"])
+    entrees.sort(key=lambda e: e["date"] or "", reverse=True)
+    return entrees
+
+
+def favicon():
+    """Petite bobine violette, encodée en data URI (onglet + écran d'accueil)."""
+    svg = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>"
+           "<rect width='64' height='64' rx='14' fill='#6c4dff'/>"
+           "<circle cx='32' cy='32' r='17' fill='none' stroke='#ffffff' stroke-width='6'/>"
+           "<circle cx='32' cy='32' r='5.5' fill='#ffffff'/>"
+           "<circle cx='32' cy='13.5' r='4' fill='#ffffff'/>"
+           "<circle cx='32' cy='50.5' r='4' fill='#ffffff'/>"
+           "<circle cx='13.5' cy='32' r='4' fill='#ffffff'/>"
+           "<circle cx='50.5' cy='32' r='4' fill='#ffffff'/>"
+           "</svg>")
+    return "data:image/svg+xml," + urllib.parse.quote(svg, safe="")
+
+
 def rendre_chips(entrees):
     """Pastilles de thèmes en HTML statique (triées par fréquence)."""
     comptes = {}
     for e in entrees:
         for t in e["themes"]:
             comptes[t] = comptes.get(t, 0) + 1
-    paires = sorted(comptes.items(), key=lambda kv: -kv[1])
+    paires = sorted(comptes.items(), key=lambda kv: (-kv[1], kv[0]))
     return "".join(
-        '<button class="chip" data-t="' + html.escape(t, quote=True) + '">'
-        + html.escape(t) + ' <b>' + str(n) + '</b></button>'
+        '<button type="button" class="chip" data-t="' + html.escape(t, quote=True)
+        + '" aria-pressed="false">' + html.escape(t)
+        + ' <span class="n">' + str(n) + '</span></button>'
         for t, n in paires
     )
 
 
-def rendre_cartes(entrees):
-    """Cartes des fiches en HTML statique (même balisage que la version JS)."""
+def rendre_carte(e):
+    """Une carte de fiche en HTML statique (visible même sans JavaScript)."""
+    date = formater_date(e.get("date", ""))
+    meta = glyphe_plateforme(e.get("plateforme", "")) + "<span>" + html.escape(e["auteur"]) + "</span>"
+    if date:
+        meta += '<span class="sep">·</span><span class="date">' + html.escape(date) + "</span>"
+    tags = "".join(
+        '<button type="button" class="tag" data-t="' + html.escape(t, quote=True)
+        + '" aria-pressed="false">' + html.escape(t) + "</button>"
+        for t in e["themes"]
+    )
+    texte_filtre = " ".join([e["titre"], e["auteur"], e["contenu"]] + e["themes"])
+    return (
+        '<article class="carte" data-themes="' + html.escape("|".join(e["themes"]), quote=True)
+        + '" data-text="' + html.escape(texte_filtre, quote=True)
+        + '" data-titre="' + html.escape(e["titre"], quote=True)
+        + '" data-contenu="' + html.escape(e["contenu"], quote=True) + '">'
+        + "<h2 title=\"" + html.escape(e["titre"], quote=True) + '">'
+        + '<a href="' + html.escape(e["lien"], quote=True) + '" target="_blank" rel="noopener">'
+        + '<span class="tt">' + html.escape(e["titre"]) + '</span><span class="ext">↗</span></a></h2>'
+        + '<div class="meta">' + meta + "</div>"
+        + '<p class="res">' + html.escape(e["contenu"]) + "</p>"
+        + '<div class="tags">' + tags + "</div>"
+        + "</article>"
+    )
+
+
+def rendre_liste(entrees):
+    """Les cartes dans la grille, précédées d'un séparateur de mois (récentes d'abord)."""
     if not entrees:
-        return '<p class="vide">Aucune fiche pour l\'instant.</p>'
-    cartes = []
+        return ('<p class="vide">Aucune fiche pour l\'instant. '
+                "Partage une vidéo depuis ton téléphone : elle apparaîtra ici.</p>")
+    parties = []
+    mois_courant = None
     for e in entrees:
-        tags = "".join('<span class="tag">' + html.escape(t) + '</span>'
-                       for t in e["themes"])
-        cartes.append(
-            '<article class="card">'
-            '<h2><a href="' + html.escape(e["lien"], quote=True)
-            + '" target="_blank" rel="noopener">' + html.escape(e["titre"])
-            + '</a></h2>'
-            '<div class="meta">' + html.escape(e["auteur"]) + '</div>'
-            '<div class="tags">' + tags + '</div>'
-            '<p class="contenu">' + html.escape(e["contenu"]) + '</p>'
-            '</article>'
-        )
-    return "".join(cartes)
+        mois = libelle_mois(e.get("date", "")) or ""
+        if mois and mois != mois_courant:
+            parties.append('<div class="mois">' + html.escape(mois) + "</div>")
+        mois_courant = mois
+        parties.append(rendre_carte(e))
+    return "".join(parties)
 
 
 def svg_statique(entrees, pos):
@@ -592,12 +876,13 @@ def main():
     icloud = Path.home() / "Library/Mobile Documents" / ("com~apple~CloudDocs/" + nom)
 
     entrees = lire_index(vault / "index.md")
+    entrees = preparer_entrees(entrees, vault)   # dates (via raw/), plateforme, tri récentes d'abord
     donnees = json.dumps(entrees, ensure_ascii=False).replace("<", "\\u003c")
 
-    lien_carte = ' <a href="graph.html">Carte &#128376;</a>'
+    lien_carte = '<a href="graph.html">Carte</a>'
     page = (TEMPLATE_LISTE
-            .replace("__DATA__", donnees)
-            .replace("__CARTES__", rendre_cartes(entrees))
+            .replace("__FAVICON__", favicon())
+            .replace("__GROUPES__", rendre_liste(entrees))
             .replace("__CHIPS__", rendre_chips(entrees))
             .replace("__STATS__", str(len(entrees)) + " / " + str(len(entrees)))
             .replace("__DATE__", datetime.now().strftime("%d/%m/%Y %H:%M"))
