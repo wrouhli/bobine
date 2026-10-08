@@ -1,0 +1,33 @@
+name: 💡 Proposer une idée
+description: Une idée pour améliorer Bobine ?
+title: "[Idée] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci ! Rappel du principe du projet : une fonctionnalité qui complique l'installation ou qui demande un compte en ligne a peu de chances d'être retenue (voir `CONTRIBUTING.md`).
+
+  - type: textarea
+    id: idee
+    attributes:
+      label: Ton idée
+      description: Décris simplement ce que tu aimerais pouvoir faire.
+    validations:
+      required: true
+
+  - type: textarea
+    id: pourqui
+    attributes:
+      label: Pour qui c'est utile ?
+      description: "La règle du projet : explique pour qui ce serait utile (les débutants ? toi ? une équipe ?)."
+    validations:
+      required: true
+
+  - type: textarea
+    id: aujourdhui
+    attributes:
+      label: Et aujourd'hui, tu fais comment ?
+      description: Sans cette fonction, tu contournes comment ? (Facultatif.)
+    validations:
+      required: false

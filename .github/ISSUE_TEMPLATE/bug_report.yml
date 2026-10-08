@@ -1,0 +1,63 @@
+name: 🐞 Signaler un bug
+description: Quelque chose ne marche pas comme prévu ?
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de décrire le souci ! Plus c'est précis, plus vite c'est réglé.
+
+  - type: textarea
+    id: probleme
+    attributes:
+      label: Ce qui se passe
+      description: Que faisais-tu, et que s'est-il passé ?
+      placeholder: J'ai partagé un Reel depuis mon iPhone, et la fiche n'est jamais apparue...
+    validations:
+      required: true
+
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce que tu attendais
+    validations:
+      required: false
+
+  - type: textarea
+    id: journal
+    attributes:
+      label: Les dernières lignes du journal
+      description: "Souvent la clé du mystère : la fin de `logs/watch.log` (ou `logs/install.log`)."
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Quelle édition ?
+      options:
+        - Mac + iPhone
+        - Linux / VPS
+        - Je ne sais pas
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version de Bobine
+      description: "Visible sur la page des releases (ex. v1.2.0)."
+      placeholder: "v1.2.0"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: verifications
+    attributes:
+      label: Avant d'envoyer
+      options:
+        - label: J'ai regardé la section « Dépannage » du README
+        - label: Je n'ai collé aucune donnée personnelle (clé API, liens privés, captures de mon vault)
+          required: true
