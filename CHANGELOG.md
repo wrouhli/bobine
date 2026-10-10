@@ -4,6 +4,7 @@
 
 En préparation 🚧
 
+- **Nouvelle palette (2026)** : les pages (liste et carte), les installeurs, la page d'aide et les badges adoptent la palette noir, blanc, platine, ambre et citron pâle ; l'identité violette disparaît. Aucun changement de fonctionnalité.
 - **Page « Galerie »** : refonte de `vault.html` : trois modes clair, sombre, système (choix mémorisé), dates des fiches, tri des plus récentes d'abord, séparateurs de mois, glyphes de plateforme (YouTube, Instagram, TikTok), carte entière cliquable, surlignage de recherche avec raccourci « / », favicon. Toujours lisible sans JavaScript.
 - **Carte v2** : `graph.html` devient une carte de navigation : clic sur un thème pour filtrer la liste, clic sur une vidéo pour l'aperçu (résumé, date, boutons), survol qui met au point, nombre de fiches par bulle, points colorés par date avec légende, thèmes fusionnés automatiquement. Les points se glissent, et l'aimant 🧲 (près du zoom) choisit entre retour en place et points posés librement. `vault.html?theme=…` pré-filtre la liste.
 - **Sans clé API** : les nouvelles fiches sont indexées « résumé en attente » et visibles dans les pages ; dès l'ajout d'une clé, les résumés en attente se remplissent tout seuls, sans doublon.
