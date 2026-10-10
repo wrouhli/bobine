@@ -16,13 +16,13 @@ SCRIPT_DIR="$DEPOT"
 # ----------------------------------------------------------- couleurs & aides
 if [ -t 1 ]; then
   FONCE=$'\033[2m'; GRAS=$'\033[1m'; ROUGE=$'\033[1;31m'; VERT=$'\033[1;32m'
-  JAUNE=$'\033[1;33m'; VIOLET=$'\033[1;35m'; CYAN=$'\033[1;36m'; FIN=$'\033[0m'
+  JAUNE=$'\033[1;33m'; AMBRE=$'\033[38;5;220m'; CYAN=$'\033[1;36m'; FIN=$'\033[0m'
 else
-  FONCE=""; GRAS=""; ROUGE=""; VERT=""; JAUNE=""; VIOLET=""; CYAN=""; FIN=""
+  FONCE=""; GRAS=""; ROUGE=""; VERT=""; JAUNE=""; AMBRE=""; CYAN=""; FIN=""
 fi
 
 ok()    { printf "  ${VERT}✓${FIN} %s\n" "$1"; }
-etape() { printf "\n${VIOLET}${GRAS}  ── %s${FIN}\n" "$1"; }
+etape() { printf "\n${AMBRE}${GRAS}  ── %s${FIN}\n" "$1"; }
 note()  { printf "  ${FONCE}%s${FIN}\n" "$1"; }
 avis()  { printf "  ${JAUNE}⚠${FIN}  %s\n" "$1"; }
 
@@ -219,12 +219,12 @@ if [ ! -f "vault.html" ]; then
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-       background:#201a3d;color:#f3ecff;font-family:system-ui,Helvetica,sans-serif}
-  .carte{background:#2c2452;border:1px solid #4a3f7d;border-radius:18px;padding:40px 46px;
-         max-width:540px;text-align:center;box-shadow:0 18px 60px rgba(0,0,0,.35)}
-  h1{margin:0 0 12px;font-size:26px}
-  p{margin:8px 0;color:#c9bdf0;line-height:1.55}
-  .petit{font-size:13px;color:#8f83bd;margin-top:18px}
+       background:#000000;color:#ffffff;font-family:system-ui,Helvetica,sans-serif}
+  .carte{background:#141414;border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:40px 46px;
+         max-width:540px;text-align:center;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+  h1{margin:0 0 12px;font-size:26px;color:#fec90a}
+  p{margin:8px 0;color:rgba(255,255,255,.72);line-height:1.55}
+  .petit{font-size:13px;color:rgba(255,255,255,.5);margin-top:18px}
 </style>
 </head>
 <body>
@@ -550,7 +550,7 @@ if [ -t 1 ]; then
   DELAI="0.09"
   printf "   ${FONCE}🎞️  Mise en bobine…${FIN}"
   for c in ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷ ⣾ ⣽; do
-    printf "\r   ${FONCE}🎞️  Mise en bobine…${FIN} ${VIOLET}${c}${FIN}"
+    printf "\r   ${FONCE}🎞️  Mise en bobine…${FIN} ${AMBRE}${c}${FIN}"
     sleep 0.07
   done
   printf "\r%*s\r" 40 ""
@@ -564,7 +564,7 @@ PAD9="$(printf ' %.0s' $(seq 1 9))"
 PAD3="   "
 printf "   ${FONCE}╭${TIRET}╮${FIN}\n"; sleep "$DELAI"
 printf "   ${FONCE}│${VIDE45}│${FIN}\n"; sleep "$DELAI"
-printf "   ${FONCE}│${FIN}${PAD17}${VIOLET}${GRAS}B O B I N E${FIN}${FONCE}${PAD17}│${FIN}\n"; sleep "$DELAI"
+printf "   ${FONCE}│${FIN}${PAD17}${AMBRE}${GRAS}B O B I N E${FIN}${FONCE}${PAD17}│${FIN}\n"; sleep "$DELAI"
 printf "   ${FONCE}│${VIDE45}│${FIN}\n"; sleep "$DELAI"
 printf "   ${FONCE}│${FIN}${PAD3}chaque vidéo partagée devient une fiche${PAD3}${FONCE}│${FIN}\n"; sleep "$DELAI"
 printf "   ${FONCE}│${FIN}${PAD9}à retrouver, à questionner.${PAD9}${FONCE}│${FIN}\n"; sleep "$DELAI"

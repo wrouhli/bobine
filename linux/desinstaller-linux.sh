@@ -12,13 +12,13 @@ VAULT="$(cd "$(dirname "$0")" && pwd)"
 # ----------------------------------------------------------- couleurs & aides
 if [ -t 1 ]; then
   FONCE=$'\033[2m'; GRAS=$'\033[1m'; VERT=$'\033[1;32m'
-  JAUNE=$'\033[1;33m'; VIOLET=$'\033[1;35m'; CYAN=$'\033[1;36m'; FIN=$'\033[0m'
+  JAUNE=$'\033[1;33m'; AMBRE=$'\033[38;5;220m'; CYAN=$'\033[1;36m'; FIN=$'\033[0m'
 else
-  FONCE=""; GRAS=""; VERT=""; JAUNE=""; VIOLET=""; CYAN=""; FIN=""
+  FONCE=""; GRAS=""; VERT=""; JAUNE=""; AMBRE=""; CYAN=""; FIN=""
 fi
 
 ok()    { printf "  ${VERT}✓${FIN} %s\n" "$1"; }
-etape() { printf "\n${VIOLET}${GRAS}  ── %s${FIN}\n" "$1"; }
+etape() { printf "\n${AMBRE}${GRAS}  ── %s${FIN}\n" "$1"; }
 note()  { printf "  ${FONCE}%s${FIN}\n" "$1"; }
 avis()  { printf "  ${JAUNE}⚠${FIN}  %s\n" "$1"; }
 
@@ -41,7 +41,7 @@ case "$VAULT" in
 esac
 
 # ------------------------------------------------------------------ accueil
-printf "\n${VIOLET}${GRAS}  Bobine — désinstallation${FIN}\n"
+printf "\n${AMBRE}${GRAS}  Bobine — désinstallation${FIN}\n"
 printf "  ${FONCE}Ce dossier : %s${FIN}\n" "$(affiche "$VAULT")"
 
 if [ ! -f "$VAULT/watch-linux.sh" ] || [ ! -f "$VAULT/ingest.py" ]; then
@@ -127,7 +127,7 @@ echo
 if [ -t 1 ]; then
   printf "   ${FONCE}🎞️  Rembobinage…${FIN}"
   for c in ⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷; do
-    printf "\r   ${FONCE}🎞️  Rembobinage…${FIN} ${VIOLET}${c}${FIN}"
+    printf "\r   ${FONCE}🎞️  Rembobinage…${FIN} ${AMBRE}${c}${FIN}"
     sleep 0.07
   done
   printf "\r%*s\r" 36 ""
