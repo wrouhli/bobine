@@ -1,3 +1,5 @@
+<div align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="../assets/brand/bobine-logo-white.svg"><img src="../assets/brand/bobine-logo-black.svg" alt="Bobine" width="420"></picture></div>
+
 # Bobine : version Linux (serveur ou VPS)
 
 <sub>🌍 <b>Français</b> · <a href="README.en.md">English</a></sub>
