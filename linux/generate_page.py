@@ -127,57 +127,57 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vault — mes vidéos sauvegardées</title>
 <link rel="icon" href="__FAVICON__">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f5f2">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14111f">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
 <style>
   /* ---- jetons de couleurs : clair par défaut ---- */
   :root{
-    --bg:#f6f5f2; --glow:none; --sticky:rgba(246,245,242,.9);
-    --panel:#ffffff; --line:#e9e4dc;
-    --ink:#1d1a24; --ink2:#57535f; --ink3:#8b8694;
-    --violet:#6c4dff;
-    --chipbg:transparent; --chipborder:#e9e4dc; --chipcolor:#57535f;
-    --chiponbg:#1d1a24; --chiponcolor:#ffffff;
-    --tagbg:#fbfaf8; --tagborder:#e9e4dc; --tagcolor:#57535f;
-    --fieldbg:#ffffff; --fieldborder:#e9e4dc; --focusring:rgba(108,77,255,.10);
-    --btnactive:rgba(29,26,36,.08);
-    --filmdash:rgba(29,26,36,.10);
-    --cardshadow:0 8px 26px rgba(29,26,36,.07);
-    --cardhoverborder:#ded7cc;
-    --mark:rgba(108,77,255,.18);
+    --bg:#ffffff; --glow:none; --sticky:rgba(255,255,255,.9);
+    --panel:#ffffff; --line:rgba(0,0,0,.10);
+    --ink:#000000; --ink2:rgba(0,0,0,.64); --ink3:rgba(0,0,0,.45);
+    --accent:#000000;
+    --chipbg:transparent; --chipborder:rgba(0,0,0,.12); --chipcolor:rgba(0,0,0,.64);
+    --chiponbg:#fec90a; --chiponcolor:#000000;
+    --tagbg:#f3f4f6; --tagborder:rgba(0,0,0,.08); --tagcolor:rgba(0,0,0,.64);
+    --fieldbg:#ffffff; --fieldborder:rgba(0,0,0,.12); --focusring:rgba(0,0,0,.06);
+    --btnactive:rgba(0,0,0,.08);
+    --filmdash:rgba(0,0,0,.10);
+    --cardshadow:0 8px 26px rgba(0,0,0,.07);
+    --cardhoverborder:rgba(0,0,0,.22);
+    --mark:#fff1c5;
   }
   /* ---- jetons : sombre explicite ---- */
   :root[data-theme="dark"]{
-    --bg:#14111f; --glow:radial-gradient(900px 320px at 50% -140px, rgba(108,77,255,.20), transparent 70%);
-    --sticky:rgba(20,17,31,.9);
+    --bg:#000000; --glow:radial-gradient(900px 320px at 50% -140px, rgba(254,201,10,.10), transparent 70%);
+    --sticky:rgba(0,0,0,.9);
     --panel:rgba(255,255,255,.04); --line:rgba(255,255,255,.075);
-    --ink:#efeaf9; --ink2:#b9b0d8; --ink3:#8079a2;
-    --violet:#8b6dff;
-    --chipbg:rgba(124,92,255,.13); --chipborder:rgba(139,109,255,.28); --chipcolor:#cfc6ff;
-    --chiponbg:#8b6dff; --chiponcolor:#0f0c1d;
-    --tagbg:rgba(255,255,255,.05); --tagborder:rgba(255,255,255,.075); --tagcolor:#b9b0d8;
-    --fieldbg:rgba(255,255,255,.05); --fieldborder:rgba(255,255,255,.075); --focusring:rgba(108,77,255,.18);
+    --ink:#ffffff; --ink2:rgba(255,255,255,.72); --ink3:rgba(255,255,255,.50);
+    --accent:#fec90a;
+    --chipbg:rgba(255,255,255,.06); --chipborder:rgba(255,255,255,.14); --chipcolor:rgba(255,255,255,.72);
+    --chiponbg:#fec90a; --chiponcolor:#000000;
+    --tagbg:rgba(255,255,255,.05); --tagborder:rgba(255,255,255,.075); --tagcolor:rgba(255,255,255,.72);
+    --fieldbg:rgba(255,255,255,.05); --fieldborder:rgba(255,255,255,.075); --focusring:rgba(254,201,10,.24);
     --btnactive:rgba(255,255,255,.12);
     --filmdash:rgba(255,255,255,.13);
-    --cardshadow:none; --cardhoverborder:rgba(139,109,255,.38);
-    --mark:rgba(139,109,255,.30);
+    --cardshadow:none; --cardhoverborder:rgba(254,201,10,.45);
+    --mark:rgba(254,201,10,.26);
   }
   /* ---- jetons : sombre système (sauf si l'utilisateur a forcé clair/sombre) ---- */
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#14111f; --glow:radial-gradient(900px 320px at 50% -140px, rgba(108,77,255,.20), transparent 70%);
-      --sticky:rgba(20,17,31,.9);
+      --bg:#000000; --glow:radial-gradient(900px 320px at 50% -140px, rgba(254,201,10,.10), transparent 70%);
+      --sticky:rgba(0,0,0,.9);
       --panel:rgba(255,255,255,.04); --line:rgba(255,255,255,.075);
-      --ink:#efeaf9; --ink2:#b9b0d8; --ink3:#8079a2;
-      --violet:#8b6dff;
-      --chipbg:rgba(124,92,255,.13); --chipborder:rgba(139,109,255,.28); --chipcolor:#cfc6ff;
-      --chiponbg:#8b6dff; --chiponcolor:#0f0c1d;
-      --tagbg:rgba(255,255,255,.05); --tagborder:rgba(255,255,255,.075); --tagcolor:#b9b0d8;
-      --fieldbg:rgba(255,255,255,.05); --fieldborder:rgba(255,255,255,.075); --focusring:rgba(108,77,255,.18);
+      --ink:#ffffff; --ink2:rgba(255,255,255,.72); --ink3:rgba(255,255,255,.50);
+      --accent:#fec90a;
+      --chipbg:rgba(255,255,255,.06); --chipborder:rgba(255,255,255,.14); --chipcolor:rgba(255,255,255,.72);
+      --chiponbg:#fec90a; --chiponcolor:#000000;
+      --tagbg:rgba(255,255,255,.05); --tagborder:rgba(255,255,255,.075); --tagcolor:rgba(255,255,255,.72);
+      --fieldbg:rgba(255,255,255,.05); --fieldborder:rgba(255,255,255,.075); --focusring:rgba(254,201,10,.24);
       --btnactive:rgba(255,255,255,.12);
       --filmdash:rgba(255,255,255,.13);
-      --cardshadow:none; --cardhoverborder:rgba(139,109,255,.38);
-      --mark:rgba(139,109,255,.30);
+      --cardshadow:none; --cardhoverborder:rgba(254,201,10,.45);
+      --mark:rgba(254,201,10,.26);
     }
   }
   *{box-sizing:border-box}
@@ -186,14 +186,14 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
     font:15px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,Roboto,sans-serif;
     -webkit-font-smoothing:antialiased}
   ::selection{background:var(--mark)}
-  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:8px}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
   @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
   .wrap{max-width:1240px;margin:0 auto;padding:0 28px 64px}
   .tete{position:sticky;top:0;z-index:5;background:var(--sticky);
     backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:18px 0 6px}
   header.top{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
   .brand{font-size:15px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
-  .brand .reel{color:var(--violet);margin-right:7px;position:relative;top:2px}
+  .brand .reel{color:var(--accent);margin-right:7px;position:relative;top:2px}
   .brand .sub{color:var(--ink3);font-weight:400;margin-left:8px}
   .search{position:relative;flex:1 1 260px;max-width:480px}
   .search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);opacity:.5}
@@ -201,9 +201,9 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
     background:var(--fieldbg);border:1px solid var(--fieldborder);border-radius:11px;outline:none;
     transition:border-color .15s,box-shadow .15s}
   .search input::placeholder{color:var(--ink3)}
-  .search input:focus{border-color:var(--violet);box-shadow:0 0 0 4px var(--focusring)}
+  .search input:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--focusring)}
   .topright{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--ink3);margin-left:auto}
-  .topright a{color:var(--violet);text-decoration:none;font-weight:500}
+  .topright a{color:var(--accent);text-decoration:none;font-weight:500}
   .topright a:hover{text-decoration:underline;text-underline-offset:3px}
   .theme{display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:2px}
   .tbtn{width:27px;height:24px;display:grid;place-items:center;border:0;background:transparent;
@@ -215,7 +215,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .chip{flex:0 0 auto;font:inherit;font-size:12.5px;color:var(--chipcolor);background:var(--chipbg);
     border:1px solid var(--chipborder);border-radius:999px;padding:3px 11px;cursor:pointer;transition:all .12s}
   .chip .n{opacity:.6;font-size:.85em;margin-left:2px}
-  .chip:hover{border-color:var(--violet)}
+  .chip:hover{border-color:var(--accent)}
   .chip.on{background:var(--chiponbg);border-color:transparent;color:var(--chiponcolor);font-weight:600}
   .film{height:9px;margin:0 0 22px;
     background-image:repeating-linear-gradient(90deg, var(--filmdash) 0 11px, transparent 11px 24px);
@@ -234,9 +234,9 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .carte h2{font-size:16.5px;line-height:1.4;letter-spacing:-.008em;margin:0;font-weight:620;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .carte h2 a{color:inherit;text-decoration:none}
-  .carte h2 a:hover{color:var(--violet)}
+  .carte h2 a:hover{color:var(--accent)}
   .carte h2 a::after{content:"";position:absolute;inset:0;border-radius:16px}
-  .carte h2 .ext{font-size:.68em;color:var(--violet);opacity:.6;margin-left:4px;vertical-align:super}
+  .carte h2 .ext{font-size:.68em;color:var(--accent);opacity:.6;margin-left:4px;vertical-align:super}
   .meta{font-size:12.5px;color:var(--ink3);display:flex;align-items:center;flex-wrap:wrap}
   .meta .pf{display:inline-flex;margin-right:6px;color:var(--ink3)}
   .meta .pf svg{display:block}
@@ -248,7 +248,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .tags{margin-top:auto;padding-top:6px;display:flex;flex-wrap:wrap;gap:6px}
   .tag{position:relative;z-index:1;font:inherit;font-size:11.5px;color:var(--tagcolor);background:var(--tagbg);
     border:1px solid var(--tagborder);border-radius:999px;padding:2px 9px;cursor:pointer}
-  .tag:hover{border-color:var(--violet);color:var(--violet)}
+  .tag:hover{border-color:var(--accent);color:var(--accent)}
   .vide{color:var(--ink3);padding:30px 0;font-size:14px}
   footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);
     color:var(--ink3);font-size:12.5px;text-align:center;line-height:2}
@@ -402,26 +402,26 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Vault — la carte</title>
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f5f2">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14111f">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
 <style>
   :root{
-    --bg:#f6f5f2; --ink:#1d1a24; --ink2:#57535f; --muted:#8b8694; --line:#e9e4dc;
-    --panel:#ffffff; --violet:#6c4dff; --btnactive:rgba(29,26,36,.08);
-    --grad-old:#a9a4c0; --grad-new:#6c4dff; --statique-bg:#14161d; --sur-bouton:#ffffff;
-    --ombre:0 12px 40px rgba(29,26,36,.18);
+    --bg:#ffffff; --ink:#000000; --ink2:rgba(0,0,0,.64); --muted:rgba(0,0,0,.45); --line:rgba(0,0,0,.10);
+    --panel:#ffffff; --accent:#000000; --accent-fill:#fec90a; --btnactive:rgba(0,0,0,.08);
+    --grad-old:rgba(0,0,0,.30); --grad-new:#fec90a; --statique-bg:#000000; --sur-bouton:#000000;
+    --ombre:0 12px 40px rgba(0,0,0,.18);
   }
   :root[data-theme="dark"]{
-    --bg:#14111f; --ink:#efeaf9; --ink2:#b9b0d8; --muted:#8079a2; --line:rgba(255,255,255,.075);
-    --panel:rgba(23,19,36,.94); --violet:#8b6dff; --btnactive:rgba(255,255,255,.12);
-    --grad-old:#79809f; --grad-new:#c9b8ff; --sur-bouton:#0f0c1d;
+    --bg:#000000; --ink:#ffffff; --ink2:rgba(255,255,255,.72); --muted:rgba(255,255,255,.50); --line:rgba(255,255,255,.075);
+    --panel:rgba(0,0,0,.92); --accent:#fec90a; --accent-fill:#fec90a; --btnactive:rgba(255,255,255,.12);
+    --grad-old:rgba(255,255,255,.35); --grad-new:#fec90a; --sur-bouton:#000000;
     --ombre:0 12px 40px rgba(0,0,0,.45);
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#14111f; --ink:#efeaf9; --ink2:#b9b0d8; --muted:#8079a2; --line:rgba(255,255,255,.075);
-      --panel:rgba(23,19,36,.94); --violet:#8b6dff; --btnactive:rgba(255,255,255,.12);
-      --grad-old:#79809f; --grad-new:#c9b8ff; --sur-bouton:#0f0c1d;
+      --bg:#000000; --ink:#ffffff; --ink2:rgba(255,255,255,.72); --muted:rgba(255,255,255,.50); --line:rgba(255,255,255,.075);
+      --panel:rgba(0,0,0,.92); --accent:#fec90a; --accent-fill:#fec90a; --btnactive:rgba(255,255,255,.12);
+      --grad-old:rgba(255,255,255,.35); --grad-new:#fec90a; --sur-bouton:#000000;
       --ombre:0 12px 40px rgba(0,0,0,.45);
     }
   }
@@ -435,9 +435,9 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
   header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:14px;
          padding:14px 16px;z-index:2;pointer-events:none;flex-wrap:wrap}
   .brand{font-size:15px;font-weight:650}
-  .brand .reel{color:var(--violet);margin-right:6px;position:relative;top:2px}
+  .brand .reel{color:var(--accent);margin-right:6px;position:relative;top:2px}
   header #stats{color:var(--muted);font-size:13px;flex:1;white-space:nowrap}
-  header a.lien{pointer-events:auto;color:var(--violet);text-decoration:none;font-weight:500}
+  header a.lien{pointer-events:auto;color:var(--accent);text-decoration:none;font-weight:500}
   header a.lien:hover{text-decoration:underline;text-underline-offset:3px}
   .theme{pointer-events:auto;display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);
          border-radius:9px;padding:2px}
@@ -450,20 +450,20 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
                background:var(--panel);color:var(--ink2);font-size:17px;cursor:pointer}
   #zoom button:hover{color:var(--ink)}
   #aimant{margin-bottom:6px}
-  #aimant.on{background:var(--btnactive);color:var(--violet)}
+  #aimant.on{background:var(--btnactive);color:var(--accent)}
   #legende{position:fixed;left:16px;bottom:46px;z-index:2;pointer-events:none;
            color:var(--muted);font-size:12px;line-height:1.9}
   #legende .puce{display:inline-block;width:9px;height:9px;border-radius:50%;
                  background:var(--grad-old);margin-right:6px;vertical-align:-1px}
-  #legende .puce.theme{width:12px;height:12px;background:var(--violet);
-                       box-shadow:0 0 8px var(--violet);margin-right:6px}
+  #legende .puce.theme{width:12px;height:12px;background:var(--accent-fill);
+                       box-shadow:0 0 8px var(--accent-fill);margin-right:6px}
   #degrade{display:inline-block;width:72px;height:8px;border-radius:4px;margin:0 6px;vertical-align:-1px;
            background:linear-gradient(90deg, var(--grad-old), var(--grad-new))}
   #hint{position:fixed;bottom:34px;left:0;right:0;text-align:center;color:var(--muted);
         font-size:12px;z-index:2;pointer-events:none;padding:0 16px}
   #signature{position:fixed;bottom:10px;left:0;right:0;text-align:center;color:var(--muted);
              font-size:11.5px;z-index:2;pointer-events:none}
-  #signature a{pointer-events:auto;color:var(--violet);text-decoration:none}
+  #signature a{pointer-events:auto;color:var(--accent);text-decoration:none}
   #apercu{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;
           width:min(520px, calc(100vw - 28px));background:var(--panel);
           border:1px solid var(--line);border-radius:16px;padding:16px 18px 14px;
@@ -476,8 +476,8 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
   #apercu .actions{display:flex;gap:10px;flex-wrap:wrap}
   #apercu .actions a{text-decoration:none;font-size:13px;font-weight:600;padding:7px 12px;
                      border-radius:9px;border:1px solid var(--line);color:var(--ink2)}
-  #apercu .actions a:hover{border-color:var(--violet);color:var(--ink)}
-  #apercu .actions a.premier{background:var(--violet);border-color:transparent;
+  #apercu .actions a:hover{border-color:var(--accent);color:var(--ink)}
+  #apercu .actions a.premier{background:var(--accent-fill);border-color:transparent;
                              color:var(--sur-bouton)}
   #fermer{position:absolute;top:8px;right:10px;border:0;background:transparent;
           color:var(--muted);font-size:15px;cursor:pointer;padding:4px 6px;line-height:1}
@@ -525,12 +525,12 @@ const THEMES = __THEMES__;
   var force = null;
   try { force = new URLSearchParams(location.search).get("theme"); } catch (e) {}
   var PALETTES = {
-    light: { fond:"#f6f5f2", halo:null, theme:"#6c4dff", themeLabel:"#4a3fd0",
-             fiche:"#9aa0b8", ficheLabel:"#6b6b7d", lien:"rgba(70,70,100,.16)",
-             lienFort:"rgba(108,77,255,.55)", ancien:"#a9a4c0", recent:"#6c4dff" },
-    dark:  { fond:"#14111f", halo:"rgba(108,77,255,.16)", theme:"#8b6dff", themeLabel:"#cfc6ff",
-             fiche:"#8d95a8", ficheLabel:"#8d95a8", lien:"rgba(150,160,180,.20)",
-             lienFort:"rgba(185,166,255,.65)", ancien:"#79809f", recent:"#c9b8ff" }
+    light: { fond:"#ffffff", halo:null, theme:"#fec90a", themeLabel:"#000000",
+             fiche:"#b3b3b3", ficheLabel:"#595959", lien:"rgba(0,0,0,.16)",
+             lienFort:"rgba(254,201,10,.70)", ancien:"#cdcdcd", recent:"#fec90a" },
+    dark:  { fond:"#000000", halo:"rgba(254,201,10,.14)", theme:"#fec90a", themeLabel:"#fff1c5",
+             fiche:"#737373", ficheLabel:"#8c8c8c", lien:"rgba(255,255,255,.20)",
+             lienFort:"rgba(254,201,10,.65)", ancien:"#5c5c5c", recent:"#fec90a" }
   };
   var pal = PALETTES.light;
   function pluriel(n, mot){ return n + " " + mot + (n < 2 ? "" : "s"); }
@@ -1038,15 +1038,15 @@ def preparer_entrees(entrees, vault):
 
 
 def favicon():
-    """Petite bobine violette, encodée en data URI (onglet + écran d'accueil)."""
+    """Petite bobine ambre, encodée en data URI (onglet + écran d'accueil)."""
     svg = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>"
-           "<rect width='64' height='64' rx='14' fill='#6c4dff'/>"
-           "<circle cx='32' cy='32' r='17' fill='none' stroke='#ffffff' stroke-width='6'/>"
-           "<circle cx='32' cy='32' r='5.5' fill='#ffffff'/>"
-           "<circle cx='32' cy='13.5' r='4' fill='#ffffff'/>"
-           "<circle cx='32' cy='50.5' r='4' fill='#ffffff'/>"
-           "<circle cx='13.5' cy='32' r='4' fill='#ffffff'/>"
-           "<circle cx='50.5' cy='32' r='4' fill='#ffffff'/>"
+           "<rect width='64' height='64' rx='14' fill='#fec90a'/>"
+           "<circle cx='32' cy='32' r='17' fill='none' stroke='#000000' stroke-width='6'/>"
+           "<circle cx='32' cy='32' r='5.5' fill='#000000'/>"
+           "<circle cx='32' cy='13.5' r='4' fill='#000000'/>"
+           "<circle cx='32' cy='50.5' r='4' fill='#000000'/>"
+           "<circle cx='13.5' cy='32' r='4' fill='#000000'/>"
+           "<circle cx='50.5' cy='32' r='4' fill='#000000'/>"
            "</svg>")
     return "data:image/svg+xml," + urllib.parse.quote(svg, safe="")
 
@@ -1129,18 +1129,18 @@ def svg_statique(entrees, pos):
         x2, y2 = pos[t0]
         parties.append('<line x1="' + str(x1) + '" y1="' + str(y1) + '" x2="'
                        + str(x2) + '" y2="' + str(y2)
-                       + '" stroke="rgba(150,160,180,0.22)" stroke-width="1.5"/>')
+                       + '" stroke="rgba(255,255,255,.22)" stroke-width="1.5"/>')
     for i, e in enumerate(entrees):
         x, y = pos[i]
         parties.append('<a href="' + html.escape(e["lien"], quote=True)
                        + '" target="_blank"><circle cx="' + str(x) + '" cy="'
-                       + str(y) + '" r="10" fill="#d9dee8"/></a>')
+                       + str(y) + '" r="10" fill="#b3b3b3"/></a>')
     for t, j in theme_idx.items():
         x, y = pos[j]
         parties.append('<circle cx="' + str(x) + '" cy="' + str(y)
-                       + '" r="20" fill="#5ea3ff"/>')
+                       + '" r="20" fill="#fec90a"/>')
         parties.append('<text x="' + str(x) + '" y="' + str(y - 30)
-                       + '" fill="#a5caff" font-size="26" font-weight="600" '
+                       + '" fill="#fff1c5" font-size="26" font-weight="600" '
                        'text-anchor="middle" '
                        'font-family="-apple-system,sans-serif">'
                        + html.escape(t) + '</text>')
