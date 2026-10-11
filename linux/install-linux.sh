@@ -15,10 +15,10 @@ SCRIPT_DIR="$DEPOT"
 
 # ----------------------------------------------------------- couleurs & aides
 if [ -t 1 ]; then
-  FONCE=$'\033[2m'; GRAS=$'\033[1m'; ROUGE=$'\033[1;31m'; VERT=$'\033[1;32m'
+  FONCE=$'\033[2m'; GRAS=$'\033[1m'; VERT=$'\033[1;32m'
   JAUNE=$'\033[1;33m'; VIOLET=$'\033[1;35m'; CYAN=$'\033[1;36m'; FIN=$'\033[0m'
 else
-  FONCE=""; GRAS=""; ROUGE=""; VERT=""; JAUNE=""; VIOLET=""; CYAN=""; FIN=""
+  FONCE=""; GRAS=""; VERT=""; JAUNE=""; VIOLET=""; CYAN=""; FIN=""
 fi
 
 ok()    { printf "  ${VERT}✓${FIN} %s\n" "$1"; }
@@ -151,6 +151,7 @@ while [ -z "$CIBLE" ]; do
     avis "Trop de tentatives — relance l'installation quand tu veux."
     exit 1
   fi
+  # shellcheck disable=SC2088  # « ~ » littéral tapé par l'utilisateur, développé à la main
   case "$REP" in
     "~")   CIBLE="$HOME" ;;
     "~/"*) CIBLE="$HOME/${REP#\~/}" ;;
@@ -194,6 +195,8 @@ else
            watch-linux.sh inbox_server.py page_server.py activer-page-web.sh install-linux.sh desinstaller-linux.sh \
            requirements.txt config.example.env filtres.exemple.yaml \
            LICENSE README.md .gitignore; do
+    # README.md ou .gitignore déjà présents (dossier non vide) : ce sont les tiens.
+    case "$f" in README.md|.gitignore) [ -f "$CIBLE/$f" ] && continue ;; esac
     [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
   done
   [ -d "$DEPOT/exemples" ] && cp -R "$DEPOT/exemples" "$CIBLE/" 2>/dev/null
@@ -247,6 +250,7 @@ ANCIENNE_CONFIG=""
 if [ -f config.env ]; then
   ANCIENNE_CONFIG="config.env.bak-$(date '+%Y%m%d-%H%M%S')"
   cp config.env "$ANCIENNE_CONFIG"
+  chmod 600 "$ANCIENNE_CONFIG"   # elle contient la clé API : lisible par toi seul
   note "Ancienne configuration sauvegardée dans $ANCIENNE_CONFIG"
 fi
 VIEILLE_CLE=""
@@ -330,6 +334,26 @@ fi
   if [ -n "$API_BLOC" ]; then
     echo
     echo "$API_BLOC"
+    case "$API_BLOC" in
+      *API_MODEL=*) ;;
+      *DEEPSEEK_API_KEY=*)
+        echo "# Modèle des résumés (facultatif) : deepseek-chat par défaut. Si DeepSeek"
+        echo "# le retire, mets ici l'identifiant actuel (voir platform.deepseek.com) :"
+        echo "#API_MODEL=deepseek-chat" ;;
+    esac
+  fi
+  echo
+  echo "# Langue des résumés : fr (défaut) ou en"
+  echo "#LANGUE_RESUMES=en"
+  # Réglages avancés de l'ancienne configuration, gardés tels quels (chemins,
+  # cookies, notification, jeton du serveur de liens, mot de passe de la page…).
+  if [ -n "$ANCIENNE_CONFIG" ]; then
+    GARDES="$(grep -E '^(VAULT|INBOX|FFMPEG_DIR|COOKIES|LANGUE_RESUMES|NOTIF_CMD|INBOX_TOKEN|PAGE_PASSWORD)=' "$ANCIENNE_CONFIG" 2>/dev/null || true)"
+    if [ -n "$GARDES" ]; then
+      echo
+      echo "# Réglages repris de ta configuration précédente :"
+      echo "$GARDES"
+    fi
   fi
 } > config.env
 chmod 600 config.env
@@ -375,6 +399,7 @@ if command -v ffmpeg >/dev/null 2>&1; then
 else
   avis "ffmpeg est introuvable — nécessaire pour la transcription."
   if confirmer "L'installer maintenant avec apt ? (sudo apt install ffmpeg)" "o"; then
+    # shellcheck disable=SC2024  # le journal appartient à l'utilisateur, c'est voulu
     if sudo apt-get install -y ffmpeg > logs/ffmpeg-install.log 2>&1; then
       ok "ffmpeg installé"
     else
@@ -499,9 +524,11 @@ fi
       ;;
   esac
   echo
-  echo "# Lecture seule : Crush lit et cherche tes fiches, ne modifie rien et ne lance pas de commandes."
-  echo "permissions allow view ls grep"
-  echo "permissions deny bash"
+  echo "# Lecture seule : Crush lit et cherche tes fiches (sans te demander à chaque fois)."
+  echo "# Les outils qui modifient des fichiers, lancent des commandes ou vont sur internet"
+  echo "# sont retirés : Crush ne peut ni écrire, ni exécuter, ni envoyer tes fiches ailleurs."
+  echo "permissions allow view ls grep glob"
+  echo "permissions deny bash edit multiedit write fetch download sourcegraph lsp_rename lsp_replace_symbol"
   echo
   echo "# Pas de statistiques anonymes."
   echo "option metrics false"
