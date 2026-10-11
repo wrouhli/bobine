@@ -672,8 +672,14 @@ def main():
     if en_attente:
         ajoutees = indexer_en_attente(chemin_index, en_attente,
                                      CONTENU_ATTENTE if not cle else CONTENU_ECHEC)
-    if not args.no_pages and (ajoutees or pages_a_actualiser(racine, cfg)):
+    # Rendu immédiat seulement s'il apporte quelque chose avant les appels à
+    # l'IA : une nouvelle vidéo à afficher, ou pas de second rendu à attendre
+    # (sans clé ni modèle). Une page simplement en retard est refaite à la fin,
+    # en une seule fois avec les résumés et les mémos du passage.
+    a_actualiser = not args.no_pages and pages_a_actualiser(racine, cfg)
+    if not args.no_pages and (ajoutees or (a_actualiser and not (cle and modele))):
         regenerer_pages(script, racine)
+        a_actualiser = False
 
     if not cle:
         print("Tes vidéos sont enregistrées et visibles. Les résumés sont facultatifs."
@@ -763,7 +769,7 @@ def main():
         ecrire_memo(racine, fiche.stem, nouveau, url, profil_emp, langue)
         memos_ecrits += 1
 
-    if (traitees or memos_ecrits) and not args.no_pages:
+    if (traitees or memos_ecrits or a_actualiser) and not args.no_pages:
         regenerer_pages(script, racine)
 
     if not (traitees or echouees or memos_ecrits or memos_echecs):
