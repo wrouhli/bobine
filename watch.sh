@@ -91,7 +91,6 @@ end run
 APPLESCRIPT
 }
 
-jour=$(date '+%Y-%m-%d')
 horodate=$(date '+%Y-%m-%d %H:%M:%S')
 
 # ---------------------------------------------------------------- verrou
@@ -113,17 +112,16 @@ if [ ! -x "$PYTHON" ]; then
 fi
 
 # ------------------------------------------------- plafond quotidien
-# Compte les fiches créées aujourd'hui ET les essais ratés du jour : une pile
-# de liens morts ne peut pas multiplier les téléchargements.
-fiches_aujourdhui=$(grep -l "traite_le: $jour" "$VAULT"/raw/*.md 2>/dev/null | wc -l | tr -d ' ')
-echecs_aujourdhui=$(grep -c "\"essai_le\": \"$jour\"" "$VAULT/journal.json" 2>/dev/null || true)
-[ -z "$echecs_aujourdhui" ] && echecs_aujourdhui=0
-fait_aujourdhui=$((fiches_aujourdhui + echecs_aujourdhui))
-if [ "$fait_aujourdhui" -ge "$MAX_PAR_JOUR" ]; then
-  echo "---- $horodate — plafond quotidien atteint ($fait_aujourdhui/$MAX_PAR_JOUR essais), pause jusqu'à demain." >> "$LOG"
-  exit 0
+# Le compteur persiste chaque essai AVANT le travail, pas seulement les liens
+# qui restent en échec. S'il est illisible, on suspend les téléchargements
+# mais on continue à mettre à jour les résumés et les pages.
+fait_aujourdhui=$("$PYTHON" "$SCRIPT_DIR/ingest.py" --vault "$VAULT" --compter-essais)
+if [ $? -ne 0 ] || ! [[ "$fait_aujourdhui" =~ ^[0-9]+$ ]]; then
+  fait_aujourdhui=$MAX_PAR_JOUR
+  echo "Compteur du jour indisponible : relève en pause, vidéos conservées." >> "$LOG"
 fi
 reste=$((MAX_PAR_JOUR - fait_aujourdhui))
+[ "$reste" -lt 0 ] && reste=0
 limite=$MAX_PAR_PASSAGE
 [ "$reste" -lt "$limite" ] && limite=$reste
 
@@ -134,10 +132,10 @@ ok_before=$(grep -c '"statut": "ok"' "$VAULT/journal.json" 2>/dev/null || true)
 {
   echo "---- $horodate — réveil (essais aujourd'hui : $fait_aujourdhui/$MAX_PAR_JOUR, limite du passage : $limite)"
 
+  if [ "$limite" -gt 0 ]; then
   if [ ! -f "$INBOX" ]; then
-    echo "boîte de réception absente ($INBOX) — rien à faire. (Le raccourci iPhone est-il créé ?)"
-    exit 0
-  fi
+    echo "Aucun nouveau lien reçu. Les vidéos enregistrées restent disponibles."
+  else
 
   cd "$VAULT" || exit 1
 
@@ -177,11 +175,16 @@ APPLESCRIPT
     if [ "$echecs_lecture" -ge 4 ] && [ $(( (echecs_lecture - 4) % 24 )) -eq 0 ]; then
       notifier "Impossible de lire la boîte iCloud depuis ~1 h (passage $echecs_lecture). Un diagnostic est conseillé." "⚠️ $NOM — tube bouché" "Basso"
     fi
-    exit 0
-  fi
+  else
   rm -f "$COMPTEUR"   # lecture de la boîte OK : compteur d'alerte remis à zéro
 
-  "$PYTHON" "$SCRIPT_DIR/ingest.py" "$copie" --vault "$VAULT" --cookies "$COOKIES" --limite "$limite"
+  "$PYTHON" "$SCRIPT_DIR/ingest.py" "$copie" --vault "$VAULT" --cookies "$COOKIES" --limite "$limite" --plafond-journalier "$MAX_PAR_JOUR"
+
+  fi   # copie lisible
+  fi   # boîte présente
+  else
+    echo "La relève reprendra demain. Les résumés en attente continuent."
+  fi
 
   ok_after=$(grep -c '"statut": "ok"' "$VAULT/journal.json" 2>/dev/null || true)
   [ -z "$ok_after" ] && ok_after=0
@@ -209,7 +212,7 @@ APPLESCRIPT
     echecs_ia=$(( $(cat "$COMPTEUR_IA" 2>/dev/null || echo 0) + 1 ))
     echo "$echecs_ia" > "$COMPTEUR_IA"
     if [ "$echecs_ia" -ge 4 ] && [ $(( (echecs_ia - 4) % 24 )) -eq 0 ]; then
-      notifier "Les résumés échouent depuis ~1 h : clé, crédit ou modèle (API_MODEL) à vérifier. Détails dans logs/watch.log." "⚠️ $NOM : résumés en panne" "Basso"
+      notifier "Tes vidéos sont enregistrées. Les résumés prennent plus de temps que prévu. Bobine réessaie automatiquement." "$NOM : résumés retardés" "Basso"
     fi
   elif [ "$code_resume" -eq 0 ]; then
     rm -f "$COMPTEUR_IA"
