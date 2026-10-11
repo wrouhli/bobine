@@ -212,6 +212,38 @@ class OutilsFiche(unittest.TestCase):
         self.assertTrue(all(len(m.split()) <= 70 for m in morceaux))
         self.assertEqual(" ".join(morceaux), texte)
 
+    def test_ancien_titre_transcription_audio(self):
+        # Les fiches créées avec l'ancien format titrent « ## Transcription audio ».
+        with tempfile.TemporaryDirectory() as dossier:
+            chemin = Path(dossier) / "insta_ancien.md"
+            chemin.write_text(
+                "---\nsource: https://www.instagram.com/reel/ancien/\ntraite_le: 2026-09-01\n---\n\n"
+                "# Ancienne fiche\n\n## Description\nUne description.\n\n"
+                "## Transcription audio\nLe texte de la vidéo est bien là.\n\n## Liens\n[[x]]\n",
+                encoding="utf-8")
+            fiche = generate_page.lire_fiche_brute(chemin)
+        self.assertEqual(fiche["transcription"], "Le texte de la vidéo est bien là.")
+        self.assertEqual(fiche["description"], "Une description.")
+
+    def test_ancien_titre_visible_dans_la_page(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = vault_demo(dossier)
+            ancienne = racine / "raw" / "insta_avis01.md"
+            ancienne.write_text(ancienne.read_text(encoding="utf-8")
+                                .replace("## Transcription\n", "## Transcription audio\n"),
+                                encoding="utf-8")
+            page = generer(racine)
+        fiche = page.split('id="f-insta_avis01"')[1].split("</article>")[0]
+        self.assertIn("Le bon moment pour demander un avis.", fiche)
+        self.assertNotIn("Pas de transcription", fiche)
+
+    def test_sections_reconnues(self):
+        self.assertEqual(generate_page.section_connue("Transcription"), "transcription")
+        self.assertEqual(generate_page.section_connue("  transcription   AUDIO "), "transcription")
+        self.assertEqual(generate_page.section_connue("Description"), "description")
+        self.assertIsNone(generate_page.section_connue("Liens"))
+        self.assertIsNone(generate_page.section_connue("Transcriptions diverses"))
+
     def test_duree_lisible(self):
         self.assertEqual(generate_page.duree_lisible("754.2"), "13 min")
         self.assertEqual(generate_page.duree_lisible("42"), "42 s")

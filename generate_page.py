@@ -1116,10 +1116,21 @@ THEMES_CACHES = {"(en attente)"}      # thème technique des entrées « résum�
 MARQUEUR_ATTENTE = "(résumé en attente"
 
 
+def section_connue(titre):
+    """« Transcription », « Transcription audio » (ancien format), « Description »…
+    → « transcription » / « description », ou None pour une autre section."""
+    nom = " ".join(titre.strip().lower().split())
+    for connue in ("transcription", "description"):
+        if nom == connue or nom.startswith(connue + " "):
+            return connue
+    return None
+
+
 def lire_fiche_brute(chemin):
     """Une fiche de raw/ → {source, plateforme, auteur, duree_s, traite_le,
     titre, description, transcription}. Seules les sections connues sont lues
-    (« Description », « Transcription ») : les ajouts d'autres outils sont ignorés."""
+    (« Description », « Transcription », y compris l'ancien titre « Transcription
+    audio ») : les ajouts d'autres outils sont ignorés."""
     try:
         texte = Path(chemin).read_text(encoding="utf-8", errors="ignore")
     except OSError:
@@ -1142,8 +1153,7 @@ def lire_fiche_brute(chemin):
             fiche["titre"] = ligne[2:].strip()
             continue
         if ligne.startswith("## "):
-            nom = ligne[3:].strip().lower()
-            section = nom if nom in morceaux else None
+            section = section_connue(ligne[3:])
             continue
         if section:
             morceaux[section].append(ligne)
