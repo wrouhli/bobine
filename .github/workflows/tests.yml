@@ -46,6 +46,27 @@ jobs:
       - name: Le cœur partagé n'a pas dérivé
         run: |
           for f in ingest.py filtre.py enrichir.py generate_page.py graphe.py requirements.txt filtres.exemple.yaml LICENSE \
-                   tests/test_ingest.py tests/test_enrichir.py tests/test_filtre.py; do
+                   tests/test_ingest.py tests/test_enrichir.py tests/test_filtre.py \
+                   tests/test_page.py tests/test_scripts.py tests/test_pipeline.py; do
             cmp "$f" "linux/$f" || { echo "::error::$f a dérivé entre la racine et linux/ — garde-les identiques"; exit 1; }
           done
+
+  # Qualité : scripts shell (shellcheck, déjà présent sur les machines GitHub)
+  # et erreurs Python courantes (ruff : noms inconnus, imports inutiles, pièges).
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: shellcheck (avertissements)
+        run: |
+          shellcheck -S warning install.sh desinstaller.sh watch.sh "👉 2. Installer Bobine.command" \
+            linux/install-linux.sh linux/desinstaller-linux.sh linux/watch-linux.sh linux/activer-page-web.sh
+      - name: ruff (erreurs et pièges)
+        run: |
+          python -m pip install --quiet ruff
+          ruff check --select F,B --target-version py310 *.py linux/*.py tests/*.py linux/tests/*.py
