@@ -179,12 +179,10 @@ while [ -z "$CIBLE" ]; do
     REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
     CIBLE=""; continue
   fi
-  if [ -n "$(ls -A "$CIBLE" 2>/dev/null)" ]; then
-    avis "« $(affiche "$CIBLE") » existe déjà et n'est pas vide."
-    if ! confirmer "Installer dedans quand même (les fichiers de Bobine y seront copiés, rien n'est supprimé) ?" "n"; then
-      REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
-      CIBLE=""; continue
-    fi
+  if ! CONTENU="$(/bin/ls -Aq "$CIBLE" 2>/dev/null)" || [ -n "$CONTENU" ]; then
+    avis "Ce dossier contient déjà des fichiers. Choisis un dossier vide pour les protéger."
+    REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
+    CIBLE=""; continue
   fi
 done
 
@@ -195,8 +193,6 @@ else
            watch-linux.sh inbox_server.py page_server.py activer-page-web.sh install-linux.sh desinstaller-linux.sh \
            requirements.txt config.example.env filtres.exemple.yaml \
            LICENSE README.md .gitignore; do
-    # README.md ou .gitignore déjà présents (dossier non vide) : ce sont les tiens.
-    case "$f" in README.md|.gitignore) [ -f "$CIBLE/$f" ] && continue ;; esac
     [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
   done
   [ -d "$DEPOT/exemples" ] && cp -R "$DEPOT/exemples" "$CIBLE/" 2>/dev/null
@@ -283,7 +279,11 @@ if [ -z "$API_BLOC" ] && confirmer "Activer les résumés automatiques ?" "o"; t
     2)
       CLE="$(secret "Colle ta clé OpenAI (platform.openai.com/api-keys)")"
       CLE="$(printf '%s' "$CLE" | tr -d '[:space:]')"
-      if [ -n "$CLE" ]; then API_BLOC="OPENAI_API_KEY=$CLE"; ok "Clé OpenAI enregistrée (masquée)"; fi ;;
+      if [ -n "$CLE" ]; then
+        API_BLOC="OPENAI_API_KEY=$CLE
+API_MODEL=gpt-4o-mini"
+        ok "Clé OpenAI enregistrée (masquée)"
+      fi ;;
     3)
       CLE="$(secret "Colle ta clé OpenRouter (openrouter.ai)")"
       CLE="$(printf '%s' "$CLE" | tr -d '[:space:]')"
@@ -562,7 +562,7 @@ printf "        systemctl --user start bobine-watch.service\n"
 printf "   3. Surveille :  tail -f %s/logs/watch.log\n" "$SCRIPT_DIR"
 printf "   4. Ta page : %s/vault.html  (et graph.html)\n" "$SCRIPT_DIR"
 printf "   5. (Option) Les liens par HTTP : voir README.md, « Le serveur de liens »\n"
-printf "   6. Un jour, pour tout retirer :  ./desinstaller-linux.sh\n"
+printf "   6. Un jour, pour arrêter Bobine sans supprimer tes fichiers :  ./desinstaller-linux.sh\n"
 if [ -z "$GARDE" ]; then
   echo
   printf "   ${GRAS}Un dernier réflexe — le ménage :${FIN}\n"
