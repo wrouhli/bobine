@@ -182,7 +182,7 @@ class FicheComplete(unittest.TestCase):
     def test_lecture_sans_javascript_et_sans_ressource_externe(self):
         with tempfile.TemporaryDirectory() as dossier:
             page = generer(vault_demo(dossier))
-        self.assertIn(".fiche:target{display:block}", page)
+        self.assertIn(".fiche:target,.vue-profil:target{display:block}", page)
         self.assertNotRegex(page, r"<link[^>]+href=[\"']https?://")
         self.assertNotRegex(page, r"<script[^>]+src=")
         self.assertNotIn("@import", page)
@@ -254,6 +254,68 @@ class OutilsFiche(unittest.TestCase):
                    {"titre": "b", "lien": "https://www.instagram.com/reel/X/?igsh=1", "fichier": ""}]
         ids = [e["id"] for e in generate_page.attribuer_ids(entrees)]
         self.assertEqual(len(set(ids)), 2)
+
+
+
+def ecrire_memo_demo(racine, nom, pour_toi="", idee="Idée centrale de la vidéo."):
+    import json
+    (racine / "memos").mkdir(exist_ok=True)
+    (racine / "memos" / (nom + ".json")).write_text(json.dumps({
+        "version": 1, "a_retenir": ["Premier réflexe.", "Second réflexe."],
+        "memo": {"idee": idee, "points": ["Un point clé."], "etapes": ["Étape A."], "outils": ["Outil B"]},
+        "pour_toi": pour_toi, "profil": "x"}), encoding="utf-8")
+
+
+class MemoEtProfil(unittest.TestCase):
+    """Étape 2 : mémo, « À retenir », « Pour toi » et page Profil."""
+
+    def test_memo_a_retenir_et_pour_toi(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = vault_demo(dossier)
+            (racine / "Mon profil.txt").write_text("# aide\nJe forme des équipes.\n", encoding="utf-8")
+            ecrire_memo_demo(racine, "yt_relance01", pour_toi="Utile pour tes ateliers.")
+            page = generer(racine)
+        fiche = page.split('id="f-yt_relance01"')[1].split("</article>")[0]
+        self.assertIn('data-niveau="memo"', fiche)
+        self.assertIn("Idée centrale de la vidéo.", fiche)
+        self.assertIn("Étape A.", fiche)
+        self.assertIn('<span class="num">2</span><span>Second réflexe.</span>', fiche)
+        self.assertIn("Utile pour tes ateliers.", fiche)
+        autre = page.split('id="f-insta_avis01"')[1].split("</article>")[0]
+        self.assertNotIn('data-niveau="memo"', autre)
+        self.assertNotIn("Pour toi", autre)
+
+    def test_invitation_au_profil_quand_il_manque(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = vault_demo(dossier)
+            ecrire_memo_demo(racine, "yt_relance01")
+            page = generer(racine)
+        fiche = page.split('id="f-yt_relance01"')[1].split("</article>")[0]
+        self.assertIn('href="#profil"', fiche)
+        self.assertIn("Pas encore de profil", page)
+
+    def test_memo_abime_ignore_et_texte_echappe(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = vault_demo(dossier)
+            (racine / "memos").mkdir()
+            (racine / "memos" / "insta_avis01.json").write_text("{abîmé", encoding="utf-8")
+            ecrire_memo_demo(racine, "yt_relance01", idee="<img src=x onerror=alert(1)>")
+            (racine / "Mon profil.txt").write_text("<b>moi</b>", encoding="utf-8")
+            page = generer(racine)
+        self.assertNotIn("<img src=x", page)
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt;", page)
+        self.assertNotIn("<b>moi</b>", page)
+        self.assertIn("&lt;b&gt;moi&lt;/b&gt;", page)
+        autre = page.split('id="f-insta_avis01"')[1].split("</article>")[0]
+        self.assertNotIn('data-niveau="memo"', autre)
+
+    def test_recherche_inclut_a_retenir(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = vault_demo(dossier)
+            ecrire_memo_demo(racine, "yt_relance01")
+            page = generer(racine)
+        carte = page.split('data-fiche="f-yt_relance01"')[1].split("</a>")[0]
+        self.assertIn("Premier réflexe.", carte)
 
 
 if __name__ == "__main__":

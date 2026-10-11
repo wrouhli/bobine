@@ -10,6 +10,7 @@ import argparse
 import html
 import json
 import re
+import shlex
 import sys
 import urllib.parse
 from datetime import datetime
@@ -18,6 +19,7 @@ from pathlib import Path
 # Outils partagés avec l'ingestion (même dossier).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ingest import ecrire_atomique, identifiant, lien_canonique  # noqa: E402
+from enrichir import FICHIER_PROFIL, lire_memo, lire_profil  # noqa: E402
 
 VAULT = Path(__file__).resolve().parent
 NOM_DEFAUT = "Bobine"
@@ -210,6 +212,13 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .marque{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;letter-spacing:-.01em;text-decoration:none}
   .marque .ico{width:24px;height:24px}
   .droite{margin-left:auto;display:flex;align-items:center;gap:14px}
+  .nav{display:flex;gap:4px;margin-left:10px}
+  .nav a{font-size:14.5px;font-weight:500;color:var(--encre-2);text-decoration:none;padding:7px 13px;border-radius:999px}
+  .nav a:hover{background:var(--surface);color:var(--encre)}
+  .nav .nav-biblio{background:var(--actif-fond);color:var(--actif-encre)}
+  body:has(#profil:target) .nav .nav-biblio{background:transparent;color:var(--encre-2)}
+  body:has(#profil:target) .nav .nav-profil{background:var(--actif-fond);color:var(--actif-encre)}
+  .lien-carte-mobile{display:none;margin-top:14px;font-size:14px;font-weight:500;color:var(--encre-2)}
   .lien-carte{font-size:14px;font-weight:500;color:var(--encre-2);text-decoration:none;padding:7px 12px;border-radius:999px}
   .lien-carte:hover{background:var(--surface);color:var(--encre)}
   .theme{display:flex;gap:2px;background:var(--surface);border-radius:999px;padding:3px}
@@ -256,9 +265,10 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .vide{color:var(--encre-2);padding:28px 0}
 
   /* ---------- fiche ---------- */
-  .fiche{display:none;padding-top:28px}
-  .fiche:target{display:block}
-  body:has(.fiche:target) #bibliotheque{display:none}
+  .fiche,.vue-profil{display:none;padding-top:28px}
+  .fiche:target,.vue-profil:target{display:block}
+  body:has(.fiche:target) #bibliotheque, body:has(.vue-profil:target) #bibliotheque{display:none}
+  .vue-profil .lecture{max-width:680px}
   .retour{display:inline-flex;align-items:center;gap:6px;color:var(--encre-2);font-weight:500;font-size:15px;text-decoration:none;margin-bottom:20px}
   .retour:hover{color:var(--encre)}
   .fiche-grille{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:48px}
@@ -291,6 +301,23 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .description{margin-top:26px;max-width:680px;border-top:1px solid var(--trait);padding-top:16px}
   .description summary{cursor:pointer;font-weight:600;font-size:15px}
   .description p{color:var(--encre-2);font-size:15.5px;white-space:pre-line;margin:12px 0 0}
+  .encadre.platine{background:var(--surface)}
+  .encadre.pourtoi{background:var(--fond);border:1px solid var(--trait-fort);position:relative;padding-left:26px}
+  .encadre.pourtoi::before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:4px;border-radius:0 4px 4px 0;background:var(--ambre)}
+  .encadre + .encadre, .lecture + .encadre{margin-top:22px}
+  .encadre-titre{display:flex;align-items:center;gap:10px;font-weight:600;margin-bottom:10px}
+  .encadre-sous{margin-left:auto;font-size:13px;font-weight:500;color:var(--encre-3)}
+  .retenir{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .retenir li{display:flex;gap:12px;align-items:flex-start}
+  .num{width:24px;height:24px;border-radius:50%;background:var(--ambre);color:var(--sur-ambre);font-size:13px;font-weight:700;
+    display:inline-flex;align-items:center;justify-content:center;flex:none;margin-top:1px}
+  .memo h3{font-size:17px;font-weight:600;letter-spacing:-.01em;margin:26px 0 8px}
+  .memo h3:first-child{margin-top:0}
+  .memo ul,.memo ol{margin:0;padding-left:22px}
+  .memo li+li{margin-top:6px}
+  .encadre a{color:inherit;font-weight:600}
+  .profil-texte{white-space:pre-line}
+  .description code{font-size:14px;background:var(--surface);padding:2px 6px;border-radius:6px;word-break:break-all}
   .cote h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--encre-3);margin:0 0 10px}
   .cote-bloc+.cote-bloc{margin-top:32px}
   .lie{display:block;text-decoration:none;padding:13px 0;border-top:1px solid var(--trait)}
@@ -302,6 +329,15 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--trait);color:var(--encre-3);font-size:12.5px;text-align:center;line-height:2}
   footer a{color:var(--lien)}
 
+  @media (max-width:640px){
+    .lien-carte{display:none}
+    .lien-carte-mobile{display:inline-block}
+    .tete-in{gap:8px;padding:10px 14px}
+    .marque{font-size:17px}
+    .nav{margin-left:0;gap:2px}
+    .nav a{padding:6px 9px;font-size:14px}
+    .theme .tbtn{width:26px}
+  }
   @media (max-width:860px){
     .tete-in{padding:12px 18px}
     .enveloppe{padding:0 18px 56px}
@@ -316,6 +352,10 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
 <header class="tete">
   <div class="tete-in">
     <a class="marque" href="#bibliotheque"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="6.6" r="1.5"/><circle cx="12" cy="17.4" r="1.5"/><circle cx="6.6" cy="12" r="1.5"/><circle cx="17.4" cy="12" r="1.5"/></svg>Bobine</a>
+    <nav class="nav" aria-label="Navigation">
+      <a class="nav-biblio" href="#bibliotheque">Bibliothèque</a>
+      <a class="nav-profil" href="#profil">Profil</a>
+    </nav>
     <div class="droite">
       <a class="lien-carte" href="graph.html">Carte des thèmes</a>
       <div class="theme" role="group" aria-label="Apparence">
@@ -335,11 +375,13 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
       <input id="q" type="search" placeholder="Cherche un sujet, un outil, une personne…" autocomplete="off" aria-label="Chercher dans tes vidéos">
     </label>
+    <a class="lien-carte-mobile" href="graph.html">Voir la carte des thèmes</a>
     <div class="chips" id="chips" role="group" aria-label="Filtrer par thème">__CHIPS__</div>
     <div id="liste" class="grille">__GROUPES__</div>
     <p class="vide" id="vide" hidden>Aucune vidéo ne correspond. Essaie un autre mot, ou enlève le filtre.</p>
   </section>
 __FICHES__
+__PROFIL__
   <footer>Mis à jour le __DATE__ · __COUNT__<br>
   🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></footer>
 </main>
@@ -481,7 +523,7 @@ __FICHES__
   function versHaut(){ window.scrollTo(0, 0); }
   window.addEventListener("hashchange", function(){
     var h = location.hash.slice(1);
-    if (h.indexOf("f-") === 0 && document.getElementById(h)) { versHaut(); }
+    if ((h.indexOf("f-") === 0 || h === "profil") && document.getElementById(h)) { versHaut(); }
     else { window.scrollTo(0, position); }
   });
   cartes.forEach(function(c){ c.addEventListener("click", function(){ position = window.scrollY; }); });
@@ -1108,6 +1150,7 @@ def preparer_entrees(entrees, vault):
         e["description"] = brute.get("description", "")
         e["transcription"] = brute.get("transcription", "")
         e["fichier"] = brute.get("fichier", "")
+        e["memo"] = lire_memo(vault, e["fichier"]) if e["fichier"] else None
     entrees.sort(key=lambda e: e["date"] or "", reverse=True)
     return entrees
 
@@ -1328,7 +1371,9 @@ def rendre_carte(e):
     """Une carte de la bibliothèque : un lien vers la fiche complète."""
     attente = en_attente(e)
     resume = "" if attente else e["contenu"]
-    texte_filtre = " ".join([e["titre"], e["auteur"], resume] + themes_visibles(e))
+    memo = e.get("memo") or {}
+    extras = memo.get("a_retenir", []) + ([memo["memo"]["idee"]] + memo["memo"]["points"] if memo else [])
+    texte_filtre = " ".join([e["titre"], e["auteur"], resume] + themes_visibles(e) + extras)
     corps = ('<span class="pastille attente">' + ICONE_HORLOGE + "Résumé à venir</span>" if attente
              else '<p class="res">' + html.escape(resume) + "</p>")
     return (
@@ -1360,7 +1405,44 @@ def rendre_liste(entrees):
     return "".join(parties)
 
 
-def rendre_fiche(e, par_id):
+def bloc_a_retenir(memo):
+    if not memo or not memo.get("a_retenir"):
+        return ""
+    return ('<div class="encadre"><div class="encadre-titre">À retenir</div><ol class="retenir">'
+            + "".join('<li><span class="num">' + str(i) + "</span><span>" + html.escape(r) + "</span></li>"
+                      for i, r in enumerate(memo["a_retenir"], 1))
+            + "</ol></div>")
+
+
+def bloc_pour_toi(memo, profil):
+    """« Pour toi » si le profil existe ; sinon, une invitation discrète (seulement
+    quand Bobine produit déjà des mémos, donc quand une clé est configurée)."""
+    if not memo:
+        return ""
+    if profil and memo.get("pour_toi"):
+        return ('<div class="encadre pourtoi"><div class="encadre-titre">Pour toi'
+                '<span class="encadre-sous">d\'après ton profil</span></div><p>'
+                + html.escape(memo["pour_toi"]) + "</p></div>")
+    if not profil:
+        return ('<div class="encadre platine"><div class="encadre-titre">Pour toi</div>'
+                '<p>Décris-toi en quelques lignes dans ton <a href="#profil">profil</a>, '
+                "et Bobine te dira ce que chaque vidéo t'apporte.</p></div>")
+    return ""   # profil tout neuf : « Pour toi » arrive au prochain passage
+
+
+def rendre_memo(memo):
+    m = memo["memo"]
+    html_memo = "<h3>L'idée centrale</h3><p>" + html.escape(m["idee"]) + "</p>"
+    if m["points"]:
+        html_memo += "<h3>Les points clés</h3><ul>" + "".join("<li>" + html.escape(x) + "</li>" for x in m["points"]) + "</ul>"
+    if m["etapes"]:
+        html_memo += "<h3>Les étapes</h3><ol>" + "".join("<li>" + html.escape(x) + "</li>" for x in m["etapes"]) + "</ol>"
+    if m["outils"]:
+        html_memo += "<h3>Outils et ressources cités</h3><ul>" + "".join("<li>" + html.escape(x) + "</li>" for x in m["outils"]) + "</ul>"
+    return '<div class="lecture memo">' + html_memo + "</div>"
+
+
+def rendre_fiche(e, par_id, profil=""):
     """La fiche complète d'une vidéo : En bref, Transcription, vidéos liées.
     Lisible sans JavaScript (les deux niveaux s'affichent l'un sous l'autre)."""
     id_ = e["id"]
@@ -1375,7 +1457,8 @@ def rendre_fiche(e, par_id):
                    if a_transcript else "")
                 + "</div>")
     else:
-        bref = '<div class="lecture"><p>' + html.escape(e["contenu"]) + "</p></div>"
+        bref = ('<div class="lecture"><p>' + html.escape(e["contenu"]) + "</p></div>"
+                + bloc_a_retenir(e.get("memo")) + bloc_pour_toi(e.get("memo"), profil))
 
     if a_transcript:
         transcript = ('<label class="chercher">' + ICONE_LOUPE
@@ -1390,14 +1473,19 @@ def rendre_fiche(e, par_id):
         transcript += ('<details class="description"><summary>Description publiée avec la vidéo</summary><p>'
                        + html.escape(e["description"]) + "</p></details>")
 
+    memo = e.get("memo")
     niveaux = (
         '<div class="niveaux" role="tablist" aria-label="Niveau de lecture">'
         '<button type="button" class="niveau" role="tab" data-niveau="bref" '
         'data-aide="Pour savoir en 30 secondes si cette vidéo t\'intéresse." aria-selected="true">En bref</button>'
-        '<button type="button" class="niveau" role="tab" data-niveau="transcript" '
+        + ('<button type="button" class="niveau" role="tab" data-niveau="memo" '
+           'data-aide="La note complète, organisée pour être relue." aria-selected="false">Mémo</button>' if memo else "")
+        + '<button type="button" class="niveau" role="tab" data-niveau="transcript" '
         'data-aide="Tout ce qui est dit dans la vidéo, mot pour mot." aria-selected="false">Transcription</button>'
         '</div><p class="aide"></p>'
     )
+    section_memo = ('<section class="section-niveau" data-niveau="memo"><h2 class="titre-niveau">Mémo</h2>'
+                    + rendre_memo(memo) + "</section>") if memo else ""
     lien = lien_sur(e.get("lien", ""))
     bouton = ('<a class="btn" href="' + html.escape(lien, quote=True)
               + '" target="_blank" rel="noopener noreferrer">' + ICONE_LECTURE + "Voir la vidéo</a>") if lien else ""
@@ -1425,6 +1513,7 @@ def rendre_fiche(e, par_id):
         + '<div class="meta">' + meta_html(e, complete=True) + "</div>"
         + bouton + niveaux
         + '<section class="section-niveau" data-niveau="bref"><h2 class="titre-niveau">En bref</h2>' + bref + "</section>"
+        + section_memo
         + '<section class="section-niveau" data-niveau="transcript"><h2 class="titre-niveau">Transcription</h2>'
         + transcript + "</section>"
         + "</div>"
@@ -1433,9 +1522,37 @@ def rendre_fiche(e, par_id):
     )
 
 
-def rendre_fiches(entrees):
+def rendre_fiches(entrees, profil=""):
     par_id = {e["id"]: e for e in entrees}
-    return "\n".join(rendre_fiche(e, par_id) for e in entrees)
+    return "\n".join(rendre_fiche(e, par_id, profil) for e in entrees)
+
+
+def rendre_profil(profil, chemin=FICHIER_PROFIL):
+    """La page Profil : le texte actuel, à quoi il sert, comment le changer."""
+    if profil:
+        actuel = ('<div class="encadre platine"><div class="encadre-titre">Ce que Bobine sait de toi</div>'
+                  '<p class="profil-texte">' + html.escape(profil) + "</p></div>")
+    else:
+        actuel = ('<div class="encadre platine"><div class="encadre-titre">Pas encore de profil</div>'
+                  "<p>C'est facultatif : tout fonctionne sans. Avec quelques lignes sur toi, chaque fiche "
+                  "gagne un bloc « Pour toi » qui dit ce que la vidéo t'apporte.</p></div>")
+    nom = html.escape(FICHIER_PROFIL)
+    return (
+        '<section class="vue-profil" id="profil" aria-label="Profil">'
+        '<a class="retour" href="#bibliotheque">' + ICONE_RETOUR + "Bibliothèque</a>"
+        '<h1 class="titre">Ton profil</h1>'
+        '<p class="sous">Quelques lignes suffisent : ce que tu fais, ce qui t\'intéresse, ce que tu cherches dans tes vidéos.</p>'
+        '<div class="lecture" style="margin-top:24px">' + actuel
+        + '<div class="encadre"><div class="encadre-titre">Pour le modifier</div><p>'
+        "Ouvre le fichier « " + nom + " » dans ton dossier Bobine, écris ou change quelques lignes, "
+        "puis enregistre. Bobine met à jour les blocs « Pour toi » au fil des prochains passages.</p>"
+        '<details class="description"><summary>Bobine tourne sur un serveur ?</summary>'
+        "<p>Connecte-toi au serveur, puis ouvre le fichier avec un éditeur de texte :<br>"
+        "<code>nano " + html.escape(shlex.quote(str(chemin))) + "</code></p></details></div>"
+        '<p class="aide" style="margin-top:18px">Ton profil est envoyé à ton service d\'IA avec les demandes de '
+        "résumé, comme le texte des vidéos. Évite d'y mettre des informations sensibles.</p>"
+        "</div></section>"
+    )
 
 
 def svg_statique(entrees, pos):
@@ -1492,6 +1609,7 @@ def main():
     sync_icloud = cfg.get("SYNC_ICLOUD", "oui").strip().lower() not in ("non", "no", "n", "0", "false")
     icloud = Path.home() / "Library/Mobile Documents" / ("com~apple~CloudDocs/" + nom)
 
+    profil = lire_profil(vault)
     entrees = lire_index(vault / "index.md")
     entrees = preparer_entrees(entrees, vault)   # dates (via raw/), plateforme, tri récentes d'abord
     entrees = canonicaliser_themes(entrees)      # fusionne « SEO »/« seo », dédoublonne
@@ -1505,12 +1623,13 @@ def main():
     donnees = json.dumps(pour_carte, ensure_ascii=False).replace("<", "\\u003c")
 
     lien_carte = '<a class="lien-carte" href="graph.html">Carte des thèmes</a>'
+    lien_carte_mobile = '<a class="lien-carte-mobile" href="graph.html">Voir la carte des thèmes</a>'
     # Le nom et le lien « Carte » se règlent sur le MODÈLE, avant d'insérer les
     # fiches : le contenu des fiches n'est ainsi jamais modifié par erreur.
     modele_liste = TEMPLATE_LISTE.replace("Vault · mes vidéos sauvegardées",
                                           nom_html + " · mes vidéos sauvegardées")
     if not carte:
-        modele_liste = modele_liste.replace(lien_carte, "")
+        modele_liste = modele_liste.replace(lien_carte, "").replace(lien_carte_mobile, "")
     valeurs_liste = {
         "__FAVICON__": favicon(),
         "__GROUPES__": rendre_liste(entrees),
@@ -1519,7 +1638,8 @@ def main():
         "__DATE__": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "__COUNT__": pluriel(len(entrees), "vidéo"),
         "__COMPTE__": pluriel(len(entrees), "vidéo") + (" enregistrée" if len(entrees) < 2 else " enregistrées"),
-        "__FICHES__": rendre_fiches(entrees),
+        "__FICHES__": rendre_fiches(entrees, profil),
+        "__PROFIL__": rendre_profil(profil, vault / FICHIER_PROFIL),
     }
     page = remplir(modele_liste, valeurs_liste)
     ecrire_atomique(vault / "vault.html", page)
@@ -1558,7 +1678,7 @@ def main():
     elif vault.resolve() == Path(__file__).resolve().parent:
         try:
             icloud.mkdir(parents=True, exist_ok=True)
-            ecrire_atomique(icloud / "vault.html", page.replace(lien_carte, ""))
+            ecrire_atomique(icloud / "vault.html", page.replace(lien_carte, "").replace(lien_carte_mobile, ""))
             print(f"copie iCloud : {icloud} (vault.html seulement)")
         except OSError as e:
             print(f"copie iCloud impossible : {e}")

@@ -14,7 +14,7 @@ The Linux/VPS edition of the [Bobine](https://github.com/wrouhli/bobine) project
 
 1. You drop a link into `inbox.txt` (by hand, over `ssh`, or via the small optional HTTP server);
 2. As soon as a link lands in the inbox (otherwise every 15 minutes, as a safety net), Bobine checks it: downloads, transcribes, writes a card into `raw/`;
-3. With an API key: summary + topics → `index.md`;
+3. With an API key: summary + topics → `index.md`, and a memo per video → `memos/` (with a "For you" block if you filled in `Mon profil.txt`, optional; the installer offers to write it);
 4. `vault.html` (list) and `graph.html` (topic map) are regenerated.
 
 *Without an API key: cards appear on the page right away, marked "(summary pending)", and Bobine replaces them with real summaries as soon as you add a key.*

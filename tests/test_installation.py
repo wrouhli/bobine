@@ -334,5 +334,41 @@ class InstallationSafety(unittest.TestCase):
                 self.assertFalse(self.calls.exists())
 
 
+    def run_profile_block(self, name, folder, answers):
+        """Execute only the installer's optional profile question, in `folder`."""
+        text = (ROOT / name).read_text(encoding="utf-8")
+        helpers = text[text.index("if [ -t 1 ]; then"):
+                       text.index("# ------------------------------------------------------------------- bannière")]
+        block = text[text.index("# Profil (facultatif)"):text.index("# écrire config.env")]
+        code = "set -u\ncd \"$1\" || exit 1\n" + helpers + block
+        return self.run_bash(["-c", code, "profile-fixture", folder], answers)
+
+    def test_profile_question_is_optional_and_never_overwrites(self):
+        import sys
+        sys.path.insert(0, str(ROOT))
+        import enrichir
+        for name in INSTALLERS:
+            with self.subTest(script=name, case="answer"):
+                folder = self.sandbox / ("profil-" + Path(name).stem)
+                folder.mkdir()
+                self.run_profile_block(name, folder, "Je forme des équipes à l'IA.\n")
+                profile = folder / "Mon profil.txt"
+                self.assertEqual(stat.S_IMODE(profile.stat().st_mode), 0o600)
+                self.assertEqual(enrichir.lire_profil(folder), "Je forme des équipes à l'IA.")
+            with self.subTest(script=name, case="skip"):
+                folder = self.sandbox / ("sans-profil-" + Path(name).stem)
+                folder.mkdir()
+                self.run_profile_block(name, folder, "\n")
+                self.assertTrue((folder / "Mon profil.txt").exists())
+                self.assertEqual(enrichir.lire_profil(folder), "")
+            with self.subTest(script=name, case="keep"):
+                folder = self.sandbox / ("garde-" + Path(name).stem)
+                folder.mkdir()
+                (folder / "Mon profil.txt").write_text("Mon texte à moi\n", encoding="utf-8")
+                output = self.run_profile_block(name, folder, "Autre chose\n")
+                self.assertEqual((folder / "Mon profil.txt").read_text(encoding="utf-8"), "Mon texte à moi\n")
+                self.assertIn("Profil conservé", output)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -137,6 +137,12 @@ Pour des résumés en anglais, ajoute `LANGUE_RESUMES=en` dans `config.env`. Les
 
 </details>
 
+### *Facultatif* : ton profil (le bloc « Pour toi »)
+
+Avec une clé API, chaque fiche gagne un onglet **Mémo** (l'idée centrale, les points clés, les étapes, les outils cités) et un encadré **À retenir**. Si tu te décris aussi en quelques lignes, chaque fiche ajoute un bloc **Pour toi** : ce que cette vidéo t'apporte, à toi.
+
+L'installation pose la question une fois (Entrée pour passer). Tu peux l'écrire ou le changer à tout moment dans `Mon profil.txt`, dans ton dossier Bobine : quelques lignes sur ce que tu fais et ce que tu cherches dans tes vidéos. Les lignes qui commencent par `#` sont ignorées. Les vidéos plus anciennes reçoivent leur mémo petit à petit, 10 par passage, sans toucher à leurs résumés.
+
 ### *Recommandé* : le raccourci iPhone (partager en un geste)
 
 Sur ton iPhone, app **Raccourcis** (« Shortcuts ») :
@@ -269,6 +275,8 @@ Bobine/
 ├── filtres.yaml        # (si tu importes) tes règles de tri, elles restent chez toi
 ├── LICENSE
 ├── raw/                # TES fiches (jamais dans le repo)
+├── memos/              # le mémo de chaque vidéo (avec une clé API ; jamais dans le repo)
+├── Mon profil.txt      # (facultatif) quelques lignes sur toi, pour « Pour toi »
 ├── journal.json        # ce qui a été traité (réussites, échecs, essais)
 ├── index.md            # l'index condensé (résumés + thèmes)
 ├── vault.html          # la page à consulter
@@ -283,7 +291,7 @@ Bobine/
 Windows : non. Bobine est pensé et testé pour Mac + iPhone, c'est un choix assumé. **Linux, oui** : une édition Linux/VPS complète existe (installeur, réveil systemd, page en HTTPS, boîte de réception locale) → **[linux/](linux/README.md)**. Même cœur, même licence, même philosophie : tout chez toi.
 
 **Où vont mes données ?**
-Bobine garde ta base de connaissances sur ta machine : aucun compte, aucun serveur à nous, aucune télémétrie. Quelques choses sortent de ta machine, toutes transparentes : le téléchargement des vidéos (Instagram, TikTok, YouTube, comme n'importe quel téléchargeur), avec les cookies de connexion de ton navigateur pour Instagram et TikTok seulement (sur Mac, Chrome par défaut : macOS peut demander une fois l'accès à « Chrome Safe Storage » ; à changer avec `COOKIES=…`) ; les téléchargements uniques des dépendances Python et du modèle de transcription ; et, uniquement si tu actives l'IA (résumés, questions à Crush), les textes concernés (transcriptions, fiches, tes questions) envoyés au fournisseur que tu as choisi (DeepSeek, OpenAI, OpenRouter…) avec ta propre clé API. Sur l'édition Mac, la page générée peut aussi être synchronisée via iCloud (proposé à l'installation, désactivable).
+Bobine garde ta base de connaissances sur ta machine : aucun compte, aucun serveur à nous, aucune télémétrie. Quelques choses sortent de ta machine, toutes transparentes : le téléchargement des vidéos (Instagram, TikTok, YouTube, comme n'importe quel téléchargeur), avec les cookies de connexion de ton navigateur pour Instagram et TikTok seulement (sur Mac, Chrome par défaut : macOS peut demander une fois l'accès à « Chrome Safe Storage » ; à changer avec `COOKIES=…`) ; les téléchargements uniques des dépendances Python et du modèle de transcription ; et, uniquement si tu actives l'IA (résumés, questions à Crush), les textes concernés (transcriptions, fiches, tes questions, ton profil si tu l'as écrit) envoyés au fournisseur que tu as choisi (DeepSeek, OpenAI, OpenRouter…) avec ta propre clé API. Sur l'édition Mac, la page générée peut aussi être synchronisée via iCloud (proposé à l'installation, désactivable).
 
 **Et si je ne mets pas de clé API ?**
 Tout tourne très bien : chaque fiche est quand même créée avec sa transcription et sa description, dans `raw/`, et elle apparaît tout de suite dans ta page, marquée « résumé en attente ». Ajoute une clé quand tu veux : au passage suivant (dans les 15 minutes), Bobine remplace ces entrées par les vrais résumés et thèmes, automatiquement.
