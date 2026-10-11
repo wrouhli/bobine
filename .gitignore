@@ -10,6 +10,8 @@ graph.html
 
 # Réglages locaux et secrets
 config.env
+config.env.bak-*
+*.abime-*
 .env
 .crushrc
 .crushrc.bak-*
