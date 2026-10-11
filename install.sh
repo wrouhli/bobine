@@ -189,12 +189,10 @@ while [ -z "$CIBLE" ]; do
     REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
     CIBLE=""; continue
   fi
-  if [ -n "$(/bin/ls -A "$CIBLE" 2>/dev/null)" ]; then
-    avis "« $(affiche "$CIBLE") » existe déjà et n'est pas vide."
-    if ! confirmer "Installer dedans quand même (les fichiers de Bobine y seront copiés, rien n'est supprimé) ?" "n"; then
-      REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
-      CIBLE=""; continue
-    fi
+  if ! CONTENU="$(/bin/ls -Aq "$CIBLE" 2>/dev/null)" || [ -n "$CONTENU" ]; then
+    avis "Ce dossier contient déjà des fichiers. Choisis un dossier vide pour les protéger."
+    REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
+    CIBLE=""; continue
   fi
 done
 
@@ -206,8 +204,6 @@ else
   for f in ingest.py enrichir.py generate_page.py graphe.py filtre.py watch.sh install.sh \
            desinstaller.sh requirements.txt config.example.env filtres.exemple.yaml \
            LICENSE .gitignore; do
-    # Un .gitignore déjà présent (dossier non vide) est le tien : on n'y touche pas.
-    [ "$f" = ".gitignore" ] && [ -f "$CIBLE/$f" ] && continue
     [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
   done
   [ -d "$DEPOT/exemples" ] && cp -R "$DEPOT/exemples" "$CIBLE/" 2>/dev/null
@@ -252,7 +248,7 @@ ici — téléchargée, transcrite et résumée automatiquement.
 ## Les docs
 
 - Guide complet, dépannage, recette du Raccourci : https://github.com/wrouhli/bobine
-- Tout retirer un jour : double-clique « Désinstaller Bobine.command ».
+- Arrêter Bobine sans supprimer tes fichiers : double-clique « Désinstaller Bobine.command ».
 EOF
 fi
 
@@ -343,7 +339,11 @@ if [ -z "$API_BLOC" ] && confirmer "Activer les résumés automatiques ?" "o"; t
     2)
       CLE="$(secret "Colle ta clé OpenAI (platform.openai.com/api-keys)")"
       CLE="$(printf '%s' "$CLE" | tr -d '[:space:]')"
-      if [ -n "$CLE" ]; then API_BLOC="OPENAI_API_KEY=$CLE"; ok "Clé OpenAI enregistrée (masquée)"; fi ;;
+      if [ -n "$CLE" ]; then
+        API_BLOC="OPENAI_API_KEY=$CLE
+API_MODEL=gpt-4o-mini"
+        ok "Clé OpenAI enregistrée (masquée)"
+      fi ;;
     3)
       CLE="$(secret "Colle ta clé OpenRouter (openrouter.ai)")"
       CLE="$(printf '%s' "$CLE" | tr -d '[:space:]')"
@@ -609,7 +609,7 @@ printf "   ${GRAS}Et maintenant ?${FIN}\n"
 printf "   1. Crée le raccourci iPhone « Send to Bobine » — recette pas-à-pas sur la page du projet\n"
 printf "   2. Partage une vidéo de test, puis surveille :  %s/logs/watch.log\n" "$SCRIPT_DIR"
 printf "   3. Ta page : %s/vault.html\n" "$SCRIPT_DIR"
-printf "   4. Un jour, pour tout retirer :  ./desinstaller.sh  (dans le dossier de ton vault)\n"
+printf "   4. Un jour, pour arrêter Bobine sans supprimer tes fichiers :  ./desinstaller.sh  (dans le dossier de ton vault)\n"
 if [ "$SYNC" = "oui" ]; then
   printf "      (sur l'iPhone : Fichiers → iCloud Drive → %s → vault.html)\n" "$NOM_VAULT"
 fi
