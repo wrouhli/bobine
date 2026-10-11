@@ -241,6 +241,8 @@ ici — téléchargée, transcrite et résumée automatiquement.
 
 - raw/ — tes fiches (Markdown, ouvrables avec n'importe quel outil)
 - index.md — l'index condensé (résumés + thèmes)
+- memos/ : le mémo de chaque vidéo (avec une clé API)
+- Mon profil.txt : quelques lignes sur toi, pour le bloc « Pour toi » (facultatif)
 - vault.html et graph.html — la page et la carte
 - config.env — ta configuration (clé API, nom, options)
 - logs/ — les journaux, en cas de souci
@@ -385,6 +387,27 @@ if confirmer "Générer aussi la carte des thèmes (graph.html) ?" "o"; then
 fi
 if confirmer "Copier la page vers iCloud pour la consulter sur ton iPhone ?" "o"; then
   SYNC="oui"; else SYNC="non"
+fi
+
+# Profil (facultatif) : quelques lignes sur toi pour le bloc « Pour toi ».
+# Jamais écrasé : s'il existe déjà, on le garde tel quel.
+if [ ! -f "Mon profil.txt" ]; then
+  note "Bobine peut te dire ce que chaque vidéo t'apporte. Pour ça, décris-toi en une ou deux phrases."
+  note "(facultatif : appuie sur Entrée pour passer ; tu pourras le faire plus tard dans « Mon profil.txt »)"
+  PROFIL="$(question "Qui es-tu, et que cherches-tu dans tes vidéos ?" "")"
+  {
+    echo "# Ton profil Bobine (facultatif)."
+    echo "# Écris quelques lignes sur toi : ce que tu fais, ce que tu cherches dans tes vidéos."
+    echo "# Bobine s'en sert pour le bloc « Pour toi » de chaque fiche."
+    echo "# Les lignes qui commencent par # sont des explications : elles ne sont jamais lues."
+    echo "# Ce texte est envoyé à ton service d'IA avec les demandes de résumé : évite les informations sensibles."
+    echo
+    if [ -n "$PROFIL" ]; then printf '%s\n' "$PROFIL"; fi
+  } > "Mon profil.txt"
+  chmod 600 "Mon profil.txt"
+  if [ -n "$PROFIL" ]; then ok "Profil enregistré (Mon profil.txt)"; else note "Pas de profil pour l'instant : « Mon profil.txt » t'attend."; fi
+else
+  ok "Profil conservé (Mon profil.txt)"
 fi
 
 # écrire config.env (nouveau, en gardant l'éventuelle clé récupérée)
