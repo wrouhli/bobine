@@ -34,12 +34,14 @@ Aucune dépendance à installer (bibliothèque standard uniquement) :
 
     python3 -m unittest discover -s tests
 
-Ils couvrent le nettoyage des sous-titres (SRT/VTT), l'extraction des identifiants de liens, la sûreté des noms de fichiers, et le filtre d'import (`filtre.py` : export Instagram, filtres.yaml, classement). Chaque pull request les lance automatiquement (GitHub Actions, Python 3.10 et 3.12). Si tu as `pytest`, `pytest tests/` fonctionne aussi.
+Ils couvrent le nettoyage des sous-titres (SRT/VTT), l'extraction des identifiants et la forme canonique des liens, la sûreté des noms de fichiers, le journal (reprise d'un fichier abîmé), les résumés (mode sans clé, échecs du service, réponses piégées), les pages (liens sûrs, repères, index piégé), la lecture de `config.env` par les scripts shell, et le filtre d'import (`filtre.py` : export Instagram, filtres.yaml, classement). Chaque pull request les lance automatiquement (GitHub Actions, Python 3.10 et 3.12). Si tu as `pytest`, `pytest tests/` fonctionne aussi.
 
 L'**édition Linux** (`linux/`) a sa suite à côté :
 
     python3 -m unittest discover -s linux/tests
 
-La CI lance les deux, et vérifie que les fichiers du cœur partagé (ingestion, enrichir, pages, tests communs…) restent **identiques au bit près** entre la racine et `linux/` : un garde-fou contre la dérive.
+Vérifie aussi `shellcheck -S warning` sur les scripts shell et `ruff check --select F,B` sur le Python avant d'envoyer (`pip install ruff`). Ces contrôles passent localement ; leur ajout à la CI est proposé dans la PR d'audit.
+
+La CI lance les deux suites, et vérifie que les fichiers du cœur partagé (ingestion, enrichir, pages, tests communs…) restent **identiques au bit près** entre la racine et `linux/` : un garde-fou contre la dérive.
 
 Merci ! 🙏

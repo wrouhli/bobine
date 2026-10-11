@@ -27,6 +27,7 @@ Usage :
 import argparse
 import hmac
 import json
+import re
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -36,6 +37,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ingest import MOTIF_LIEN  # même motif que l'ingestion : une seule source
 
 TAILLE_MAX_CORPS = 16 * 1024   # 16 Ko : largement assez pour quelques liens
+DELAI_LECTURE = 15             # secondes : un client trop lent est déconnecté
+
+
+def masquer_jeton(texte):
+    """Masque le jeton dans une ligne de journal (« /push/JETON », « token=… »)."""
+    texte = re.sub(r"(/push/)[^\s?#\"]+", r"\1***", texte)
+    return re.sub(r"(token=)[^\s&#\"]+", r"\1***", texte)
 
 
 def extraire_texte(corps):
@@ -89,6 +97,14 @@ def ajouter_a_la_boite(inbox, liens):
 
 class BoiteHandler(BaseHTTPRequestHandler):
     server_version = "bobine-inbox/0.1"
+    timeout = DELAI_LECTURE
+
+    def log_message(self, format, *args):  # noqa: A002 (signature imposée)
+        """Journal de chaque requête, jeton masqué (le journal systemd est
+        souvent lisible plus largement que config.env)."""
+        sys.stderr.write("%s - - [%s] %s\n" % (
+            self.address_string(), self.log_date_time_string(),
+            masquer_jeton(format % args)))
 
     def _repondre(self, code, texte):
         corps = (texte + "\n").encode("utf-8")

@@ -103,6 +103,11 @@ Tunnel, Tailscale) ou un proxy avec mot de passe (Caddy, nginx) : **jamais ce
 port en clair sur internet**. Un modèle de service systemd est fourni dans
 `systemd/bobine-inbox.service`.
 
+Préfère l'en-tête `Authorization: Bearer …`. Le serveur accepte aussi le jeton
+dans l'adresse (`/push/JETON` ou `?token=…`) pour les raccourcis qui ne savent
+pas ajouter d'en-tête ; Bobine le masque dans son propre journal, mais un
+proxy ou un tunnel placé devant peut encore enregistrer les adresses complètes.
+
 ## Consulter la page
 
 `vault.html` (et `graph.html`) vivent dans le dossier du vault. Quelques options :
@@ -139,7 +144,9 @@ rien (ajoute l'option à la ligne ExecStart de ton service).
 [Crush](https://charm.sh/crush) est un assistant IA pour le terminal : lancé
 dans le dossier du vault, il lit tes fiches pour répondre (« Quelles vidéos
 parlent de cuisine ? »). L'installateur prépare son fichier de réglages
-(`.crushrc`, lecture seule, avec ta clé) ; il ne reste qu'à l'installer, via
+(`.crushrc`, lecture seule, avec ta clé : Crush lit et cherche dans tes
+fiches, mais ses outils pour modifier des fichiers, lancer des commandes ou
+aller sur internet sont retirés) ; il ne reste qu'à l'installer, via
 le dépôt Charm :
 
     sudo mkdir -p /etc/apt/keyrings
@@ -167,6 +174,12 @@ le dépôt Charm :
   (`ls -la ~/Bobine/inbox.txt`) et le minuteur (`systemctl --user list-timers`).
 - **Les résumés ne viennent pas** → pas de clé API dans `config.env`
   (facultatif ; vérifier avec `.venv/bin/python enrichir.py --dry-run`).
+  Avec une clé, les fiches restent « (résumé en attente) » et `logs/watch.log`
+  affiche le message du fournisseur (clé refusée, crédit épuisé, modèle retiré :
+  mets `API_MODEL=…`). Bobine réessaie à chaque passage et appelle `NOTIF_CMD`
+  si ça dure environ une heure.
+- **Résumés en anglais** → ajoute `LANGUE_RESUMES=en` dans `config.env` (les
+  pages et les messages restent en français).
 - **systemd --user indisponible** → utilise la ligne cron ci-dessus.
 - **Installation des dépendances en échec** → `logs/install.log` ; sur les
   petites machines, la compilation de certains paquets peut manquer d'un
@@ -174,7 +187,9 @@ le dépôt Charm :
 
 ## Désinstaller
 
-    ./desinstaller-linux.sh     # retire le réveil, le serveur de liens, et (si tu veux) le dossier
+Tes fichiers locaux ne sont jamais supprimés automatiquement. Après avoir vérifié le contenu du dossier, tu peux le supprimer toi-même si tu n'en as plus besoin.
+
+    ./desinstaller-linux.sh     # arrête les services ; conserve ta bibliothèque et tous tes fichiers locaux
 
 ## Différences avec la version Mac
 

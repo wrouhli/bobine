@@ -109,9 +109,20 @@ class Identifiants(unittest.TestCase):
         self.assertEqual(ingest.identifiant(lien), "tiktok_" + "A" * 40)
 
     def test_repli_quand_segment_inutilisable(self):
-        # Dernier segment entièrement nettoyé → repli sur un court chiffre.
+        # Dernier segment entièrement nettoyé → repli sur une courte empreinte.
         nom = ingest.identifiant("https://www.tiktok.com/@u/video/...")
-        self.assertRegex(nom, r"^tiktok_\d+$")
+        self.assertRegex(nom, r"^tiktok_[0-9a-f]{10}$")
+
+    def test_repli_stable_d_un_lancement_a_l_autre(self):
+        # hash() de Python change à chaque lancement : le repli doit être stable.
+        import subprocess
+        code = ("import sys; sys.path.insert(0, %r); import ingest; "
+                "print(ingest.identifiant('https://www.instagram.com/reel/\u2713\u2713/'))"
+                % str(Path(ingest.__file__).resolve().parent))
+        noms = {subprocess.run([sys.executable, "-c", code], capture_output=True,
+                               text=True).stdout.strip() for _ in range(3)}
+        self.assertEqual(len(noms), 1)
+        self.assertRegex(noms.pop(), r"^insta_[0-9a-f]{10}$")
 
 
 class ExtraireLiens(unittest.TestCase):
@@ -146,3 +157,103 @@ class Pluriel(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LienCanonique(unittest.TestCase):
+    """lien_canonique : une même vidéo, quels que soient les paramètres de suivi."""
+
+    def test_youtube_toutes_les_formes(self):
+        attendu = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        for lien in ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=AAA",
+                     "https://youtu.be/dQw4w9WgXcQ?si=BBB",
+                     "https://m.youtube.com/shorts/dQw4w9WgXcQ?feature=share",
+                     "https://www.youtube.com/live/dQw4w9WgXcQ"):
+            self.assertEqual(ingest.lien_canonique(lien), attendu)
+
+    def test_instagram_et_tiktok_sans_parametres(self):
+        self.assertEqual(
+            ingest.lien_canonique("https://www.instagram.com/reel/ABC123/?igsh=xyz"),
+            "https://www.instagram.com/reel/ABC123/")
+        self.assertEqual(
+            ingest.lien_canonique("https://www.instagram.com/reel/ABC123"),
+            "https://www.instagram.com/reel/ABC123/")
+        self.assertEqual(
+            ingest.lien_canonique("https://www.tiktok.com/@u/video/7300000000000000001?_r=1"),
+            "https://www.tiktok.com/@u/video/7300000000000000001")
+
+    def test_vide(self):
+        self.assertEqual(ingest.lien_canonique(""), "")
+        self.assertEqual(ingest.lien_canonique(None), "")
+
+    def test_extraire_liens_dedoublonne_par_forme_canonique(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            fichier = Path(dossier) / "liens.txt"
+            fichier.write_text(
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=A\n"
+                "https://youtu.be/dQw4w9WgXcQ?si=B\n"
+                "https://www.instagram.com/reel/ABC123/?igsh=1\n"
+                "https://www.instagram.com/reel/ABC123/?igsh=2\n",
+                encoding="utf-8")
+            self.assertEqual(len(ingest.extraire_liens(fichier)), 2)
+
+
+class Journal(unittest.TestCase):
+    """journal.json : clés canoniques, reprise d'un journal abîmé."""
+
+    def test_normaliser_fusionne_et_prefere_ok(self):
+        journal = {
+            "https://youtu.be/dQw4w9WgXcQ?si=A": {"statut": "echec", "tentatives": 1},
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=B": {"statut": "ok", "fiche": "yt.md"},
+        }
+        propre = ingest.normaliser_journal(journal)
+        self.assertEqual(list(propre), ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"])
+        self.assertEqual(propre["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]["statut"], "ok")
+        self.assertEqual(
+            ingest.entree_journal(propre, "https://youtu.be/dQw4w9WgXcQ?si=Z")["statut"], "ok")
+
+    def test_journal_abime_est_reconstruit_depuis_raw(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = Path(dossier)
+            (racine / "raw").mkdir()
+            (racine / "raw" / "insta_ABC.md").write_text(
+                "---\nsource: https://www.instagram.com/reel/ABC/\n---\n# t\n",
+                encoding="utf-8")
+            (racine / "journal.json").write_text('{"https://x": {"statut": "ok"',
+                                                 encoding="utf-8")
+            journal = ingest.charger_journal(racine / "journal.json")
+            restes = sorted(p.name for p in racine.iterdir())
+        self.assertEqual(journal["https://www.instagram.com/reel/ABC/"]["statut"], "ok")
+        self.assertTrue(any(n.startswith("journal.json.abime-") for n in restes))
+        self.assertNotIn("journal.json", restes)
+
+    def test_ecriture_atomique_sans_reste(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            chemin = Path(dossier) / "journal.json"
+            ingest.sauver_journal(chemin, {"a": {"statut": "ok"}})
+            self.assertEqual(sorted(p.name for p in Path(dossier).iterdir()), ["journal.json"])
+            self.assertIn('"statut": "ok"', chemin.read_text(encoding="utf-8"))
+
+
+class Fiche(unittest.TestCase):
+    """ecrire_fiche : l'en-tête ne peut pas être cassé par la plateforme."""
+
+    def test_auteur_et_titre_sur_une_ligne(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            meta = {"uploader": "Auteur\nstatut: faux", "title": "Titre\n---\nsource: x",
+                    "description": "desc", "duration": 12}
+            ingest.ecrire_fiche(Path(dossier), "yt_x", "https://youtu.be/dQw4w9WgXcQ?si=1",
+                                meta, "texte", "video", "whisper (local)")
+            texte = (Path(dossier) / "yt_x.md").read_text(encoding="utf-8")
+        entete = texte.split("---\n")[1]
+        self.assertIn("auteur: Auteur statut: faux\n", entete)
+        self.assertEqual(sum(1 for l in entete.splitlines() if l.startswith("statut:")), 1)
+        self.assertIn("source: https://www.youtube.com/watch?v=dQw4w9WgXcQ\n", entete)
+        self.assertIn("# Titre --- source: x\n", texte)
+
+    def test_nettoyer_temporaires(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            d = Path(dossier)
+            for nom in ("yt_x.m4a", "yt_x.webm.part", "subs_yt_x.fr.vtt", "yt_y.m4a"):
+                (d / nom).write_text("x", encoding="utf-8")
+            ingest.nettoyer_temporaires(d, "yt_x")
+            self.assertEqual(sorted(p.name for p in d.iterdir()), ["yt_y.m4a"])

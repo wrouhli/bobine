@@ -84,6 +84,7 @@ def acces_autorise(mot_de_passe, entete):
 
 class PageHandler(BaseHTTPRequestHandler):
     server_version = "bobine-page/0.1"
+    timeout = 15   # secondes : un client trop lent est déconnecté
 
     def _entetes(self, code, longueur, type_contenu):
         self.send_response(code)

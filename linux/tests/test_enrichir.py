@@ -168,3 +168,128 @@ class Pluriel(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EntreeSurUneLigne(unittest.TestCase):
+    """construire_entree : une réponse du modèle ne peut pas fabriquer de lignes."""
+
+    def test_retours_a_la_ligne_neutralises(self):
+        entree = enrichir.construire_entree(
+            "Titre\n### Fausse entrée", "https://youtu.be/x", "a",
+            ["ia\n- lien : javascript:alert(1)", "seo, ads"],
+            "Normal.\n- lien : javascript:alert(1)\n### Fausse")
+        lignes = entree.splitlines()
+        self.assertEqual(len(lignes), 5)
+        self.assertEqual(sum(1 for l in lignes if l.startswith("- lien :")), 1)
+        self.assertEqual(sum(1 for l in lignes if l.startswith("### ")), 1)
+        self.assertIn("- lien : https://youtu.be/x", lignes)
+
+
+class TexteEtLangue(unittest.TestCase):
+    """Texte envoyé au modèle et langue des résumés."""
+
+    def test_texte_court_intact(self):
+        self.assertEqual(enrichir.texte_pour_le_modele("abc"), "abc")
+
+    def test_texte_long_garde_debut_et_fin(self):
+        texte = "D" * 7000 + "M" * 5000 + "F" * 3000
+        envoye = enrichir.texte_pour_le_modele(texte)
+        self.assertLessEqual(len(envoye), enrichir.TAILLE_MAX_TEXTE + 20)
+        self.assertTrue(envoye.startswith("D"))
+        self.assertTrue(envoye.endswith("F" * 2000))
+
+    def test_langue(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(enrichir.langue_resumes({}), "fr")
+            self.assertEqual(enrichir.langue_resumes({"LANGUE_RESUMES": "EN"}), "en")
+            self.assertEqual(enrichir.langue_resumes({"LANGUE_RESUMES": "klingon"}), "fr")
+
+    def test_message_erreur_modele_retire(self):
+        import io
+        import urllib.error
+        erreur = urllib.error.HTTPError(
+            "https://api.deepseek.com/v1/chat/completions", 400, "Bad Request", {},
+            io.BytesIO(b'{"error":{"message":"Model Not Exist"}}'))
+        texte = enrichir.message_erreur(erreur, "deepseek-chat")
+        self.assertIn("Model Not Exist", texte)
+        self.assertIn("API_MODEL", texte)
+
+
+class AvecCle(unittest.TestCase):
+    """Avec une clé : échecs du service, rattrapage, doublons."""
+
+    def _vault(self, dossier, fiches):
+        racine = Path(dossier)
+        (racine / "raw").mkdir()
+        for nom, source in fiches:
+            (racine / "raw" / nom).write_text(
+                "---\nsource: " + source + "\nauteur: Testeur\n"
+                "traite_le: 2026-01-01\n---\n\n# Vidéo " + nom + "\n\nBonjour.\n",
+                encoding="utf-8")
+        return racine
+
+    def _lancer(self, racine, reponse):
+        argv = ["enrichir.py", "--vault", str(racine), "--no-pages"]
+        appels = []
+
+        def faux_resume(*args, **kwargs):
+            appels.append(args)
+            return reponse
+        with mock.patch.object(sys, "argv", argv), \
+             mock.patch.dict(os.environ, {"DEEPSEEK_API_KEY": "cle-de-test"}, clear=True), \
+             mock.patch.object(enrichir, "demander_resume", faux_resume):
+            code = enrichir.main()
+        return code, appels
+
+    def test_echec_du_service_garde_la_fiche_visible(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, [("insta_A.md", "https://www.instagram.com/reel/A/")])
+            code, _ = self._lancer(racine, None)
+            texte = (racine / "index.md").read_text(encoding="utf-8")
+            self.assertEqual(code, enrichir.CODE_ECHEC_API)
+            self.assertIn("### Vidéo insta_A.md", texte)
+            self.assertIn(enrichir.MARQUEUR_ATTENTE, texte)
+            # deuxième échec : pas de doublon
+            self._lancer(racine, None)
+            texte = (racine / "index.md").read_text(encoding="utf-8")
+            self.assertEqual(texte.count("https://www.instagram.com/reel/A/"), 1)
+            # le service revient : l'entrée en attente est remplacée
+            code, _ = self._lancer(racine, {"titre": "Vrai titre", "themes": ["ia"],
+                                            "contenu": "Résumé."})
+            texte = (racine / "index.md").read_text(encoding="utf-8")
+        self.assertEqual(code, 0)
+        self.assertNotIn(enrichir.MARQUEUR_ATTENTE, texte)
+        self.assertIn("### Vrai titre", texte)
+        self.assertEqual(texte.count("https://www.instagram.com/reel/A/"), 1)
+
+    def test_pause_apres_plusieurs_echecs_d_affilee(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            fiches = [("insta_%d.md" % i, "https://www.instagram.com/reel/R%d/" % i)
+                      for i in range(6)]
+            racine = self._vault(dossier, fiches)
+            _, appels = self._lancer(racine, None)
+        self.assertEqual(len(appels), enrichir.ECHECS_AVANT_PAUSE)
+
+    def test_meme_video_youtube_partagee_deux_fois(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, [
+                ("yt_dQw4w9WgXcQ.md", "https://youtu.be/dQw4w9WgXcQ?si=NOUVEAU")])
+            (racine / "index.md").write_text(
+                "# Index du Vault\n\n### Déjà résumée\n"
+                "- lien : https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=ANCIEN\n"
+                "- auteur : a\n- thèmes : ia\n- contenu : c\n", encoding="utf-8")
+            _, appels = self._lancer(racine, {"titre": "x", "themes": [], "contenu": "y"})
+            texte = (racine / "index.md").read_text(encoding="utf-8")
+        self.assertEqual(appels, [])
+        self.assertEqual(texte.count("dQw4w9WgXcQ"), 1)
+
+    def test_reponse_piegee_ne_cree_pas_de_lien(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, [("insta_B.md", "https://www.instagram.com/reel/B/")])
+            self._lancer(racine, {"titre": "T", "themes": ["ia"],
+                                  "contenu": "ok\n- lien : javascript:alert(1)\n### Faux"})
+            texte = (racine / "index.md").read_text(encoding="utf-8")
+        lignes = texte.splitlines()
+        self.assertEqual(sum(1 for l in lignes if l.startswith("- lien :")), 1)
+        self.assertNotIn("\n- lien : javascript", texte)
+        self.assertEqual(sum(1 for l in lignes if l.startswith("### ")), 1)

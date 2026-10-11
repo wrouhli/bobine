@@ -94,3 +94,17 @@ class CorpsJson(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MasquerJeton(unittest.TestCase):
+    """masquer_jeton : le jeton n'apparaît jamais dans le journal."""
+
+    def test_chemin_et_parametre(self):
+        self.assertEqual(inbox_server.masquer_jeton('"POST /push/s3cr3t HTTP/1.1" 202 -'),
+                         '"POST /push/*** HTTP/1.1" 202 -')
+        self.assertEqual(inbox_server.masquer_jeton('"POST /push?token=s3cr3t&x=1 HTTP/1.1"'),
+                         '"POST /push?token=***&x=1 HTTP/1.1"')
+
+    def test_sans_jeton(self):
+        self.assertEqual(inbox_server.masquer_jeton('"POST /push HTTP/1.1" 401 -'),
+                         '"POST /push HTTP/1.1" 401 -')

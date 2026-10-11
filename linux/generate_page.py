@@ -9,10 +9,15 @@ Usage : python3 generate_page.py [--vault ~/Vault]
 import argparse
 import html
 import json
+import re
 import sys
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
+
+# Outils partagés avec l'ingestion (même dossier).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ingest import ecrire_atomique, lien_canonique  # noqa: E402
 
 VAULT = Path(__file__).resolve().parent
 NOM_DEFAUT = "Bobine"
@@ -36,9 +41,34 @@ def lire_config(*dossiers):
     return cfg
 
 
+def lien_sur(lien):
+    """Le lien tel quel s'il pointe vers une page web (http ou https), sinon "".
+
+    Les liens de l'index viennent de la plateforme et du modèle d'IA : un lien
+    « javascript: », « data: » ou « file: » ne doit jamais devenir cliquable
+    sur la page."""
+    lien = (lien or "").strip()
+    return lien if re.match(r"(?i)^https?://[^\s\"'<>]+$", lien) else ""
+
+
+def remplir(modele, valeurs):
+    """Remplace les repères (« __CHIPS__ », « __SVG__ »…) en UN seul passage.
+
+    Remplacer repère par repère (str.replace en chaîne) re-parcourt aussi le
+    contenu déjà inséré : un titre contenant « __SVG__ » recevait alors tout le
+    SVG, et la page se cassait. Ici, le texte inséré n'est jamais relu."""
+    if not valeurs:
+        return modele
+    motif = re.compile("|".join(re.escape(cle) for cle in
+                                sorted(valeurs, key=len, reverse=True)))
+    return motif.sub(lambda m: valeurs[m.group(0)], modele)
+
+
 def lire_index(chemin):
     """Lit index.md et retourne une liste d'entrées
-    {titre, lien, auteur, themes, contenu}. Fichier absent → liste vide."""
+    {titre, lien, auteur, themes, contenu}. Fichier absent → liste vide.
+    Dans un bloc, la PREMIÈRE ligne de chaque champ fait foi (une ligne en
+    double ne peut pas remplacer le vrai lien)."""
     entrees = []
     courant = None
     if not chemin.is_file():
@@ -53,9 +83,9 @@ def lire_index(chemin):
             for prefixe, champ in (("- lien :", "lien"),
                                    ("- auteur :", "auteur"),
                                    ("- contenu :", "contenu")):
-                if ligne.startswith(prefixe):
+                if ligne.startswith(prefixe) and not courant[champ]:
                     courant[champ] = ligne[len(prefixe):].strip()
-            if ligne.startswith("- thèmes :"):
+            if ligne.startswith("- thèmes :") and not courant["themes"]:
                 courant["themes"] = [t.strip() for t in
                                      ligne[len("- thèmes :"):].split(",")
                                      if t.strip()]
@@ -941,17 +971,15 @@ def dates_des_fiches(vault):
 
 
 def normaliser_lien(lien):
-    """Clé de rapprochement fiche ↔ index : sans paramètres de suivi ni ancre.
+    """Clé de rapprochement fiche ↔ index : la forme canonique du lien.
 
-    Instagram ajoute des paramètres (?stkn=…) qui changent d'un partage à
-    l'autre : on les ignore des deux côtés pour que la bonne fiche (et donc
-    la bonne date) soit toujours retrouvée.
+    Les applis ajoutent des paramètres (?stkn=…, ?si=…) qui changent d'un
+    partage à l'autre : on les ignore des deux côtés pour que la bonne fiche
+    (et donc la bonne date) soit toujours retrouvée. Pour YouTube, la forme
+    canonique garde l'identifiant de la vidéo (« watch?v=… »), sans quoi
+    toutes les vidéos « watch » partageraient la même clé.
     """
-    l = (lien or "").strip()
-    for coupe in ("?", "#"):
-        if coupe in l:
-            l = l.split(coupe, 1)[0]
-    return l.rstrip("/")
+    return lien_canonique(lien).rstrip("/")
 
 
 def plateforme_de(lien):
@@ -1030,6 +1058,7 @@ def preparer_entrees(entrees, vault):
     """Ajoute date + plateforme à chaque entrée, puis trie : récentes d'abord."""
     dates = dates_des_fiches(vault)
     for e in entrees:
+        e["lien"] = lien_sur(e["lien"])
         e["date"] = dates.get(normaliser_lien(e["lien"]), "")
         e["plateforme"] = plateforme_de(e["lien"])
         e["date_fr"] = formater_date(e["date"])   # pour l'aperçu de la Carte
@@ -1169,17 +1198,22 @@ def main():
     donnees = json.dumps(entrees, ensure_ascii=False).replace("<", "\\u003c")
 
     lien_carte = '<a href="graph.html">Carte</a>'
-    page = (TEMPLATE_LISTE
-            .replace("__FAVICON__", favicon())
-            .replace("__GROUPES__", rendre_liste(entrees))
-            .replace("__CHIPS__", rendre_chips(entrees))
-            .replace("__STATS__", str(len(entrees)) + " / " + str(len(entrees)))
-            .replace("__DATE__", datetime.now().strftime("%d/%m/%Y %H:%M"))
-            .replace("__COUNT__", pluriel(len(entrees), "fiche"))
-            .replace("Vault — mes vidéos sauvegardées", nom_html + " — mes vidéos sauvegardées"))
+    # Le nom et le lien « Carte » se règlent sur le MODÈLE, avant d'insérer les
+    # fiches : le contenu des fiches n'est ainsi jamais modifié par erreur.
+    modele_liste = TEMPLATE_LISTE.replace("Vault — mes vidéos sauvegardées",
+                                          nom_html + " — mes vidéos sauvegardées")
     if not carte:
-        page = page.replace(lien_carte, "")
-    (vault / "vault.html").write_text(page, encoding="utf-8")
+        modele_liste = modele_liste.replace(lien_carte, "")
+    valeurs_liste = {
+        "__FAVICON__": favicon(),
+        "__GROUPES__": rendre_liste(entrees),
+        "__CHIPS__": rendre_chips(entrees),
+        "__STATS__": str(len(entrees)) + " / " + str(len(entrees)),
+        "__DATE__": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "__COUNT__": pluriel(len(entrees), "fiche"),
+    }
+    page = remplir(modele_liste, valeurs_liste)
+    ecrire_atomique(vault / "vault.html", page)
     print(f"vault.html généré — {pluriel(len(entrees), 'fiche')}")
 
     if carte and entrees:
@@ -1190,16 +1224,18 @@ def main():
                 vus_themes[t] = vus_themes.get(t, 0) + 1
         themes_graphe = [{"nom": t, "n": n} for t, n in vus_themes.items()]
         nb_themes = len(themes_graphe)
-        graphe = (TEMPLATE_GRAPHE
-                  .replace("__ENTREES__", donnees)
-                  .replace("__POS__", json.dumps(pos))
-                  .replace("__THEMES__", json.dumps(themes_graphe, ensure_ascii=False))
-                  .replace("__SVG__", svg_statique(entrees, pos))
-                  .replace("__STATS_G__", pluriel(len(entrees), "fiche") + " · "
-                           + pluriel(nb_themes, "thème"))
-                  .replace("La carte du Vault", "La carte du " + nom_html)
-                  .replace("Vault — la carte", nom_html + " — la carte"))
-        (vault / "graph.html").write_text(graphe, encoding="utf-8")
+        modele_graphe = (TEMPLATE_GRAPHE
+                         .replace("La carte du Vault", "La carte du " + nom_html)
+                         .replace("Vault — la carte", nom_html + " — la carte"))
+        graphe = remplir(modele_graphe, {
+            "__FAVICON__": favicon(),
+            "__ENTREES__": donnees,
+            "__POS__": json.dumps(pos),
+            "__THEMES__": json.dumps(themes_graphe, ensure_ascii=False).replace("<", "\\u003c"),
+            "__SVG__": svg_statique(entrees, pos),
+            "__STATS_G__": pluriel(len(entrees), "fiche") + " · " + pluriel(nb_themes, "thème"),
+        })
+        ecrire_atomique(vault / "graph.html", graphe)
         print("graph.html généré — la carte du graphe")
     elif not carte:
         print("carte désactivée (CARTE=non dans config.env)")
@@ -1214,7 +1250,7 @@ def main():
     elif vault.resolve() == Path(__file__).resolve().parent:
         try:
             icloud.mkdir(parents=True, exist_ok=True)
-            (icloud / "vault.html").write_text(page.replace(lien_carte, ""), encoding="utf-8")
+            ecrire_atomique(icloud / "vault.html", page.replace(lien_carte, ""))
             print(f"copie iCloud : {icloud} (vault.html seulement)")
         except OSError as e:
             print(f"copie iCloud impossible : {e}")

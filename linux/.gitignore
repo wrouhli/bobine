@@ -12,6 +12,8 @@ inbox.txt
 
 # Réglages locaux et secrets
 config.env
+config.env.bak-*
+*.abime-*
 .env
 .crushrc
 .crushrc.bak-*
@@ -34,3 +36,7 @@ __pycache__/
 .inbox-local.txt
 .watch.lock
 .watch-echecs-lecture
+
+# Compteur privé de la relève
+.ingest-essais.json
+.watch-echecs-resume

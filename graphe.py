@@ -15,20 +15,16 @@ Usage :
 
 import argparse
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 
+# Le nom de fichier d'une fiche vient de ingest.py (une seule source de vérité :
+# l'ancienne copie locale ignorait YouTube et ne retrouvait pas ses fiches).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ingest import identifiant  # noqa: E402,F401
+
 MARQUEUR = "## Liens"
-
-
-def identifiant(lien):
-    """Meme logique que ingest.py : derive le nom de fichier depuis l'URL."""
-    # Couper la query AVANT de prendre le dernier segment (liens partages par
-    # l'appli instagram : ".../reel/ABC/?stkn=..." sinon nom vide).
-    fin = lien.split("?")[0].rstrip("/").split("/")[-1]
-    fin = re.sub(r"[^A-Za-z0-9_-]", "", fin)[:40]
-    plateforme = "tiktok" if "tiktok" in lien else "insta"
-    return f"{plateforme}_{fin}"
 
 
 def nom_sur(texte):

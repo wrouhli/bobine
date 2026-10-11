@@ -2,8 +2,8 @@
 # Bobine — désinstallation guidée.
 # Usage : place-toi dans le dossier de ton vault, puis :  ./desinstaller.sh
 #
-# Retire, proprement : le réveil automatique, la copie iCloud, et — si tu
-# le souhaites — le dossier du vault lui-même (mis à la corbeille).
+# Arrête le réveil automatique et propose de retirer la copie iCloud.
+# Tous les fichiers locaux sont conservés, y compris les vidéos.
 
 set -u
 
@@ -54,13 +54,13 @@ if [ -f "$VAULT/config.env" ]; then
   if [ -n "${ANCIEN_NOM:-}" ]; then NOM="$ANCIEN_NOM"; fi
 fi
 
-note "Au programme : le réveil automatique, la copie iCloud, et le dossier"
-note "(pour le dossier, c'est toi qui choisis à la fin)."
+note "Au programme : arrêter le réveil automatique, puis choisir si la copie iCloud reste."
+note "Tes vidéos locales et tous tes autres fichiers restent en place."
 
 # ------------------------------------------------- 1. le réveil automatique
 etape "1/3 — Le réveil automatique"
 PLIST="$HOME/Library/LaunchAgents/com.bobine.watch.plist"
-if [ -f "$PLIST" ] && grep -qF "$VAULT/watch.sh" "$PLIST" 2>/dev/null; then
+if [ -f "$PLIST" ] && { grep -qF "<string>$VAULT/watch.sh</string>" "$PLIST" || grep -qxF "$VAULT/watch.sh" "$PLIST"; }; then
   launchctl bootout "gui/$(id -u)/com.bobine.watch" 2>/dev/null || launchctl remove com.bobine.watch 2>/dev/null || true
   rm -f "$PLIST"
   ok "Réveil retiré (il ne tournera plus toutes les 15 minutes)."
@@ -89,22 +89,12 @@ else
   note "Pas de copie iCloud trouvée — rien à retirer."
 fi
 
-# --------------------------------------------------- 3. le dossier du vault
-etape "3/3 — Le dossier de Bobine (fiches comprises)"
-note "Dedans : tes fiches (raw/), ta configuration, l'environnement… tout Bobine."
-SUPPRIME="non"
-if confirmer "Le mettre à la corbeille ? (tu pourras le récupérer si besoin)" "n"; then
-  DEST="$HOME/.Trash/$(basename "$VAULT") ($(date '+%Y-%m-%d %H-%M-%S'))"
-  mkdir -p "$HOME/.Trash" 2>/dev/null
-  ( sleep 2; mv "$VAULT" "$DEST" ) >/dev/null 2>&1 &
-  SUPPRIME="oui"
-  ok "D'accord — il part à la corbeille dans une seconde."
-  note "Ton Terminal va se retrouver dans un dossier qui n'existe plus : c'est normal."
-  note "(ferme-le, ou tape :  cd ~ )"
-else
-  note "D'accord — je le laisse tel quel, en place."
-  note "Tu peux le glisser dans la corbeille toi-même quand tu veux."
-fi
+# --------------------------------------------------- 3. les fichiers conservés
+etape "3/3 : Tes fichiers restent en place"
+note "Bobine est arrêté pour ce dossier."
+note "Toutes tes vidéos locales et tes autres fichiers sont conservés."
+note "Après avoir vérifié son contenu, tu peux supprimer toi-même ce dossier :"
+note "$(affiche "$VAULT")"
 
 # ------------------------------------------------------------------- au revoir
 echo
@@ -116,10 +106,5 @@ if [ -t 1 ]; then
   done
   printf "\r%*s\r" 36 ""
 fi
-if [ "$SUPPRIME" = "oui" ]; then
-  printf "${VERT}${GRAS}  ✨ Bobine est désinstallé — merci d'avoir essayé !${FIN}\n"
-  printf "   ${FONCE}(si un jour tu veux revenir : https://github.com/wrouhli/bobine)${FIN}\n\n"
-else
-  printf "${VERT}${GRAS}  ✓ C'est fait : réveil et copie iCloud retirés.${FIN}\n"
-  printf "   ${FONCE}(le dossier est resté en place, sans effet — supprime-le quand tu veux.)${FIN}\n\n"
-fi
+printf "${VERT}${GRAS}  ✓ C'est fait : Bobine est arrêté, tes fichiers locaux sont conservés.${FIN}\n"
+printf "   ${FONCE}(si un jour tu veux revenir : https://github.com/wrouhli/bobine)${FIN}\n\n"
