@@ -129,7 +129,7 @@ def charger_posts(chemin):
         donnees = json.loads(Path(chemin).read_text(encoding="utf-8",
                                                     errors="ignore"))
     except ValueError as erreur:
-        raise ErreurFiltre("illisible : %s (%s)" % (chemin, erreur))
+        raise ErreurFiltre("illisible : %s (%s)" % (chemin, erreur)) from erreur
     if isinstance(donnees, dict):
         donnees = donnees.get("saved_posts") or donnees.get("posts") or []
 
@@ -504,7 +504,7 @@ def charger_config(chemin):
         return analyser_config(chemin.read_text(encoding="utf-8",
                                                 errors="ignore"))
     except ErreurFiltre as erreur:
-        raise ErreurFiltre("%s → %s" % (chemin.name, erreur))
+        raise ErreurFiltre("%s → %s" % (chemin.name, erreur)) from erreur
 
 
 # ------------------------------------------------------------------ règles

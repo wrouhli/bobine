@@ -18,7 +18,9 @@ Usage :
 """
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -76,17 +78,62 @@ def verifier_outils():
         sys.exit(1)
 
 
+def lien_canonique(lien):
+    """La forme stable d'un lien, pour reconnaître une même vidéo partagée
+    plusieurs fois (les applis ajoutent des paramètres de suivi qui changent
+    à chaque partage : ?si=…, ?igsh=…, ?_r=…).
+
+    - YouTube : https://www.youtube.com/watch?v=IDENTIFIANT (watch, youtu.be,
+      shorts, embed et live donnent tous la même forme) ;
+    - Instagram et TikTok : le lien sans paramètres ni ancre.
+    Un lien vide ou inconnu est rendu tel quel (sans espaces autour).
+    """
+    l = (lien or "").strip()
+    if not l:
+        return ""
+    if "youtube.com" in l or "youtu.be" in l:
+        trouve = re.search(
+            r"(?:v=|youtu\.be/|/shorts/|/embed/|/live/)([A-Za-z0-9_-]{6,})", l
+        )
+        if trouve:
+            return "https://www.youtube.com/watch?v=" + trouve.group(1)
+    for coupe in ("#", "?"):
+        l = l.split(coupe, 1)[0]
+    if "instagram.com" in l or "tiktok.com" in l:
+        l = l.rstrip("/") + ("/" if "instagram.com" in l else "")
+    return l
+
+
 def extraire_liens(chemin):
     """Récupère toutes les URLs TikTok/Instagram/YouTube d'un fichier, quel que soit
-    son format (txt, csv, json d'export). Les doublons sont supprimés."""
+    son format (txt, csv, json d'export). Les doublons sont supprimés, y compris
+    une même vidéo partagée avec des paramètres de suivi différents."""
     texte = Path(chemin).read_text(encoding="utf-8", errors="ignore")
     liens, vus = [], set()
     for lien in MOTIF_LIEN.findall(texte):
         lien = lien.rstrip(".,;")
-        if lien not in vus:
-            vus.add(lien)
+        cle = lien_canonique(lien)
+        if cle not in vus:
+            vus.add(cle)
             liens.append(lien)
     return liens
+
+
+def ecrire_atomique(chemin, texte):
+    """Écrit un fichier d'un seul coup : d'abord une copie temporaire, puis un
+    renommage. Une coupure en plein milieu ne laisse jamais un fichier à moitié
+    écrit (journal, index, pages)."""
+    chemin = Path(chemin)
+    temporaire = chemin.with_name("." + chemin.name + ".tmp")
+    temporaire.write_text(texte, encoding="utf-8")
+    os.replace(temporaire, chemin)
+
+
+def une_ligne(texte):
+    """Texte ramené sur une seule ligne (retours à la ligne et tabulations
+    remplacés par des espaces). Sert pour l'en-tête des fiches et pour
+    l'index : une valeur ne doit jamais pouvoir créer une ligne de plus."""
+    return " ".join(str(texte or "").split())
 
 
 def options_cookies(cookies, lien=""):
@@ -105,16 +152,68 @@ def options_cookies(cookies, lien=""):
     return ["--cookies-from-browser", cookies]
 
 
+def reconstruire_journal(dossier_raw):
+    """Journal minimal refait à partir des fiches : chaque fiche présente dans
+    raw/ correspond à un lien déjà traité avec succès."""
+    journal = {}
+    if not Path(dossier_raw).is_dir():
+        return journal
+    for fiche in sorted(Path(dossier_raw).glob("*.md")):
+        if fiche.name.startswith("."):
+            continue
+        for ligne in fiche.read_text(encoding="utf-8", errors="ignore").splitlines()[:20]:
+            if ligne.startswith("source:"):
+                source = ligne.split(":", 1)[1].strip()
+                if source:
+                    journal[lien_canonique(source)] = {"statut": "ok", "fiche": fiche.name}
+                break
+    return journal
+
+
 def charger_journal(chemin):
-    if chemin.exists():
-        return json.loads(chemin.read_text(encoding="utf-8"))
-    return {}
+    """Lit journal.json. S'il est illisible (coupure pendant une écriture,
+    fichier abîmé), il est mis de côté et reconstruit depuis les fiches de
+    raw/ : rien n'est retraité inutilement, rien ne bloque."""
+    chemin = Path(chemin)
+    if not chemin.exists():
+        return {}
+    try:
+        journal = json.loads(chemin.read_text(encoding="utf-8"))
+        if isinstance(journal, dict):
+            return journal
+        raise ValueError("le journal n'est pas un objet JSON")
+    except (ValueError, UnicodeDecodeError) as erreur:
+        copie = chemin.with_name(f"{chemin.name}.abime-{datetime.now():%Y%m%d-%H%M%S}")
+        try:
+            os.replace(chemin, copie)
+        except OSError:
+            copie = None
+        log(f"journal.json illisible ({erreur}) : mis de côté"
+            + (f" ({copie.name})" if copie else "")
+            + ", reconstruit depuis les fiches de raw/.")
+        return reconstruire_journal(chemin.parent / "raw")
 
 
 def sauver_journal(chemin, journal):
-    chemin.write_text(
-        json.dumps(journal, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    ecrire_atomique(chemin, json.dumps(journal, ensure_ascii=False, indent=2))
+
+
+def normaliser_journal(journal):
+    """Ramène les clés du journal à leur forme canonique (les journaux écrits
+    avant cette version utilisent le lien brut, paramètres de suivi compris).
+    Si une même vidéo apparaît deux fois, l'entrée « ok » l'emporte."""
+    propre = {}
+    for lien, entree in journal.items():
+        cle = lien_canonique(lien) or lien
+        deja = propre.get(cle)
+        if deja is None or (deja.get("statut") != "ok" and entree.get("statut") == "ok"):
+            propre[cle] = entree
+    return propre
+
+
+def entree_journal(journal, lien):
+    """L'entrée du journal (normalisé) pour ce lien, ou {}."""
+    return journal.get(lien_canonique(lien), {})
 
 
 def nom_plateforme(lien):
@@ -143,7 +242,10 @@ def identifiant(lien):
     fin = lien.split("?")[0].rstrip("/").split("/")[-1]
     fin = re.sub(r"[^A-Za-z0-9_-]", "", fin)[:40]
     plateforme = "tiktok" if "tiktok" in lien else "insta"
-    return f"{plateforme}_{fin or str(abs(hash(lien)))[:10]}"
+    # Repli stable (sha1) : le hash() de Python change à chaque lancement,
+    # un même lien recevrait sinon un nom différent à chaque passage.
+    repli = hashlib.sha1(lien.encode("utf-8")).hexdigest()[:10]
+    return f"{plateforme}_{fin or repli}"
 
 
 # ---------------------------------------------------------------- étapes
@@ -298,6 +400,17 @@ def duree_video(fichier):
         return 0
 
 
+def nettoyer_temporaires(dossier, nom):
+    """Supprime les fichiers temporaires d'une vidéo (audio partiel, sous-titres),
+    qu'elle ait réussi ou échoué."""
+    for motif in (f"{nom}.*", f"subs_{nom}.*"):
+        for fichier in Path(dossier).glob(motif):
+            try:
+                fichier.unlink()
+            except OSError:
+                pass
+
+
 def transcrire(audio, modele):
     if audio is None:
         return ""
@@ -349,18 +462,22 @@ def recuperer_carrousel(lien, cookies):
 
 
 def ecrire_fiche(dossier, nom, lien, meta, transcription, genre, source_texte):
+    # Auteur et titre viennent de la plateforme : ramenés sur une ligne, ils ne
+    # peuvent pas casser l'en-tête de la fiche.
+    auteur = une_ligne(meta.get("uploader") or meta.get("channel")) or "inconnu"
+    titre = une_ligne(meta.get("title")) or nom
     contenu = f"""---
-source: {lien}
+source: {lien_canonique(lien)}
 plateforme: {nom_plateforme(lien)}
 genre: {genre}
-auteur: {meta.get("uploader") or meta.get("channel") or "inconnu"}
+auteur: {auteur}
 duree_s: {meta.get("duration") or ""}
 texte: {source_texte}
 traite_le: {datetime.now():%Y-%m-%d}
 statut: brut
 ---
 
-# {(meta.get("title") or nom)[:120]}
+# {titre[:120]}
 
 ## Description
 {(meta.get("description") or "").strip() or "(vide)"}
@@ -368,7 +485,7 @@ statut: brut
 ## Transcription
 {transcription or "(pas de texte récupéré)"}
 """
-    (dossier / f"{nom}.md").write_text(contenu, encoding="utf-8")
+    ecrire_atomique(dossier / f"{nom}.md", contenu)
 
 
 # ---------------------------------------------------------------- programme
@@ -393,15 +510,15 @@ def main():
         d.mkdir(parents=True, exist_ok=True)
 
     chemin_journal = vault / "journal.json"
-    journal = charger_journal(chemin_journal)
+    journal = normaliser_journal(charger_journal(chemin_journal))
 
     liens = extraire_liens(args.fichier)
     # On ne retente un échec que 2 fois : au-delà, c'est presque toujours un
     # post supprimé/privé, et insister fatigue Instagram plus qu'autre chose.
     a_faire = [
         l for l in liens
-        if journal.get(l, {}).get("statut") != "ok"
-        and journal.get(l, {}).get("tentatives", 0) < 2
+        if entree_journal(journal, l).get("statut") != "ok"
+        and entree_journal(journal, l).get("tentatives", 0) < 2
     ]
     if args.limite:
         a_faire = a_faire[: args.limite]
@@ -482,20 +599,21 @@ def main():
             ecrire_fiche(dossier_raw, nom, lien, meta, transcription,
                          genre, source_texte)
 
-            if audio and audio.exists():
-                audio.unlink()
-
-            journal[lien] = {"statut": "ok", "fiche": f"{nom}.md"}
+            journal[lien_canonique(lien)] = {"statut": "ok", "fiche": f"{nom}.md"}
             reussites += 1
         except Exception as erreur:  # noqa: BLE001 — on continue quoi qu'il arrive
             log(f"    échec : {erreur}")
-            tentatives = journal.get(lien, {}).get("tentatives", 0) + 1
-            journal[lien] = {
+            tentatives = entree_journal(journal, lien).get("tentatives", 0) + 1
+            journal[lien_canonique(lien)] = {
                 "statut": "echec",
                 "erreur": str(erreur)[:300],
                 "tentatives": tentatives,
+                # date de l'essai : le plafond quotidien compte aussi les échecs
+                "essai_le": f"{datetime.now():%Y-%m-%d}",
             }
             echecs += 1
+        finally:
+            nettoyer_temporaires(dossier_temp, nom)
 
         sauver_journal(chemin_journal, journal)
         time.sleep(PAUSE_ENTRE_VIDEOS)
