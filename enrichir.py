@@ -22,6 +22,7 @@ Usage :
 """
 
 import argparse
+import http.client
 import json
 import os
 import re
@@ -90,10 +91,8 @@ TAILLE_FIN_TEXTE = 2000
 # Entrées « en attente » : ajoutées quand aucune clé n'est configurée, puis
 # remplacées par le vrai résumé dès qu'une clé est disponible.
 MARQUEUR_ATTENTE = "(résumé en attente"
-CONTENU_ATTENTE = ("(résumé en attente : ajoute une clé API dans config.env — "
-                   "Bobine remplacera cette entrée automatiquement)")
-CONTENU_ECHEC = ("(résumé en attente : le service d'IA n'a pas répondu, "
-                 "nouvel essai automatique au prochain passage ; voir logs/watch.log)")
+CONTENU_ATTENTE = "(résumé en attente : ta vidéo est enregistrée ; le résumé est facultatif)"
+CONTENU_ECHEC = "(résumé en attente : ta vidéo est enregistrée ; Bobine réessaiera automatiquement)"
 THEMES_ATTENTE = "(en attente)"
 
 # Code de sortie quand une clé est configurée mais qu'AUCUN résumé n'a pu être
@@ -309,6 +308,20 @@ def titre_provisoire(fiche, texte):
     return fiche.stem
 
 
+def pages_a_actualiser(racine, cfg):
+    """Après une interruption, une page manquante ou plus ancienne que l'index
+    est reconstruite au prochain passage, sans nouvel appel payant."""
+    index = racine / "index.md"
+    if not index.is_file():
+        return False
+    pages = [racine / "vault.html"]
+    carte = cfg.get("CARTE", "oui").strip().lower() not in ("non", "no", "n", "0", "false")
+    if carte and decouper_index(index)[1]:
+        pages.append(racine / "graph.html")
+    return any(not page.is_file() or page.stat().st_mtime_ns < index.stat().st_mtime_ns
+               for page in pages)
+
+
 def regenerer_pages(script, racine):
     """Régénère vault.html / graph.html via generate_page.py (si présent)."""
     page_script = script / "generate_page.py"
@@ -317,7 +330,7 @@ def regenerer_pages(script, racine):
     print("Régénération des pages…")
     sous = subprocess.run([sys.executable, str(page_script), "--vault", str(racine)])
     if sous.returncode != 0:
-        print("(les pages n'ont pas pu être régénérées — relance generate_page.py)")
+        print("La page n’a pas pu être actualisée. Bobine réessaiera au prochain passage.")
 
 
 # ------------------------------------------------------------------ modèle
@@ -376,12 +389,41 @@ def demander_resume(cle, adresse, modele, texte_fiche, consigne=CONSIGNE):
                 raise ValueError("réponse sans JSON")
             return json.loads(m.group(0))
         except (urllib.error.URLError, KeyError, IndexError, TypeError, ValueError,
-                json.JSONDecodeError, TimeoutError) as erreur:
+                json.JSONDecodeError, OSError, http.client.HTTPException) as erreur:
             derniere_erreur = erreur
             if isinstance(erreur, urllib.error.HTTPError) and erreur.code in (401, 402, 403):
                 break   # clé refusée ou crédit épuisé : inutile de réessayer
     print("    (" + message_erreur(derniere_erreur, modele) + ")")
     return None
+
+
+def resume_valide(resultat):
+    """Une réponse incomplète ne doit pas passer pour un résumé terminé."""
+    return (isinstance(resultat, dict)
+            and isinstance(resultat.get("titre"), str)
+            and bool(resultat["titre"].strip())
+            and isinstance(resultat.get("contenu"), str)
+            and bool(resultat["contenu"].strip())
+            and isinstance(resultat.get("themes"), (list, str)))
+
+
+def indexer_en_attente(chemin_index, fiches, contenu):
+    """Toutes les vidéos sont visibles AVANT le premier appel à l'IA.
+    La limite et la pause après échec ne limitent que les appels, pas l'index."""
+    deja = {lien_canonique(u) for u in liens_en_attente(chemin_index)}
+    nouvelles = []
+    for fiche, champs in fiches:
+        url = champs.get("source", "")
+        if url and lien_canonique(url) in deja:
+            continue
+        texte = fiche.read_text(encoding="utf-8", errors="ignore")
+        nouvelles.append(construire_entree(titre_provisoire(fiche, texte), url,
+                                         champs.get("auteur", ""), [THEMES_ATTENTE], contenu))
+        deja.add(lien_canonique(url))
+    if nouvelles:
+        # Une seule écriture pour tout le lot (pas de copie complète par fiche).
+        ajouter_entree(chemin_index, "\n".join(nouvelles))
+    return len(nouvelles)
 
 
 # ------------------------------------------------------------------ principal
@@ -401,7 +443,7 @@ def main():
     dossier_fiches = racine / "raw"
 
     if not dossier_fiches.is_dir():
-        print("Dossier raw/ introuvable dans " + str(racine) + " — rien à faire.")
+        print("Aucune vidéo enregistrée pour le moment.")
         return 0
 
     cfg = charger_config(script, racine)
@@ -420,7 +462,9 @@ def main():
         en_attente.append((fiche, champs))
 
     if not en_attente:
-        print("Index à jour — aucune nouvelle fiche à résumer. ✨")
+        if not args.no_pages and pages_a_actualiser(racine, cfg):
+            regenerer_pages(script, racine)
+        print("Tout est à jour. ✨")
         return 0
 
     if args.dry_run:
@@ -433,71 +477,38 @@ def main():
         print("\nMode --dry-run : aucun appel API, aucune écriture.")
         return 0
 
+    # On rend toutes les nouvelles vidéos visibles, même sans clé, sans modèle
+    # ou en cas de panne. --limite ne limite que les demandes de résumé.
+    ajoutees = indexer_en_attente(chemin_index, en_attente,
+                                 CONTENU_ATTENTE if not cle else CONTENU_ECHEC)
+    if not args.no_pages and (ajoutees or pages_a_actualiser(racine, cfg)):
+        regenerer_pages(script, racine)
+
     if not cle:
-        # Sans clé : on indexe quand même les nouvelles fiches, marquées
-        # « résumé en attente ». Elles seront remplacées automatiquement dès
-        # qu'une clé API sera configurée (rattrapage).
-        deja_en_attente = liens_en_attente(chemin_index)
-        ajoutees = 0
-        for fiche, champs in en_attente:
-            if args.limite and ajoutees >= args.limite:
-                break
-            url = champs.get("source", "")
-            if url and lien_canonique(url) in deja_en_attente:
-                continue
-            texte = fiche.read_text(encoding="utf-8", errors="ignore")
-            entree = construire_entree(titre_provisoire(fiche, texte), url,
-                                       champs.get("auteur", ""), [THEMES_ATTENTE],
-                                       CONTENU_ATTENTE)
-            ajouter_entree(chemin_index, entree)
-            deja_en_attente.add(lien_canonique(url))
-            ajoutees += 1
-        if ajoutees:
-            print("Aucune clé API configurée (voir config.example.env) — "
-                  + pluriel(ajoutees, "fiche")
-                  + (" indexée" if ajoutees < 2 else " indexées")
-                  + " en attente de résumé.")
-            if not args.no_pages:
-                regenerer_pages(script, racine)
-        else:
-            print("Aucune clé API configurée — rien de nouveau à indexer.")
-            if len(en_attente) > 1:
-                print("(" + pluriel(len(en_attente), "fiche")
-                      + " attendent leur résumé ; elles sont déjà dans l'index.)")
-            else:
-                print("(" + pluriel(len(en_attente), "fiche")
-                      + " attend son résumé ; elle est déjà dans l'index.)")
+        print("Tes vidéos sont enregistrées et visibles. Les résumés sont facultatifs.")
         return 0
     if not modele:
-        print("API_MODEL n'est pas défini pour ce fournisseur — voir config.example.env.")
-        return 1
+        print("Tes vidéos sont enregistrées. Un réglage du service de résumé manque.")
+        print("Détail pour le dépannage : renseigne API_MODEL dans config.env.")
+        return CODE_ECHEC_API
 
     traitees = echouees = echecs_d_affilee = 0
-    deja_en_attente = liens_en_attente(chemin_index)
     for fiche, champs in en_attente:
         if args.limite and traitees + echouees >= args.limite:
-            print("Limite de " + str(args.limite) + " atteinte — le reste au prochain passage.")
+            print("Limite de " + str(args.limite) + " atteinte : Bobine reprendra automatiquement.")
             break
         if echecs_d_affilee >= ECHECS_AVANT_PAUSE:
-            print(pluriel(echecs_d_affilee, "échec") + " d'affilée : le service d'IA semble indisponible, "
-                  "pause jusqu'au prochain passage.")
+            print(pluriel(echecs_d_affilee, "échec") + " d'affilée : les vidéos sont enregistrées. Bobine réessaiera les résumés plus tard.")
             break
         texte = fiche.read_text(encoding="utf-8", errors="ignore")
         url = champs.get("source", "")
         auteur = champs.get("auteur", "")
         resultat = demander_resume(cle, adresse, modele, texte, consigne)
-        if not isinstance(resultat, dict):
+        if not resume_valide(resultat):
             echouees += 1
             echecs_d_affilee += 1
-            # La fiche reste visible sur la page, marquée « résumé en attente »,
-            # et sera retentée au prochain passage (jamais de fiche invisible).
-            if not url or lien_canonique(url) not in deja_en_attente:
-                ajouter_entree(chemin_index, construire_entree(
-                    titre_provisoire(fiche, texte), url, auteur,
-                    [THEMES_ATTENTE], CONTENU_ECHEC))
-                deja_en_attente.add(lien_canonique(url))
-            print("  ✗ " + fiche.name + " : échec du modèle, fiche affichée « résumé en attente », "
-                  "nouvel essai au prochain passage.")
+            print("  ✗ " + titre_provisoire(fiche, texte)
+                  + " : vidéo enregistrée, résumé à venir. Bobine réessaiera automatiquement.")
             continue
         titre = une_ligne(resultat.get("titre", "")) or fiche.stem
         themes = resultat.get("themes", [])
@@ -514,7 +525,7 @@ def main():
         traitees += 1
         print("  ✓ " + fiche.name + " → « " + titre + " »")
 
-    if (traitees or echouees) and not args.no_pages:
+    if traitees and not args.no_pages:
         regenerer_pages(script, racine)
 
     print("Terminé — " + pluriel(traitees, "fiche")
