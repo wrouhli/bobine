@@ -482,6 +482,43 @@ class Memos(unittest.TestCase):
             self.assertFalse(appel.called)
             self.assertFalse((racine / "memos").exists())
 
+
+    def _compter_rendus(self, racine, reponses, cle=True):
+        appels = []
+
+        def faux_rendu(script, racine_pages):
+            appels.append(1)
+            for page in ("vault.html", "graph.html"):
+                (Path(racine_pages) / page).write_text("<html>", encoding="utf-8")
+        env = {"DEEPSEEK_API_KEY": "cle-de-test"} if cle else {}
+        argv = ["enrichir.py", "--vault", str(racine)]
+        with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, env, clear=True), \
+             mock.patch.object(enrichir, "demander_resume", lambda *a, **k: reponses), \
+             mock.patch.object(enrichir, "regenerer_pages", faux_rendu), \
+             mock.patch("sys.stdout"):
+            enrichir.main()
+        return len(appels)
+
+    def test_un_seul_rendu_quand_les_pages_sont_juste_en_retard(self):
+        # Copie fraîche (pages absentes) + rattrapage : un seul rendu, à la fin.
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 2)
+            self.assertEqual(self._compter_rendus(racine, memo_modele()), 1)
+            # Passage suivant : rien à faire, aucun rendu.
+            self.assertEqual(self._compter_rendus(racine, memo_modele()), 0)
+
+    def test_sans_cle_les_pages_en_retard_sont_refaites(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 2)
+            self.assertEqual(self._compter_rendus(racine, None, cle=False), 1)
+
+    def test_nouvelle_video_visible_tout_de_suite_puis_resumee(self):
+        # Voulu : un rendu dès l'indexation (la vidéo est visible même si l'IA
+        # traîne), un second avec le résumé.
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 1, indexees=False)
+            self.assertEqual(self._compter_rendus(racine, memo_modele()), 2)
+
     def test_memo_illisible_est_refait(self):
         with tempfile.TemporaryDirectory() as dossier:
             racine = self._vault(dossier, 1)
