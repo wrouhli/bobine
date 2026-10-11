@@ -34,3 +34,7 @@ __pycache__/
 .inbox-local.txt
 .watch.lock
 .watch-echecs-lecture
+
+# Compteur privé de la relève
+.ingest-essais.json
+.watch-echecs-resume

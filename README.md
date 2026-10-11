@@ -22,7 +22,7 @@ You share a video from your iPhone. A few minutes later, Bobine has downloaded i
 > 🍎 **Mac + iPhone**: you're in the right place. Download the folder, double-click, done (iCloud, notifications, Crush).
 > 🐧 **Linux / VPS**: the server edition: installer, systemd wake-up, HTTPS page → **[linux/](linux/README.en.md)**
 
-> **🇫🇷 Language:** Bobine speaks French for now: the installer, the pages and the notifications are in French. AI summaries are written in French by default; add `LANGUE_RESUMES=en` to `config.env` to get them in English. *(A fully English onboarding is [on the way](https://github.com/wrouhli/bobine/issues/32).)*
+> **🇫🇷 Language:** Bobine speaks French for now: the installer, the pages and the notifications are in French. AI summaries are in French by default; English summaries are available as an optional setting below. *(A fully English onboarding is [on the way](https://github.com/wrouhli/bobine/issues/32).)*
 
 > **📥 Just downloaded the folder?** Start with **"👉 1. LIS-MOI D'ABORD (installation)"**, a French page that walks you through the install click by click, macOS security questions included. Everything is also detailed in the [Installation](#installation) section.
 
@@ -98,13 +98,13 @@ Installation is **interactive**, guided from start to finish: you choose the **n
 >
 > **Clicked "Placer dans la corbeille"?** No drama: right-click the file in the Trash → "Put Back", or unzip the ZIP again.
 
-**Another method, always reliable: the Terminal** *(and usually no security dialog at all: macOS asks when you double-click a downloaded file, not when you run it from the Terminal)*. Move into the downloaded folder (tip: type `cd` followed by a space, then drag the folder into the Terminal window, and press Enter), then run:
+**If you prefer the Terminal**, you can run the installer yourself. Read the script before authorising it; security prompts can vary with your Mac settings. Move into the downloaded folder (tip: type `cd` followed by a space, then drag the folder into the Terminal window, and press Enter), then run:
 
 ```bash
 ./install.sh    # banner, guided questions, environment + dependencies...
 ```
 
-At the end, everything lives in **your vault folder** (the one you chose): you can then delete the downloaded folder, it is no longer needed.
+At the end, everything lives in **your vault folder** (the one you chose): if you installed into a separate folder, the downloaded folder is no longer needed. If you chose to keep Bobine in the downloaded folder, keep that folder.
 
 *(Optional check, in your vault folder: `.venv/bin/python enrichir.py --dry-run`.)*
 
@@ -118,6 +118,11 @@ DEEPSEEK_API_KEY=sk-…
 
 That's it. The other lines stay empty.
 
+If a summary is delayed, your video is still saved. Bobine will try again automatically. You don't need to watch it or restart it.
+
+<details>
+<summary>Other AI providers and advanced settings (optional)</summary>
+
 Other providers work too, each with its own line:
 
 | Provider | Line in `config.env` | Model |
@@ -128,7 +133,9 @@ Other providers work too, each with its own line:
 | Google Gemini | `GEMINI_API_KEY=…` | `API_MODEL=…` required |
 | Any OpenAI-compatible service | `API_KEY=…` + `API_BASE_URL=…` | `API_MODEL=…` required |
 
-> **If summaries stop working** (key refused, no credit left, or a model the provider has retired), your cards still appear on the page, marked "summary pending". `logs/watch.log` shows the provider's own message, Bobine retries at every run, and you get a notification if it lasts about an hour. A retired model is fixed with one line: `API_MODEL=…`.
+For summaries in English, add `LANGUE_RESUMES=en` to `config.env`. The interface remains in French. DeepSeek's existing default is kept; if your provider stops accepting a model, you can choose another with `API_MODEL=…`.
+
+</details>
 
 ### *Recommended*: the iPhone shortcut (share in one gesture)
 
@@ -207,6 +214,13 @@ cd ~/Bobine     # your vault folder
 
 ## Troubleshooting: the classics
 
+- **A shared video hasn't appeared yet?** Give Bobine up to 15 minutes while your Mac is awake. Check that you used “Send to Bobine” when sharing.
+- **“Résumé en attente”?** Your video is saved. Summaries are optional; if you enabled them and the service is busy, Bobine will retry automatically.
+- **Today's limit reached?** New videos will be processed tomorrow. Summaries for videos already saved can continue today.
+
+<details>
+<summary>Advanced troubleshooting: logs, provider settings and manual commands</summary>
+
 - **Nothing happens after a share** → check `logs/watch.log` (last run + errors). The wake-up runs every 15 minutes, and catches up when the Mac wakes.
 - **"yt-dlp" errors** → Instagram and YouTube change often; updating fixes almost everything: `.venv/bin/pip install -U yt-dlp`
 - **A post never goes through** → it is probably deleted or private (common on old saves): Bobine retries it only twice, then moves on.
@@ -221,13 +235,16 @@ cd ~/Bobine        # your vault folder (the location you chose)
 .venv/bin/python enrichir.py --vault .     # summaries + pages
 ```
 
+
+</details>
+
 ## Uninstalling Bobine
 
-Remove everything, cleanly, from your vault folder:
+Stop Bobine from your library folder:
 
 **Double-click "Désinstaller Bobine.command"** (or, in the Terminal: `./desinstaller.sh`).
 
-It only acts on this folder (never on another vault): it removes the automatic wake-up and the iCloud copy, and can move the folder (cards included) to the Trash. *(Crush, the assistant, is a separate tool: it stays installed if you want to keep it. And on your iPhone, you can delete the "Send to Bobine" shortcut.)*
+It disables background services belonging to this library and offers to remove the iCloud page. **Your local videos and other files stay in place.** If you no longer want them, check the folder and delete it yourself; Bobine never deletes the library automatically. *(Crush, the assistant, is a separate tool: it stays installed if you want to keep it. And on your iPhone, you can delete the "Send to Bobine" shortcut.)*
 
 ## Project structure
 
@@ -243,7 +260,7 @@ Bobine/
 ├── watch.sh            # the wake-up: checks the box and chains everything
 ├── install.sh          # guided installation (environment, wake-up)
 ├── 👉 2. Installer Bobine.command   # double-click: (re)installs
-├── desinstaller.sh     # guided uninstall (wake-up, iCloud, folder)
+├── desinstaller.sh     # stops background services; keeps local files
 ├── Désinstaller Bobine.command # double-click: uninstalls
 ├── requirements.txt    # Python dependencies
 ├── config.example.env  # copy to config.env (API key, settings)

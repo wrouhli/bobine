@@ -134,7 +134,9 @@ Protected by Cloudflare Access (or another gatekeeper upstream)? Start the page 
 
 ## Uninstalling
 
-    ./desinstaller-linux.sh     # removes the wake-up, the link server, and (if you want) the folder
+Your local files are never deleted automatically. Once you have checked the folder, you can remove it yourself if you no longer need it.
+
+    ./desinstaller-linux.sh     # stops background services; keeps your library and all local files
 
 ## Differences from the Mac version
 

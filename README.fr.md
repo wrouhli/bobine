@@ -22,7 +22,7 @@ Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a
 > 🍎 **Mac + iPhone** : tu es au bon endroit. Télécharge le dossier, double-clique, c'est fini (iCloud, notifications, Crush).
 > 🐧 **Linux / VPS**, la version serveur : installeur, réveil systemd, page en HTTPS → **[linux/](linux/README.md)**
 
-> **🌍 Langue des résumés :** les résumés sont écrits en français par défaut. Pour les avoir en anglais, ajoute `LANGUE_RESUMES=en` dans `config.env` (les pages et les messages restent en français).
+> **🌍 Langue des résumés :** les résumés sont écrits en français par défaut. Une option permet de les avoir en anglais ; elle est expliquée dans les réglages avancés ci-dessous.
 
 > **📥 Tu viens de télécharger le dossier ?** Ouvre d'abord **« 👉 1. LIS-MOI D'ABORD (installation) »** : cette page t'accompagne clic par clic pendant l'installation (questions de sécurité de macOS comprises). Tout est aussi détaillé dans la section [Installation](#installation).
 
@@ -98,13 +98,13 @@ L'installation est **interactive**, guidée du début à la fin : tu choisis le 
 >
 > **Tu as cliqué « Placer dans la corbeille » ?** Pas de drame : clic droit sur le fichier dans la corbeille → « Remettre en place », ou re-décompresse le ZIP.
 
-**Autre méthode, toujours fiable : en Terminal** *(et en général sans aucun dialogue de sécurité : macOS pose ses questions quand on double-clique un fichier téléchargé, pas quand on le lance depuis le Terminal)*. Place-toi dans le dossier téléchargé (astuce : tape `cd` suivi d'une espace, puis glisse le dossier dans la fenêtre du Terminal, et appuie sur Entrée), puis lance :
+**Si tu préfères le Terminal**, tu peux lancer toi-même l'installateur. Lis le script avant de l'autoriser ; les demandes de sécurité dépendent des réglages de ton Mac. Place-toi dans le dossier téléchargé (astuce : tape `cd` suivi d'une espace, puis glisse le dossier dans la fenêtre du Terminal, et appuie sur Entrée), puis lance :
 
 ```bash
 ./install.sh    # bannière, questions guidées, environnement + dépendances...
 ```
 
-À la fin, tout vit dans **le dossier de ton vault** (celui que tu as choisi) : tu peux alors supprimer le dossier téléchargé, il ne sert plus à rien.
+À la fin, tout vit dans **le dossier de ton vault** (celui que tu as choisi) : si tu as choisi un dossier séparé, le dossier téléchargé ne sert plus à rien. Si tu as gardé Bobine dans le dossier téléchargé, conserve ce dossier.
 
 *(Vérification facultative, dans le dossier de ton vault : `.venv/bin/python enrichir.py --dry-run`.)*
 
@@ -118,6 +118,11 @@ DEEPSEEK_API_KEY=sk-…
 
 C'est tout. Les autres lignes restent vides.
 
+Si un résumé tarde, ta vidéo est quand même enregistrée. Bobine réessaie automatiquement : pas besoin de surveiller ou de relancer quoi que ce soit.
+
+<details>
+<summary>Autres fournisseurs et réglages avancés (facultatif)</summary>
+
 D'autres fournisseurs marchent aussi, chacun avec sa ligne :
 
 | Fournisseur | Ligne dans `config.env` | Modèle |
@@ -128,7 +133,9 @@ D'autres fournisseurs marchent aussi, chacun avec sa ligne :
 | Google Gemini | `GEMINI_API_KEY=…` | `API_MODEL=…` obligatoire |
 | Tout service compatible OpenAI | `API_KEY=…` + `API_BASE_URL=…` | `API_MODEL=…` obligatoire |
 
-> **Si les résumés ne marchent plus** (clé refusée, crédit épuisé, ou modèle retiré par le fournisseur), tes fiches restent visibles sur la page, marquées « résumé en attente ». `logs/watch.log` affiche le message du fournisseur, Bobine réessaie à chaque passage, et une notification te prévient si ça dure environ une heure. Un modèle retiré se corrige en une ligne : `API_MODEL=…`.
+Pour des résumés en anglais, ajoute `LANGUE_RESUMES=en` dans `config.env`. Les pages et les messages restent en français. Le modèle DeepSeek existant reste le défaut ; si le fournisseur ne l'accepte plus, tu peux en choisir un autre avec `API_MODEL=…`.
+
+</details>
 
 ### *Recommandé* : le raccourci iPhone (partager en un geste)
 
@@ -207,6 +214,13 @@ cd ~/Bobine     # le dossier de ton vault
 
 ## Dépannage : les classiques
 
+- **Ta vidéo partagée n'est pas encore là ?** Attends jusqu'à 15 minutes avec ton Mac réveillé. Vérifie que tu as bien choisi « Send to Bobine » au moment du partage.
+- **« Résumé en attente » ?** Ta vidéo est enregistrée. Le résumé est facultatif ; si tu l'as activé et que le service tarde, Bobine réessaie automatiquement.
+- **La limite du jour est atteinte ?** Les nouvelles vidéos seront traitées demain. Les résumés des vidéos déjà enregistrées peuvent continuer aujourd'hui.
+
+<details>
+<summary>Dépannage avancé : journaux, réglages du fournisseur et commandes manuelles</summary>
+
 - **Rien ne se passe après un partage** → regarde `logs/watch.log` (dernier passage + erreurs). Le réveil tourne toutes les 15 minutes, et rattrape au réveil du Mac.
 - **Erreurs « yt-dlp »** → Instagram et YouTube changent souvent ; la mise à jour règle presque tout : `.venv/bin/pip install -U yt-dlp`
 - **Un post ne passe jamais** → il est probablement supprimé ou privé (fréquent sur les vieilles sauvegardes) : Bobine ne le retente que 2 fois puis passe au suivant.
@@ -221,13 +235,16 @@ cd ~/Bobine        # le dossier de ton vault (l'emplacement que tu as choisi)
 .venv/bin/python enrichir.py --vault .     # résumés + pages
 ```
 
+
+</details>
+
 ## Désinstaller Bobine
 
-Tout retirer, proprement, depuis le dossier de ton vault :
+Arrêter Bobine depuis le dossier de ta bibliothèque :
 
 **Double-clique sur « Désinstaller Bobine.command »** (ou, en Terminal : `./desinstaller.sh`).
 
-Il n'agit que sur ce dossier-ci (jamais sur un autre vault) : il retire le réveil automatique et la copie iCloud, et peut mettre le dossier (fiches comprises) à la corbeille. *(Crush, l'assistant, est un outil à part : il reste installé si tu veux le garder. Et sur ton iPhone, tu peux supprimer le raccourci « Send to Bobine ».)*
+Il désactive les services automatiques de cette bibliothèque et propose de retirer la page iCloud. **Tes vidéos locales et tes autres fichiers restent en place.** Si tu n'en veux plus, vérifie le contenu du dossier puis supprime-le toi-même. Bobine ne supprime jamais automatiquement ta bibliothèque. *(Crush, l'assistant, est un outil à part : il reste installé si tu veux le garder. Et sur ton iPhone, tu peux supprimer le raccourci « Send to Bobine ».)*
 
 ## La structure du projet
 
@@ -243,7 +260,7 @@ Bobine/
 ├── watch.sh            # le réveil : relève la boîte et enchaîne tout
 ├── install.sh          # installation guidée (environnement, réveil)
 ├── 👉 2. Installer Bobine.command   # double-clic : (ré)installe
-├── desinstaller.sh     # désinstallation guidée (réveil, iCloud, dossier)
+├── desinstaller.sh     # arrête les services et conserve les fichiers locaux
 ├── Désinstaller Bobine.command # double-clic : désinstalle
 ├── requirements.txt    # dépendances Python
 ├── config.example.env  # à copier en config.env (clé API, réglages)

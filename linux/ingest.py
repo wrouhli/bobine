@@ -198,6 +198,52 @@ def sauver_journal(chemin, journal):
     ecrire_atomique(chemin, json.dumps(journal, ensure_ascii=False, indent=2))
 
 
+def compter_essais(vault, jour=None):
+    """Chaque essai est compté avant le téléchargement, réussite ou non.
+    Le compteur est séparé des statuts des liens : un nouvel échec ou un
+    succès ne peut pas effacer la trace d'un essai déjà consommé."""
+    vault = Path(vault)
+    jour = jour or f"{datetime.now():%Y-%m-%d}"
+    fichier = vault / ".ingest-essais.json"
+    if fichier.exists():
+        donnees = json.loads(fichier.read_text(encoding="utf-8"))
+        if (not isinstance(donnees, dict) or not isinstance(donnees.get("jour"), str)
+                or type(donnees.get("nombre")) is not int or donnees["nombre"] < 0):
+            raise ValueError("compteur des essais illisible")
+        return donnees["nombre"] if donnees["jour"] == jour else 0
+    # Première exécution après mise à jour : estimation prudente à partir des
+    # données présentes. Les anciens journaux ne détaillent pas chaque essai.
+    total = 0
+    for fiche in (vault / "raw").glob("*.md"):
+        if fiche.name.startswith("."):
+            continue
+        if f"traite_le: {jour}" in fiche.read_text(encoding="utf-8", errors="ignore").splitlines()[:20]:
+            total += 1
+    journal = vault / "journal.json"
+    if journal.exists():
+        try:
+            entrees = json.loads(journal.read_text(encoding="utf-8"))
+            if not isinstance(entrees, dict):
+                return total
+            for entree in entrees.values():
+                if isinstance(entree, dict) and entree.get("essai_le") == jour:
+                    total += max(1, int(entree.get("tentatives", 1)))
+        except (ValueError, TypeError):
+            pass  # le journal sera réparé au chargement ; le compteur reste séparé
+    return total
+
+
+def enregistrer_essai(vault, jour=None):
+    """Réserve un essai avant toute requête. En cas d'échec d'écriture, on ne
+    télécharge rien (un compteur fiable vaut mieux qu'une limite contournée)."""
+    vault = Path(vault)
+    jour = jour or f"{datetime.now():%Y-%m-%d}"
+    nombre = compter_essais(vault, jour) + 1
+    ecrire_atomique(vault / ".ingest-essais.json",
+                    json.dumps({"jour": jour, "nombre": nombre}))
+    return nombre
+
+
 def normaliser_journal(journal):
     """Ramène les clés du journal à leur forme canonique (les journaux écrits
     avant cette version utilisent le lien brut, paramètres de suivi compris).
@@ -492,14 +538,26 @@ statut: brut
 
 def main():
     parseur = argparse.ArgumentParser()
-    parseur.add_argument("fichier", help="fichier contenant les liens")
+    parseur.add_argument("fichier", nargs="?", help="fichier contenant les liens")
     parseur.add_argument("--vault", default=str(VAULT))
     parseur.add_argument("--cookies", default=None,
                          help="navigateur pour les cookies (chrome, firefox, edge)")
     parseur.add_argument("--limite", type=int, default=0,
                          help="ne traiter que les N premières vidéos")
     parseur.add_argument("--modele", default=MODELE_WHISPER)
+    parseur.add_argument("--compter-essais", action="store_true",
+                         help="affiche le compteur du jour, sans télécharger")
+    parseur.add_argument("--plafond-journalier", type=int, default=0,
+                         help="plafond quotidien (0 = sans plafond)")
     args = parseur.parse_args()
+    if args.compter_essais:
+        try:
+            print(compter_essais(Path(args.vault)))
+        except (ValueError, OSError):
+            return 1
+        return 0
+    if not args.fichier:
+        parseur.error("un fichier de liens est nécessaire")
 
     verifier_outils()
 
@@ -541,6 +599,14 @@ def main():
 
     reussites = echecs = 0
     for numero, lien in enumerate(a_faire, 1):
+        try:
+            if args.plafond_journalier and compter_essais(vault) >= args.plafond_journalier:
+                log("La relève reprendra demain. Les résumés déjà en attente continuent.")
+                break
+            enregistrer_essai(vault)
+        except (ValueError, OSError) as erreur:
+            log(f"Relève mise en pause pour protéger la limite quotidienne ({erreur}).")
+            return 1
         nom = identifiant(lien)
         log(f"[{numero}/{len(a_faire)}] {lien}")
         try:
@@ -625,4 +691,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

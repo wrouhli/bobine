@@ -187,7 +187,9 @@ le dépôt Charm :
 
 ## Désinstaller
 
-    ./desinstaller-linux.sh     # retire le réveil, le serveur de liens, et (si tu veux) le dossier
+Tes fichiers locaux ne sont jamais supprimés automatiquement. Après avoir vérifié le contenu du dossier, tu peux le supprimer toi-même si tu n'en as plus besoin.
+
+    ./desinstaller-linux.sh     # arrête les services ; conserve ta bibliothèque et tous tes fichiers locaux
 
 ## Différences avec la version Mac
 

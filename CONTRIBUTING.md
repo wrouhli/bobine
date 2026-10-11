@@ -40,7 +40,7 @@ L'**édition Linux** (`linux/`) a sa suite à côté :
 
     python3 -m unittest discover -s linux/tests
 
-La CI lance aussi `shellcheck -S warning` sur les scripts shell et `ruff check --select F,B` sur le Python : lance-les avant d'envoyer si tu les as (`pip install ruff`).
+Vérifie aussi `shellcheck -S warning` sur les scripts shell et `ruff check --select F,B` sur le Python avant d'envoyer (`pip install ruff`). Ces contrôles passent localement ; leur ajout à la CI est proposé dans la PR d'audit.
 
 La CI lance les deux suites, et vérifie que les fichiers du cœur partagé (ingestion, enrichir, pages, tests communs…) restent **identiques au bit près** entre la racine et `linux/` : un garde-fou contre la dérive.
 
