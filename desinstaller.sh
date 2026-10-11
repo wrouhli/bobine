@@ -91,19 +91,72 @@ fi
 
 # --------------------------------------------------- 3. le dossier du vault
 etape "3/3 — Le dossier de Bobine (fiches comprises)"
-note "Dedans : tes fiches (raw/), ta configuration, l'environnement… tout Bobine."
+# Ce qui appartient à Bobine dans ce dossier : fichiers installés, données
+# créées par Bobine, et fichiers du dépôt quand on l'a installé sur place.
+est_a_bobine() {  # $1 = nom d'un élément du dossier
+  case "$1" in
+    ingest.py|enrichir.py|generate_page.py|graphe.py|filtre.py|inbox_server.py|page_server.py) return 0 ;;
+    watch.sh|install.sh|desinstaller.sh|watch-linux.sh|install-linux.sh|desinstaller-linux.sh|activer-page-web.sh) return 0 ;;
+    requirements.txt|config.example.env|filtres.exemple.yaml|filtres.yaml|LICENSE|CHANGELOG.md|CONTRIBUTING.md|SECURITY.md) return 0 ;;
+    config.env|config.env.bak-*|.crushrc|.crushrc.bak-*|journal.json|journal.json.abime-*|index.md|vault.html|graph.html) return 0 ;;
+    raw|logs|.venv|.temp|.crush|exemples|systemd|themes|tests|assets|linux|.github|.git|__pycache__) return 0 ;;
+    "Ma page.webloc"|"Désinstaller Bobine.command"|"👉 1. LIS-MOI D'ABORD (installation).html"|"👉 2. Installer Bobine.command") return 0 ;;
+    inbox.txt|.inbox-local.txt|*.inbox-local.txt|.watch.lock|.watch-echecs-lecture|.watch-echecs-resume|liens*.txt|.DS_Store|.*.tmp) return 0 ;;
+    README.md|README.fr.md|README.en.md)
+      # Seulement s'ils parlent de Bobine (sinon, ce sont peut-être les tiens).
+      grep -qi "bobine" "$VAULT/$1" 2>/dev/null && return 0 ;;
+    .gitignore)
+      # Celui de Bobine protège journal.json ; un autre est peut-être le tien.
+      grep -q "^journal.json" "$VAULT/$1" 2>/dev/null && return 0 ;;
+  esac
+  return 1
+}
+
+ETRANGERS=""      # éléments qui ne viennent pas de Bobine (affichage)
+NB_ETRANGERS=0
+A_BOBINE=()       # éléments de Bobine (pour un retrait partiel)
+while IFS= read -r element; do
+  [ -n "$element" ] || continue
+  if est_a_bobine "$element"; then
+    A_BOBINE+=("$element")
+  else
+    NB_ETRANGERS=$((NB_ETRANGERS + 1))
+    [ "$NB_ETRANGERS" -le 8 ] && ETRANGERS="$ETRANGERS    · $element
+"
+  fi
+done <<LISTE
+$(/bin/ls -A "$VAULT")
+LISTE
 SUPPRIME="non"
-if confirmer "Le mettre à la corbeille ? (tu pourras le récupérer si besoin)" "n"; then
-  DEST="$HOME/.Trash/$(basename "$VAULT") ($(date '+%Y-%m-%d %H-%M-%S'))"
-  mkdir -p "$HOME/.Trash" 2>/dev/null
-  ( sleep 2; mv "$VAULT" "$DEST" ) >/dev/null 2>&1 &
-  SUPPRIME="oui"
-  ok "D'accord — il part à la corbeille dans une seconde."
-  note "Ton Terminal va se retrouver dans un dossier qui n'existe plus : c'est normal."
-  note "(ferme-le, ou tape :  cd ~ )"
+DEST="$HOME/.Trash/$(basename "$VAULT") ($(date '+%Y-%m-%d %H-%M-%S'))"
+if [ "$NB_ETRANGERS" -gt 0 ]; then
+  # Bobine a été installé dans un dossier qui contenait déjà d'autres fichiers :
+  # on ne met JAMAIS ce dossier entier à la corbeille, seulement ce qui vient de Bobine.
+  avis "Ce dossier contient aussi $NB_ETRANGERS élément(s) qui ne vien(nen)t pas de Bobine :"
+  printf '%s' "$ETRANGERS"
+  [ "$NB_ETRANGERS" -gt 8 ] && note "    · … et d'autres"
+  note "Ceux-là ne seront pas touchés."
+  if confirmer "Mettre à la corbeille UNIQUEMENT les fichiers de Bobine (fiches comprises) ?" "n"; then
+    mkdir -p "$DEST" 2>/dev/null
+    ( sleep 2; for element in "${A_BOBINE[@]}"; do mv "$VAULT/$element" "$DEST/" 2>/dev/null; done ) >/dev/null 2>&1 &
+    SUPPRIME="partiel"
+    ok "D'accord : les fichiers de Bobine partent à la corbeille dans une seconde, tes autres fichiers restent."
+  else
+    note "D'accord, je laisse tout en place."
+  fi
 else
-  note "D'accord — je le laisse tel quel, en place."
-  note "Tu peux le glisser dans la corbeille toi-même quand tu veux."
+  note "Dedans : tes fiches (raw/), ta configuration, l'environnement… tout Bobine."
+  if confirmer "Le mettre à la corbeille ? (tu pourras le récupérer si besoin)" "n"; then
+    mkdir -p "$HOME/.Trash" 2>/dev/null
+    ( sleep 2; mv "$VAULT" "$DEST" ) >/dev/null 2>&1 &
+    SUPPRIME="oui"
+    ok "D'accord — il part à la corbeille dans une seconde."
+    note "Ton Terminal va se retrouver dans un dossier qui n'existe plus : c'est normal."
+    note "(ferme-le, ou tape :  cd ~ )"
+  else
+    note "D'accord — je le laisse tel quel, en place."
+    note "Tu peux le glisser dans la corbeille toi-même quand tu veux."
+  fi
 fi
 
 # ------------------------------------------------------------------- au revoir
@@ -116,7 +169,7 @@ if [ -t 1 ]; then
   done
   printf "\r%*s\r" 36 ""
 fi
-if [ "$SUPPRIME" = "oui" ]; then
+if [ "$SUPPRIME" = "oui" ] || [ "$SUPPRIME" = "partiel" ]; then
   printf "${VERT}${GRAS}  ✨ Bobine est désinstallé — merci d'avoir essayé !${FIN}\n"
   printf "   ${FONCE}(si un jour tu veux revenir : https://github.com/wrouhli/bobine)${FIN}\n\n"
 else
