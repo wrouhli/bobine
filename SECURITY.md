@@ -20,3 +20,17 @@ Hors périmètre : les dépendances (yt-dlp, faster-whisper, gallery-dl, Crush�
 ## Versions
 
 Seule la dernière [release](https://github.com/wrouhli/bobine/releases) (et la branche `main`) sont supportées.
+
+---
+
+## Security policy (English)
+
+Bobine is **local-first**: no server of ours, no account, no telemetry. Risks mainly concern your machine, your vault, and the pieces you choose to expose (the remote page, the link server).
+
+**Please do not open a public issue for a vulnerability.** Use [GitHub private reporting](https://github.com/wrouhli/bobine/security/advisories/new) (Security tab, then "Report a vulnerability"), or contact [@wrouhli](https://github.com/wrouhli). You will get a quick answer, and credit if you wish.
+
+**In scope:** `ingest.py`, `enrichir.py`, `filtre.py`, `generate_page.py`, `graphe.py`, `watch.sh`, `install.sh`, `desinstaller.sh`, and the `linux/` edition (including the optional `inbox_server.py` and `page_server.py`). Content coming from videos or from the AI model that ends up in the pages is in scope too.
+
+**Out of scope:** dependencies (yt-dlp, faster-whisper, gallery-dl, Crush…), to be reported to their own projects, and any service deliberately exposed without a password or upstream protection.
+
+**Supported versions:** only the latest [release](https://github.com/wrouhli/bobine/releases) and the `main` branch.

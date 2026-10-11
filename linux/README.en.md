@@ -84,6 +84,8 @@ Test (the server listens on 127.0.0.1:8785 by default):
 
 To use it remotely, expose it properly via your tunnel (Cloudflare Tunnel, Tailscale) or a password-protected proxy (Caddy, nginx): **never this port in the open on the internet**. A systemd service template is provided in `systemd/bobine-inbox.service`.
 
+Prefer the `Authorization: Bearer …` header. The server also accepts the token in the address (`/push/TOKEN` or `?token=…`) for shortcuts that cannot set headers; Bobine masks it in its own log, but a proxy or tunnel in front may still record full addresses.
+
 ## Viewing the page
 
 `vault.html` (and `graph.html`) live in the vault folder. A few options:
@@ -108,7 +110,7 @@ Protected by Cloudflare Access (or another gatekeeper upstream)? Start the page 
 
 ## Crush (bonus)
 
-[Crush](https://charm.sh/crush) is an AI assistant for the terminal: launched in the vault folder, it reads your cards to answer ("Which videos talk about cooking?"). The installer prepares its settings file (`.crushrc`, read-only, with your key); you only need to install it, from the Charm repository:
+[Crush](https://charm.sh/crush) is an AI assistant for the terminal: launched in the vault folder, it reads your cards to answer ("Which videos talk about cooking?"). The installer prepares its settings file (`.crushrc`, read-only, with your key: Crush can read and search your cards, but its tools for editing files, running commands or going online are removed); you only need to install it, from the Charm repository:
 
     sudo mkdir -p /etc/apt/keyrings
     curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
@@ -125,7 +127,8 @@ Protected by Cloudflare Access (or another gatekeeper upstream)? Start the page 
 ## Troubleshooting
 
 - **Nothing happens** → `tail -50 ~/Bobine/logs/watch.log`; check the inbox (`ls -la ~/Bobine/inbox.txt`) and the timer (`systemctl --user list-timers`).
-- **Summaries don't come through** → no API key in `config.env` (optional; check with `.venv/bin/python enrichir.py --dry-run`).
+- **Summaries don't come through** → no API key in `config.env` (optional; check with `.venv/bin/python enrichir.py --dry-run`). With a key, cards stay "(summary pending)" and `logs/watch.log` shows the provider's message (key refused, no credit, retired model: set `API_MODEL=…`). Bobine retries at every run and calls `NOTIF_CMD` if it lasts about an hour.
+- **Summaries in English** → add `LANGUE_RESUMES=en` to `config.env` (pages and messages stay in French).
 - **systemd --user unavailable** → use the cron line above.
 - **Dependency install fails** → `logs/install.log`; on small machines, some package builds need a system package (`sudo apt install build-essential python3-dev`).
 

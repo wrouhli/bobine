@@ -22,6 +22,8 @@ Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a
 > 🍎 **Mac + iPhone** : tu es au bon endroit. Télécharge le dossier, double-clique, c'est fini (iCloud, notifications, Crush).
 > 🐧 **Linux / VPS**, la version serveur : installeur, réveil systemd, page en HTTPS → **[linux/](linux/README.md)**
 
+> **🌍 Langue des résumés :** les résumés sont écrits en français par défaut. Pour les avoir en anglais, ajoute `LANGUE_RESUMES=en` dans `config.env` (les pages et les messages restent en français).
+
 > **📥 Tu viens de télécharger le dossier ?** Ouvre d'abord **« 👉 1. LIS-MOI D'ABORD (installation) »** : cette page t'accompagne clic par clic pendant l'installation (questions de sécurité de macOS comprises). Tout est aussi détaillé dans la section [Installation](#installation).
 
 ---
@@ -73,7 +75,7 @@ Partager ───────►  boîte iCloud ──►  toutes les 15 min : 
 
 - **Transcription locale** (Whisper) : gratuite. Pour YouTube, Bobine récupère d'abord les **sous-titres** (récupération de quelques kilo-octets, en secondes) et ne transcrit que s'il n'y en a pas.
 - **Résumés** : *facultatifs*, avec ta propre clé API (DeepSeek, OpenAI, OpenRouter…), Bobine écrit pour chaque fiche un titre, des thèmes et un résumé concret, met à jour l'index et régénère les pages.
-- **Garde-fous** : jamais de rafale de téléchargements (15 par passage, 50 par jour maximum), jamais deux passages en même temps, un échec n'est retenté que 2 fois.
+- **Garde-fous** : jamais de rafale de téléchargements (15 par passage, 50 essais par jour au maximum, échecs compris), jamais deux passages en même temps, un échec n'est retenté que 2 fois. Une fiche dont le résumé a échoué reste visible sur ta page, marquée « résumé en attente », et elle est retentée à chaque passage.
 
 ## Ce qu'il te faut
 
@@ -96,7 +98,7 @@ L'installation est **interactive**, guidée du début à la fin : tu choisis le 
 >
 > **Tu as cliqué « Placer dans la corbeille » ?** Pas de drame : clic droit sur le fichier dans la corbeille → « Remettre en place », ou re-décompresse le ZIP.
 
-**Autre méthode, toujours fiable : en Terminal.** Place-toi dans le dossier téléchargé (astuce : tape `cd` suivi d'une espace, puis glisse le dossier dans la fenêtre du Terminal, et appuie sur Entrée), puis lance :
+**Autre méthode, toujours fiable : en Terminal** *(et en général sans aucun dialogue de sécurité : macOS pose ses questions quand on double-clique un fichier téléchargé, pas quand on le lance depuis le Terminal)*. Place-toi dans le dossier téléchargé (astuce : tape `cd` suivi d'une espace, puis glisse le dossier dans la fenêtre du Terminal, et appuie sur Entrée), puis lance :
 
 ```bash
 ./install.sh    # bannière, questions guidées, environnement + dépendances...
@@ -115,6 +117,18 @@ DEEPSEEK_API_KEY=sk-…
 ```
 
 C'est tout. Les autres lignes restent vides.
+
+D'autres fournisseurs marchent aussi, chacun avec sa ligne :
+
+| Fournisseur | Ligne dans `config.env` | Modèle |
+|---|---|---|
+| DeepSeek | `DEEPSEEK_API_KEY=…` | `deepseek-chat` par défaut ; à changer avec `API_MODEL=…` |
+| OpenAI | `OPENAI_API_KEY=…` | `API_MODEL=…` obligatoire (ex. `gpt-4o-mini`) |
+| OpenRouter | `OPENROUTER_API_KEY=…` | `API_MODEL=…` obligatoire |
+| Google Gemini | `GEMINI_API_KEY=…` | `API_MODEL=…` obligatoire |
+| Tout service compatible OpenAI | `API_KEY=…` + `API_BASE_URL=…` | `API_MODEL=…` obligatoire |
+
+> **Si les résumés ne marchent plus** (clé refusée, crédit épuisé, ou modèle retiré par le fournisseur), tes fiches restent visibles sur la page, marquées « résumé en attente ». `logs/watch.log` affiche le message du fournisseur, Bobine réessaie à chaque passage, et une notification te prévient si ça dure environ une heure. Un modèle retiré se corrige en une ligne : `API_MODEL=…`.
 
 ### *Recommandé* : le raccourci iPhone (partager en un geste)
 
@@ -142,7 +156,7 @@ crush
 
 Puis pose tes questions en langage naturel : « Quelles vidéos parlent de cuisine ? », « Résume la vidéo sur le montage », « Quelles idées pour un post ? »… *(exemple dans l'image ci-dessus, sur un Bobine de démonstration.)*
 
-*(L'installation prépare tout : le fichier `.crushrc` du dossier contient ta clé, le modèle DeepSeek et la lecture seule. Pas encore installé ? `brew install charmbracelet/tap/crush` : le script d'installation te l'a proposé.)*
+*(L'installation prépare tout : le fichier `.crushrc` du dossier contient ta clé, le modèle DeepSeek et la lecture seule. Crush peut lire et chercher dans tes fiches, mais ses outils pour modifier des fichiers, lancer des commandes ou aller sur internet sont retirés. Pas encore installé ? `brew install charmbracelet/tap/crush` : le script d'installation te l'a proposé.)*
 
 ## Ton Bobine au quotidien
 
@@ -156,7 +170,7 @@ Puis pose tes questions en langage naturel : « Quelles vidéos parlent de cuisi
 
 Si ton compte a des centaines (ou des milliers) de Reels gardés « pour plus tard », tout ingérer d'un coup serait des heures de transcription pour des fiches jamais relues. **`filtre.py` te laisse trier avant** : il lit ton export, applique tes règles, et seuls les posts retenus partent en transcription. Le tri suit **tes propres collections** : c'est ton rangement qui fait foi.
 
-> 🛡️ **Côté compte, rien à craindre** : l'export se demande via l'outil officiel d'Instagram ; `filtre.py` ne se connecte à rien (tout est local) ; et l'ingestion garde sa cadence douce habituelle (une vidéo à la fois, 15 par passage).
+> 🛡️ **Côté compte, un risque faible** : l'export se demande via l'outil officiel d'Instagram ; `filtre.py` ne se connecte à rien (tout est local) ; et l'ingestion garde sa cadence douce habituelle (une vidéo à la fois, 15 par passage, 50 essais par jour). Aucun téléchargement automatique n'est sans risque, et c'est justement pour ça que ces limites existent.
 
 **1.** Sur Instagram : **Paramètres → Centre des comptes → Vos informations et autorisations → Télécharger vos informations** (format **JSON**). Ça arrive par e-mail, parfois sous 48 h.
 
@@ -196,6 +210,7 @@ cd ~/Bobine     # le dossier de ton vault
 - **Rien ne se passe après un partage** → regarde `logs/watch.log` (dernier passage + erreurs). Le réveil tourne toutes les 15 minutes, et rattrape au réveil du Mac.
 - **Erreurs « yt-dlp »** → Instagram et YouTube changent souvent ; la mise à jour règle presque tout : `.venv/bin/pip install -U yt-dlp`
 - **Un post ne passe jamais** → il est probablement supprimé ou privé (fréquent sur les vieilles sauvegardes) : Bobine ne le retente que 2 fois puis passe au suivant.
+- **Des fiches restent « (résumé en attente) » alors que tu as une clé** → ouvre `logs/watch.log` : le message du fournisseur dit pourquoi (clé refusée, crédit épuisé, modèle retiré). Pour un modèle retiré, mets `API_MODEL=…` dans `config.env` ; Bobine réessaie à chaque passage.
 - **Une fiche sans texte** → la vidéo n'a ni parole ni sous-titres (musique seule). La fiche gardera la description seulement.
 - **Aucune alerte quand le réveil se bloque ?** Si la boîte iCloud devient illisible ~1 h, une notification macOS est envoyée automatiquement.
 - **Relancer à la main** (pour un lot, ou après un import) :
@@ -232,9 +247,12 @@ Bobine/
 ├── Désinstaller Bobine.command # double-clic : désinstalle
 ├── requirements.txt    # dépendances Python
 ├── config.example.env  # à copier en config.env (clé API, réglages)
+├── config.env          # TES réglages et ta clé API (privé, jamais dans le repo)
+├── .crushrc            # réglages de Crush pour ce dossier (ta clé, lecture seule)
 ├── filtres.yaml        # (si tu importes) tes règles de tri, elles restent chez toi
 ├── LICENSE
 ├── raw/                # TES fiches (jamais dans le repo)
+├── journal.json        # ce qui a été traité (réussites, échecs, essais)
 ├── index.md            # l'index condensé (résumés + thèmes)
 ├── vault.html          # la page à consulter
 ├── Ma page.webloc      # double-clic : ouvre la page dans ton navigateur
@@ -248,10 +266,10 @@ Bobine/
 Windows : non. Bobine est pensé et testé pour Mac + iPhone, c'est un choix assumé. **Linux, oui** : une édition Linux/VPS complète existe (installeur, réveil systemd, page en HTTPS, boîte de réception locale) → **[linux/](linux/README.md)**. Même cœur, même licence, même philosophie : tout chez toi.
 
 **Où vont mes données ?**
-Bobine garde ta base de connaissances sur ta machine : aucun compte, aucun serveur à nous, aucune télémétrie. Quelques choses sortent de ta machine, toutes transparentes : le téléchargement des vidéos (Instagram, TikTok, YouTube, comme n'importe quel téléchargeur) ; les téléchargements uniques des dépendances Python et du modèle de transcription ; et, uniquement si tu actives l'IA (résumés, questions à Crush), les textes concernés (transcriptions, fiches, tes questions) envoyés au fournisseur que tu as choisi (DeepSeek, OpenAI, OpenRouter…) avec ta propre clé API. Sur l'édition Mac, la page générée peut aussi être synchronisée via iCloud (proposé à l'installation, désactivable).
+Bobine garde ta base de connaissances sur ta machine : aucun compte, aucun serveur à nous, aucune télémétrie. Quelques choses sortent de ta machine, toutes transparentes : le téléchargement des vidéos (Instagram, TikTok, YouTube, comme n'importe quel téléchargeur), avec les cookies de connexion de ton navigateur pour Instagram et TikTok seulement (sur Mac, Chrome par défaut : macOS peut demander une fois l'accès à « Chrome Safe Storage » ; à changer avec `COOKIES=…`) ; les téléchargements uniques des dépendances Python et du modèle de transcription ; et, uniquement si tu actives l'IA (résumés, questions à Crush), les textes concernés (transcriptions, fiches, tes questions) envoyés au fournisseur que tu as choisi (DeepSeek, OpenAI, OpenRouter…) avec ta propre clé API. Sur l'édition Mac, la page générée peut aussi être synchronisée via iCloud (proposé à l'installation, désactivable).
 
 **Et si je ne mets pas de clé API ?**
-Tout tourne très bien : chaque fiche est quand même créée avec sa transcription et sa description, dans `raw/`, et elle apparaît tout de suite dans ta page, marquée « résumé en attente ». Ajoute une clé quand tu veux : Bobine remplace alors ces entrées par les vrais résumés et thèmes, automatiquement.
+Tout tourne très bien : chaque fiche est quand même créée avec sa transcription et sa description, dans `raw/`, et elle apparaît tout de suite dans ta page, marquée « résumé en attente ». Ajoute une clé quand tu veux : au passage suivant (dans les 15 minutes), Bobine remplace ces entrées par les vrais résumés et thèmes, automatiquement.
 
 **En quoi c'est différent d'Obsidian ou Notion ?**
 Ce n'est pas un remplaçant : Bobine **fabrique** ta bibliothèque. Les fiches sont de simples fichiers Markdown (`raw/`), que tu peux ouvrir avec n'importe quel outil, y compris Obsidian.
