@@ -70,6 +70,238 @@ secret() {  # $1 = texte ; lit sans afficher (pour la clé API)
   printf '%s' "$reponse"
 }
 
+# ------------------------------------- dépendances et réveils (même code Mac et Linux)
+# Ce bloc est identique, octet pour octet, dans install.sh et linux/install-linux.sh
+# (vérifié par tests/test_installation.py). Les détails techniques vont dans
+# logs/install.log ; les messages affichés restent simples.
+
+# Installe requirements.txt dans .venv. L'appelant redirige tout vers
+# logs/install.log. Méthode, dans cet ordre :
+#   a) .venv/bin/pip (cas habituel) ;
+#   b) .venv/bin/python -m pip (pip présent sans son raccourci) ;
+#   c) uv pip, si uv est installé (un environnement créé par uv n'a pas de pip) ;
+#   d) python -m ensurepip pour ajouter pip, puis b).
+# ensurepip n'a pas d'option -q : sa sortie va simplement dans le journal.
+# La méthode retenue est notée en tête du journal.
+installer_dependances() {
+  local py=.venv/bin/python rc
+  if [ -x .venv/bin/pip ]; then
+    echo "Bobine : installation avec .venv/bin/pip"
+    .venv/bin/pip install --upgrade pip -q &&
+      .venv/bin/pip install -q -r requirements.txt
+  elif "$py" -m pip --version >/dev/null 2>&1; then
+    echo "Bobine : installation avec .venv/bin/python -m pip"
+    "$py" -m pip install --upgrade pip -q &&
+      "$py" -m pip install -q -r requirements.txt
+  elif command -v uv >/dev/null 2>&1; then
+    echo "Bobine : pas de pip dans .venv, installation avec uv pip ($(command -v uv))"
+    uv pip install --python "$py" -q -r requirements.txt
+  else
+    echo "Bobine : ni pip ni uv, ajout de pip avec python -m ensurepip puis python -m pip"
+    "$py" -m ensurepip --upgrade &&
+      "$py" -m pip install --upgrade pip -q &&
+      "$py" -m pip install -q -r requirements.txt
+  fi
+  rc=$?
+  if [ "$rc" -ne 0 ]; then echo "Bobine : échec de l'installation des dépendances (code $rc)"; fi
+  return "$rc"
+}
+
+# Lecture des réveils, en Python (bibliothèque standard seulement). Un réveil est
+# un fichier .plist sur Mac (clés ProgramArguments et Label) ou une unité
+# .service sous Linux (lignes ExecStart). Un lien symbolique ou un fichier
+# illisible n'est jamais reconnu comme relevant ce dossier.
+#   lire_reveils examiner FICHIER SCRIPT
+#     code 0 si FICHIER lance SCRIPT (même chemin réel), 1 sinon ; dans ce cas,
+#     affiche le dossier relevé quand il se lit.
+#   lire_reveils anciens DOSSIER SCRIPT EXCLU...
+#     liste « fichier<tabulation>nom » des réveils de DOSSIER (même extension que
+#     le premier EXCLU, sans les EXCLUS) qui lancent SCRIPT ; nom = Label sur Mac,
+#     nom de l'unité sans .service sous Linux.
+#   lire_reveils declenche FICHIER UNITE
+#     code 0 si le .timer ou le .path FICHIER (fichier ordinaire) déclenche UNITE.
+lire_reveils() {
+  "${PY:-python3}" - "$@" <<'PYTHON'
+import os
+import plistlib
+import re
+import shlex
+import sys
+
+
+def ordinaire(fichier):
+    return not os.path.islink(fichier) and os.path.isfile(fichier)
+
+
+def lire(fichier):
+    """(mots, commandes, nom) d'un réveil, ou None s'il est illisible."""
+    if not ordinaire(fichier):
+        return None
+    try:
+        if fichier.endswith(".plist"):
+            with open(fichier, "rb") as f:
+                donnees = plistlib.load(f)
+            mots = donnees.get("ProgramArguments") if isinstance(donnees, dict) else None
+            if not isinstance(mots, list) or not all(isinstance(m, str) for m in mots):
+                return None
+            nom = donnees.get("Label")
+            return mots, [], nom if isinstance(nom, str) else ""
+        home = os.path.expanduser("~")
+        mots, commandes = [], []
+        with open(fichier, encoding="utf-8") as f:
+            for ligne in f:
+                ligne = ligne.strip()
+                if not ligne.startswith("ExecStart="):
+                    continue
+                commande = re.sub(r"%%|%h", lambda m: "%" if m.group() == "%%" else home,
+                                  ligne.split("=", 1)[1].strip())
+                try:
+                    morceaux = shlex.split(commande)
+                except ValueError:
+                    morceaux = commande.split()
+                if morceaux:
+                    morceaux[0] = morceaux[0].lstrip("-@:+!|")
+                mots += morceaux
+                commandes.append(commande)
+        return mots, commandes, os.path.basename(fichier).rsplit(".", 1)[0]
+    except Exception:
+        return None
+
+
+def lance(lu, script):
+    """Le réveil lu lance-t-il script ? Chemin réel identique, ou chemin cité
+    tel quel dans une commande (entre espaces ou guillemets : un chemin avec
+    des espaces écrit sans guillemets reste reconnu, sans confondre
+    /x/Bobine et /x/Bobine-autre)."""
+    mots, commandes = lu[0], lu[1]
+    reel = os.path.realpath(script)
+    if any(os.path.isabs(m) and os.path.realpath(m) == reel for m in mots):
+        return True
+    for commande in commandes:
+        for chemin in {os.path.abspath(script), reel}:
+            debut = commande.find(chemin)
+            while debut >= 0:
+                fin = debut + len(chemin)
+                if ((debut == 0 or commande[debut - 1] in " \t\"'")
+                        and (fin == len(commande) or commande[fin] in " \t\"';")):
+                    return True
+                debut = commande.find(chemin, debut + 1)
+    return False
+
+
+mode = sys.argv[1]
+if mode == "examiner":
+    fichier, script = sys.argv[2], sys.argv[3]
+    lu = lire(fichier)
+    if lu and lance(lu, script):
+        sys.exit(0)
+    if lu:
+        for mot in lu[0]:
+            if os.path.isabs(mot) and os.path.basename(mot) == os.path.basename(script):
+                print(os.path.dirname(mot))
+                break
+    sys.exit(1)
+elif mode == "anciens":
+    dossier, script, exclus = sys.argv[2], sys.argv[3], sys.argv[4:]
+    extension = os.path.splitext(exclus[0])[1]
+    try:
+        noms = sorted(os.listdir(dossier))
+    except OSError:
+        noms = []
+    for nom in noms:
+        if not nom.endswith(extension) or nom in exclus or "\t" in nom or "\n" in nom:
+            continue
+        fichier = os.path.join(dossier, nom)
+        lu = lire(fichier)
+        if lu and lu[2] and "\t" not in lu[2] and "\n" not in lu[2] and lance(lu, script):
+            print(fichier + "\t" + lu[2])
+elif mode == "declenche":
+    fichier, unite = sys.argv[2], sys.argv[3]
+    if not ordinaire(fichier):
+        sys.exit(1)
+    try:
+        with open(fichier, encoding="utf-8") as f:
+            lignes = [ligne.strip() for ligne in f]
+    except Exception:
+        sys.exit(1)
+    cibles = [ligne.split("=", 1)[1].strip() for ligne in lignes if ligne.startswith("Unit=")]
+    defaut = os.path.basename(fichier).rsplit(".", 1)[0] + ".service"
+    sys.exit(0 if set(cibles or [defaut]) == {unite} else 1)
+else:
+    sys.exit(2)
+PYTHON
+}
+
+# Avant d'écrire le réveil de Bobine : s'il existe déjà et relève un AUTRE dossier
+# (ou s'il ne se lit pas, ou si c'est un lien symbolique), on demande avant de le
+# remplacer. Le même dossier : remplacement sans question.
+# Code 0 : on peut écrire le réveil ; 1 : on n'y touche pas.
+reveil_libre() {  # $1 = fichier du réveil de Bobine, $2 = script relevé par ce dossier
+  local autre
+  if [ ! -e "$1" ] && [ ! -L "$1" ]; then return 0; fi
+  if autre="$(lire_reveils examiner "$1" "$2" 2>/dev/null)"; then return 0; fi
+  if [ -z "$autre" ]; then autre="dossier inconnu"; else autre="$(affiche "$autre")"; fi
+  avis "Un réveil existe déjà pour un autre dossier Bobine ($autre)."
+  if confirmer "Le remplacer par celui de ce dossier ?" "n"; then
+    return 0
+  fi
+  note "D'accord, on n'y touche pas : ce dossier n'aura pas de réveil automatique."
+  note "Tu pourras relancer l'installation plus tard pour changer d'avis."
+  return 1
+}
+
+# Le dossier de sauvegarde de ce passage : celui de la mise à jour s'il est déjà
+# choisi, sinon un nouveau (horodaté, rendu unique au besoin). Jamais supprimé.
+dossier_anciens_reveils() {
+  local horodatage n=1
+  if [ -z "${SAUVEGARDE:-}" ]; then
+    horodatage="$(date '+%Y%m%d-%H%M')"
+    SAUVEGARDE="$SCRIPT_DIR/.bobine-sauvegarde-$horodatage"
+    while [ -e "$SAUVEGARDE" ] || [ -L "$SAUVEGARDE" ]; do
+      n=$((n + 1)); SAUVEGARDE="$SCRIPT_DIR/.bobine-sauvegarde-$horodatage-$n"
+    done
+  fi
+  mkdir -p "$SAUVEGARDE/anciens-reveils" 2>/dev/null
+}
+
+ranger_fichier_reveil() {  # $1 = fichier mis de côté dans anciens-reveils/ (jamais écrasé)
+  local destination="$SAUVEGARDE/anciens-reveils/${1##*/}"
+  [ ! -e "$destination" ] && [ ! -L "$destination" ] && mv "$1" "$destination"
+}
+
+# Anciens réveils d'un autre nom qui relèvent CE dossier (d'anciennes installations
+# en ont un, par exemple com.wahid.vaultwatch) : avec celui de Bobine, ce dossier
+# serait relevé deux fois. Pour chacun, on propose de le remplacer ; son fichier
+# est rangé dans le dossier de sauvegarde (retirer_ancien_reveil, propre à chaque
+# édition). Un réveil qui relève un autre dossier n'est jamais touché.
+ranger_anciens_reveils() {  # $1 = dossier des réveils, $2 = script de ce dossier, $3... = réveils de Bobine
+  local liste fichier nom
+  liste="$(lire_reveils anciens "$@" 2>/dev/null)" || liste=""
+  [ -n "$liste" ] || return 0
+  # Lecture sur le descripteur 3 : les réponses, elles, viennent du clavier.
+  while IFS=$'\t' read -r fichier nom <&3; do
+    [ -n "$fichier" ] || continue
+    avis "Un ancien réveil ($nom) relève déjà ce dossier."
+    if confirmer "Le remplacer par celui de Bobine ?" "o"; then
+      retirer_ancien_reveil "$fichier" "$nom"
+    else
+      note "D'accord, il est gardé : deux réveils relèveront ce dossier."
+    fi
+  done 3<<<"$liste"
+}
+# ---------------------------------------------- fin du code commun Mac et Linux
+
+# Mac : arrêter un ancien réveil (par son étiquette, lue dans le fichier) puis
+# ranger son fichier dans le dossier de sauvegarde.
+retirer_ancien_reveil() {  # $1 = fichier .plist, $2 = son étiquette (Label)
+  launchctl bootout "gui/$(id -u)/$2" 2>/dev/null || true
+  if dossier_anciens_reveils && ranger_fichier_reveil "$1"; then
+    ok "Ancien réveil ($2) arrêté, gardé dans ${SAUVEGARDE##*/}/anciens-reveils/"
+  else
+    avis "L'ancien réveil ($2) est arrêté, mais son fichier n'a pas pu être rangé : il reviendra au prochain redémarrage."
+  fi
+}
+
 # Page locale, raccourci « Ma page » et réglage « Demander » : logique partagée
 # avec activer-demander.sh, desactiver-demander.sh et ouvrir-ma-page.sh.
 if [ ! -f "$DEPOT/page-locale.sh" ]; then
@@ -199,26 +431,118 @@ while [ -z "$CIBLE" ]; do
     CIBLE=""; continue
   fi
   if ! CONTENU="$(/bin/ls -Aq "$CIBLE" 2>/dev/null)" || [ -n "$CONTENU" ]; then
+    if [ -f "$CIBLE/config.env" ] || [ -d "$CIBLE/.venv" ]; then
+      # Un Bobine déjà installé ailleurs : on propose de le mettre à jour.
+      # Seuls les fichiers programme changent ; fiches, réglages et pages restent intacts.
+      if confirmer "Ce dossier contient déjà un Bobine. Le mettre à jour en gardant tes fiches et tes réglages ?" "o"; then
+        GARDE="maj"
+        break
+      fi
+      note "D'accord, on n'y touche pas."
+      REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
+      CIBLE=""; continue
+    fi
     avis "Ce dossier contient déjà des fichiers. Choisis un dossier vide pour les protéger."
     REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
     CIBLE=""; continue
   fi
 done
 
+# Copie d'un fichier programme du dépôt vers le vault. Installation neuve : copie
+# simple. Mise à jour : un fichier identique est laissé tel quel, un fichier
+# différent est d'abord mis de côté dans le dossier de sauvegarde, un lien
+# symbolique ou un dossier du même nom n'est jamais écrasé.
+SAUVEGARDE=""; REMPLACES=0; AJOUTES=0; SAUVES=0
+identiques() {  # $1 et $2 ont-ils exactement le même contenu ?
+  if command -v cmp >/dev/null 2>&1; then cmp -s "$1" "$2"; return; fi
+  "${PY:-python3}" -c 'import sys; sys.exit(open(sys.argv[1], "rb").read() != open(sys.argv[2], "rb").read())' "$1" "$2" 2>/dev/null
+}
+installer_fichier() {  # $1 = chemin relatif au dépôt
+  local source="$DEPOT/$1" destination="$CIBLE/$1"
+  [ -f "$source" ] || return 0
+  if [ "$GARDE" = "maj" ]; then
+    if [ -L "$destination" ]; then
+      avis "« $1 » est un lien symbolique chez toi : gardé tel quel, pas mis à jour."
+      return 0
+    fi
+    if [ -d "$destination" ]; then
+      avis "« $1 » est un dossier chez toi : gardé tel quel, pas mis à jour."
+      return 0
+    fi
+    if [ -f "$destination" ]; then
+      if identiques "$source" "$destination"; then return 0; fi
+      if ! mkdir -p "$(dirname "$SAUVEGARDE/$1")" || ! cp -p "$destination" "$SAUVEGARDE/$1"; then
+        avis "Impossible de sauvegarder « $1 » : il est gardé tel quel, pas mis à jour."
+        return 0
+      fi
+      SAUVES=$((SAUVES + 1))
+      if cp "$source" "$destination"; then REMPLACES=$((REMPLACES + 1)); fi
+    else
+      mkdir -p "$(dirname "$destination")" 2>/dev/null
+      if cp "$source" "$destination"; then AJOUTES=$((AJOUTES + 1)); fi
+    fi
+  else
+    mkdir -p "$(dirname "$destination")" 2>/dev/null
+    cp "$source" "$destination"
+  fi
+  if [ -x "$source" ]; then chmod +x "$destination" 2>/dev/null || true; fi
+}
+
 if [ "$GARDE" = "reinstall" ]; then
   ok "Réinstallation dans ton dossier Bobine : $(affiche "$CIBLE")"
 elif [ "$GARDE" = "oui" ]; then
   ok "D'accord — ce dossier devient ton dossier Bobine (il ne sera pas supprimé)."
 else
+  if [ "$GARDE" = "maj" ]; then
+    # Un dossier de sauvegarde par mise à jour, horodaté ; un suffixe le rend unique
+    # si deux mises à jour tombent dans la même minute.
+    HORODATAGE="$(date '+%Y%m%d-%H%M')"
+    SAUVEGARDE="$CIBLE/.bobine-sauvegarde-$HORODATAGE"
+    n=1
+    while [ -e "$SAUVEGARDE" ] || [ -L "$SAUVEGARDE" ]; do
+      n=$((n + 1)); SAUVEGARDE="$CIBLE/.bobine-sauvegarde-$HORODATAGE-$n"
+    done
+    # Le nom du vault : si tu as gardé la proposition, on reprend celui de ta configuration.
+    ANCIEN_NOM="$(grep -m1 '^NOM=' "$CIBLE/config.env" 2>/dev/null | cut -d'=' -f2- | tr -d '"' || true)"
+    if [ -n "${ANCIEN_NOM:-}" ] && [ "$NOM_VAULT" = "${NOM_DEFAUT:-$NOM_VAULT}" ] && [ "$ANCIEN_NOM" != "$NOM_VAULT" ]; then
+      NOM_VAULT="$ANCIEN_NOM"
+      ok "Nom repris de ta configuration : $NOM_VAULT"
+    fi
+  fi
   for f in ingest.py enrichir.py generate_page.py graphe.py filtre.py page_server.py demander.py watch.sh install.sh \
            desinstaller.sh page-locale.sh activer-demander.sh desactiver-demander.sh ouvrir-ma-page.sh \
            requirements.txt config.example.env filtres.exemple.yaml \
-           LICENSE .gitignore; do
-    [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
+           LICENSE; do
+    installer_fichier "$f"
   done
-  [ -d "$DEPOT/exemples" ] && cp -R "$DEPOT/exemples" "$CIBLE/" 2>/dev/null
-  [ -f "$DEPOT/👉 2. Installer Bobine.command" ] && cp "$DEPOT/👉 2. Installer Bobine.command" "$CIBLE/"
-  ok "Fichiers installés dans : $(affiche "$CIBLE")"
+  if [ -d "$DEPOT/exemples" ]; then
+    while IFS= read -r chemin; do
+      installer_fichier "${chemin#"$DEPOT"/}"
+    done < <(find "$DEPOT/exemples" -type f 2>/dev/null)
+  fi
+  installer_fichier "👉 2. Installer Bobine.command"
+  # .gitignore : fourni à l'installation ; un .gitignore déjà présent est à toi, on n'y touche pas.
+  if [ -f "$DEPOT/.gitignore" ] && [ ! -e "$CIBLE/.gitignore" ] && [ ! -L "$CIBLE/.gitignore" ]; then
+    cp "$DEPOT/.gitignore" "$CIBLE/.gitignore"
+  fi
+  if [ "$GARDE" = "maj" ]; then
+    if [ "$REMPLACES" -eq 0 ] && [ "$AJOUTES" -eq 0 ]; then
+      ok "Ton dossier Bobine est déjà à jour : $(affiche "$CIBLE")"
+    else
+      BILAN=""
+      if [ "$REMPLACES" -eq 1 ]; then BILAN="1 fichier remplacé"; fi
+      if [ "$REMPLACES" -gt 1 ]; then BILAN="$REMPLACES fichiers remplacés"; fi
+      if [ "$AJOUTES" -eq 1 ]; then BILAN="${BILAN:+$BILAN, }1 fichier ajouté"; fi
+      if [ "$AJOUTES" -gt 1 ]; then BILAN="${BILAN:+$BILAN, }$AJOUTES fichiers ajoutés"; fi
+      if [ "$SAUVES" -gt 0 ]; then
+        BILAN="$BILAN, anciens fichiers gardés dans ${SAUVEGARDE##*/}/"
+      fi
+      ok "Mise à jour de ton dossier Bobine : $BILAN"
+    fi
+    note "Tes fiches, tes réglages et tes pages n'ont pas bougé."
+  else
+    ok "Fichiers installés dans : $(affiche "$CIBLE")"
+  fi
 fi
 cd "$CIBLE" || exit 1
 SCRIPT_DIR="$(pwd)"
@@ -459,11 +783,18 @@ chmod 600 config.env
 ok "config.env écrit (clé comprise, lisible par toi seul)"
 
 # ---------------------------------------------------------------- réveil (launchd)
-if [ "$REVEIL" = "oui" ]; then
-  PLIST="$HOME/Library/LaunchAgents/com.bobine.watch.plist"
-  if [ -f "$PLIST" ] && ! grep -qF "$SCRIPT_DIR/watch.sh" "$PLIST" 2>/dev/null; then
-    note "Un réveil existait déjà pour un autre dossier — remplacé (Bobine n'en fait tourner qu'un à la fois)."
-  fi
+# Bobine n'en fait tourner qu'un à la fois : celui d'un autre dossier n'est
+# remplacé qu'avec ton accord (reveil_libre). Les anciens réveils d'un autre nom
+# qui relèvent CE dossier sont proposés au remplacement (ranger_anciens_reveils).
+PLIST="$HOME/Library/LaunchAgents/com.bobine.watch.plist"
+if [ "$REVEIL" = "oui" ] && ! reveil_libre "$PLIST" "$SCRIPT_DIR/watch.sh"; then
+  REVEIL="non"
+elif [ "$REVEIL" = "oui" ]; then
+  ranger_anciens_reveils "$HOME/Library/LaunchAgents" "$SCRIPT_DIR/watch.sh" \
+    com.bobine.watch.plist com.bobine.page.plist
+  mkdir -p "$HOME/Library/LaunchAgents"
+  # Un lien symbolique est remplacé par un vrai fichier : sa cible n'est jamais réécrite.
+  if [ -L "$PLIST" ]; then rm -f "$PLIST"; fi
   cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -501,10 +832,8 @@ if [ ! -d .venv ]; then
   "$PY" -m venv .venv || { avis "Impossible de créer l'environnement."; exit 1; }
 fi
 if [ -x .venv/bin/python ]; then
-  (
-    .venv/bin/pip install --upgrade pip -q &&
-    .venv/bin/pip install -q -r requirements.txt
-  ) > logs/install.log 2>&1 &
+  # En arrière-plan, pour afficher l'attente ; méthode et détails : logs/install.log.
+  ( installer_dependances ) > logs/install.log 2>&1 &
   pid=$!
   tours=0
   while kill -0 "$pid" 2>/dev/null; do
@@ -691,7 +1020,7 @@ printf "   4. Un jour, pour arrêter Bobine sans supprimer tes fichiers :  ./des
 if [ "$SYNC" = "oui" ]; then
   printf "      (sur l'iPhone : Fichiers → iCloud Drive → %s → vault.html)\n" "$NOM_VAULT"
 fi
-if [ -z "$GARDE" ]; then
+if [ -z "$GARDE" ] || [ "$GARDE" = "maj" ]; then
   echo
   printf "   ${GRAS}Un dernier réflexe — le ménage :${FIN}\n"
   printf "   • ton vault vit ici :       %s\n" "$(affiche "$CIBLE")"

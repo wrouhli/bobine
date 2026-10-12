@@ -330,6 +330,245 @@ class InstallationSafety(unittest.TestCase):
                 self.assertIn(f"TARGET={depot}", output)
                 self.assertEqual(snapshot(depot), before)
 
+    # ------------------------------------------------------------ mise à jour
+    UPDATE_QUESTION = (
+        "Ce dossier contient déjà un Bobine. "
+        "Le mettre à jour en gardant tes fiches et tes réglages ?"
+    )
+    # Fichiers programme livrés par le dépôt de test, avec leur contenu neuf.
+    UPDATE_PROGRAM = {
+        "ingest.py": "# new core\n",
+        "LICENSE": "fixture license\n",  # identique à l'existant : ni copié, ni sauvegardé
+        "requirements.txt": "yt-dlp\n",  # absent chez l'utilisateur : ajouté
+        "graphe.py": "# new graph\n",  # lien symbolique chez l'utilisateur : conservé
+        "exemples/fiche-exemple.md": "# new example\n",
+    }
+    UPDATE_EDITION = {
+        "install.sh": {"\U0001f449 2. Installer Bobine.command": "#!/bin/bash\n# new\n"},
+        "linux/install-linux.sh": {"systemd/bobine-watch.service": "[Unit]\n# new\n"},
+    }
+    # Fichiers du dépôt qui ne doivent jamais arriver chez l'utilisateur.
+    UPDATE_FOREIGN = {
+        "README.md": "project readme\n",
+        "CHANGELOG.md": "changes\n",
+        "tests/test_x.py": "# test\n",
+        "docs/guide.md": "guide\n",
+        ".gitignore": "project ignore\n",
+    }
+    # Ce qui appartient à l'utilisateur : jamais touché, octet pour octet.
+    UPDATE_PERSONAL = {
+        "config.env": ('NOM="Mes vidéos"\nDEEPSEEK_API_KEY=sk-perso\nPAGE_PASSWORD="secret"\n'
+                       'DEMANDER=non\nNOTIF_CMD="$(touch SENTINEL)"\n'),
+        "Mon profil.txt": "Profil personnel\n",
+        "raw/family.md": "PRIVATE NOTE\n",
+        "memos/family.md": "PRIVATE MEMO\n",
+        "index.md": "My index\n",
+        "journal.json": '{"personal": true}\n',
+        "vault.html": "My page\n",
+        "graph.html": "My graph\n",
+        "logs/watch.log": "PRIVATE LOG\n",
+        "README.md": "Personal notes\n",
+        ".gitignore": "my-ignore\n",
+        "Ma page.webloc": "my shortcut\n",
+        "Activer Demander.command": "#!/bin/bash\n# personal\n",
+        "filtres.yaml": "mes: filtres\n",
+        ".crushrc": "my crush\n",
+        "inbox.txt": "https://example.org/v\n",
+        ".bobine-compteur-2024": "3\n",
+        ".venv/bin/python": "fake venv\n",
+        "exemples/ma-fiche.md": "# mine\n",
+    }
+    # Fichiers programme déjà présents chez l'utilisateur, dans leur ancienne version.
+    UPDATE_OLD = {
+        "ingest.py": "# old core\n",
+        "LICENSE": "fixture license\n",
+        "page-locale.sh": "#!/bin/bash\n# old page module\n",
+        "exemples/fiche-exemple.md": "# old example\n",
+        "\U0001f449 2. Installer Bobine.command": "#!/bin/bash\n# old\n",
+        "systemd/bobine-watch.service": "[Unit]\n# old\n",
+    }
+
+    def write_tree(self, root, files):
+        for relative, content in files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+
+    def make_update_depot(self, name):
+        depot = self.make_depot(name)
+        self.write_tree(depot, {**self.UPDATE_PROGRAM, **self.UPDATE_EDITION[name], **self.UPDATE_FOREIGN})
+        return depot
+
+    def make_existing_bobine(self, name, personal=True):
+        """A vault installed by a previous version, with data and personal files."""
+        vault = self.home / ("Bobine-" + Path(name).stem)
+        vault.mkdir()
+        self.write_tree(vault, self.UPDATE_OLD)
+        (vault / "page-locale.sh").chmod(0o755)
+        if personal:
+            self.write_tree(vault, {k: v.replace("SENTINEL", str(self.sandbox / "config-executed"))
+                                    for k, v in self.UPDATE_PERSONAL.items()})
+            (vault / "Mon profil.txt").chmod(0o600)
+            (vault / "config.env").chmod(0o600)
+        (vault / "private.txt").write_text("PRIVATE\n", encoding="utf-8")
+        (vault / "graphe.py").symlink_to("private.txt")  # un programme remplacé par un lien personnel
+        return vault
+
+    def backups(self, vault):
+        return sorted(p for p in vault.iterdir() if p.name.startswith(".bobine-sauvegarde-"))
+
+    def run_update(self, name, depot, answers, config=False):
+        code = self.installer_harness(name, config) + 'printf "NOM=%s\\n" "$NOM_VAULT"\n'
+        return self.run_bash(["-c", code, "installer-fixture", depot], answers)
+
+    def test_update_replaces_program_files_only_and_backs_up_changed_ones(self):
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                vault = self.make_existing_bobine(name)
+                before_depot = snapshot(depot)
+                before = snapshot(vault)
+                output = self.run_update(name, depot, f"{vault}\no\n")
+                self.assertIn(self.UPDATE_QUESTION, output)
+                self.assertIn("[O/n]", output)
+                self.assertNotIn(REFUSAL, output)
+                self.assertIn(f"TARGET={vault}", output)
+                self.assertIn("NOM=Mes vidéos", output)
+                self.assertIn("Nom repris de ta configuration : Mes vidéos", output)
+                self.assertEqual(snapshot(depot), before_depot, "the downloaded folder stays intact")
+                # Fichiers programme : remplacés par la version du dépôt, le lien gardé.
+                replaced = {**self.UPDATE_PROGRAM, **self.UPDATE_EDITION[name]}
+                del replaced["graphe.py"]
+                replaced["page-locale.sh"] = (depot / "page-locale.sh").read_text(encoding="utf-8")
+                for relative, content in replaced.items():
+                    self.assertEqual((vault / relative).read_text(encoding="utf-8"), content, relative)
+                self.assertEqual(stat.S_IMODE((vault / "page-locale.sh").stat().st_mode), 0o755)
+                self.assertTrue((vault / "graphe.py").is_symlink())
+                self.assertEqual(os.readlink(vault / "graphe.py"), "private.txt")
+                self.assertEqual((vault / "private.txt").read_text(encoding="utf-8"), "PRIVATE\n")
+                self.assertIn("« graphe.py » est un lien symbolique chez toi : gardé tel quel", output)
+                # Sauvegarde : seulement les anciens fichiers dont le contenu différait.
+                backups = self.backups(vault)
+                self.assertEqual(len(backups), 1, backups)
+                backup = backups[0]
+                saved = {str(p.relative_to(backup)): p.read_text(encoding="utf-8")
+                         for p in backup.rglob("*") if p.is_file()}
+                expected_saved = {k: v for k, v in self.UPDATE_OLD.items()
+                                  if k != "LICENSE" and k in replaced}
+                self.assertEqual(saved, expected_saved)
+                self.assertEqual(stat.S_IMODE((backup / "page-locale.sh").stat().st_mode), 0o755)
+                self.assertIn("Mise à jour de ton dossier Bobine : 4 fichiers remplacés, 1 fichier ajouté, "
+                              f"anciens fichiers gardés dans {backup.name}/", output)
+                # Tout le reste est intact, octet pour octet (contenu, droits, dates).
+                after = snapshot(vault)
+                untouched = {k: v for k, v in before.items()
+                             if k not in replaced and k not in ("exemples", "systemd", ".")}
+                for key, value in untouched.items():
+                    self.assertEqual(after[key], value, key)
+                self.assertEqual(before["LICENSE"], after["LICENSE"], "identical file not rewritten")
+                added = set(after) - set(before)
+                self.assertEqual(
+                    added,
+                    {"requirements.txt", backup.name,
+                     *(str(Path(backup.name) / p) for p in
+                       {*expected_saved, *{str(Path(k).parent) for k in expected_saved if "/" in k}})},
+                )
+                for relative in self.UPDATE_FOREIGN:
+                    if relative not in self.UPDATE_PERSONAL:
+                        self.assertFalse((vault / relative).exists(), relative)
+                self.assertFalse(self.calls.exists())
+
+    def test_update_then_keeps_previous_settings_like_a_reinstall(self):
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                vault = self.make_existing_bobine(name)
+                profile_before = snapshot(vault / "Mon profil.txt")
+                answers = f"{vault}\no\no\nn\nn\n" + ("n\n" if name == "install.sh" else "")
+                output = self.run_update(name, depot, answers, config=True)
+                self.assertIn("Une clé API était déjà configurée", output)
+                self.assertIn("Profil conservé", output)
+                config = (vault / "config.env").read_text(encoding="utf-8").splitlines()
+                self.assertIn('NOM="Mes vidéos"', config)
+                self.assertIn("DEEPSEEK_API_KEY=sk-perso", config)
+                self.assertIn('PAGE_PASSWORD="secret"', config)
+                self.assertIn("DEMANDER=non", config)
+                self.assertEqual(stat.S_IMODE((vault / "config.env").stat().st_mode), 0o600)
+                self.assertTrue(any(p.name.startswith("config.env.bak-") for p in vault.iterdir()))
+                self.assertEqual(snapshot(vault / "Mon profil.txt"), profile_before)
+                self.assertFalse((self.sandbox / "config-executed").exists())
+                self.assertEqual((vault / "ingest.py").read_text(encoding="utf-8"), "# new core\n")
+                self.assertNotIn("sk-perso", output)
+                self.assertFalse(self.calls.exists())
+
+    def test_update_declined_asks_again_and_touches_nothing(self):
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                # Détecté par .venv seul : pas de config.env.
+                vault = self.make_existing_bobine(name, personal=False)
+                (vault / ".venv/bin").mkdir(parents=True)
+                (vault / ".venv/bin/python").write_text("fake\n", encoding="utf-8")
+                before = snapshot(vault)
+                empty = self.home / ("empty-" + Path(name).stem)
+                output = self.run_update(name, depot, f"{vault}\nn\n{empty}\n")
+                self.assertIn(self.UPDATE_QUESTION, output)
+                self.assertNotIn(REFUSAL, output)
+                self.assertIn(f"TARGET={empty}", output)
+                self.assertIn("NOM=Bobine", output)
+                self.assertEqual(snapshot(vault), before)
+                self.assertEqual(self.backups(vault), [])
+                self.assertEqual((empty / "ingest.py").read_text(encoding="utf-8"), "# new core\n")
+
+    def test_update_is_not_offered_for_a_folder_that_is_not_bobine(self):
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                foreign = self.home / ("foreign-" + Path(name).stem)
+                foreign.mkdir()
+                self.write_tree(foreign, {"ingest.py": "private core\n", "LICENSE": "mine\n",
+                                          "raw/x.md": "private\n"})
+                before = snapshot(foreign)
+                empty = self.home / ("empty-" + Path(name).stem)
+                output = self.run_update(name, depot, f"{foreign}\no\n{empty}\n")
+                self.assertIn(REFUSAL, output)
+                self.assertNotIn("déjà un Bobine", output)
+                self.assertIn(f"TARGET={empty}", output)
+                self.assertEqual(snapshot(foreign), before)
+                self.assertEqual(self.backups(foreign), [])
+
+    def test_update_backup_folder_is_unique_and_repeat_reports_up_to_date(self):
+        # Horloge figée : deux mises à jour dans la même minute ne partagent pas de dossier.
+        self.stub("date", "#!/bin/bash\necho 20240102-0304\n")
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                vault = self.make_existing_bobine(name)
+                taken = vault / ".bobine-sauvegarde-20240102-0304"
+                taken.mkdir()
+                (taken / "marker").write_text("older backup\n", encoding="utf-8")
+                taken_before = snapshot(taken)
+                output = self.run_update(name, depot, f"{vault}\no\n")
+                self.assertIn("gardés dans .bobine-sauvegarde-20240102-0304-2/", output)
+                self.assertEqual(snapshot(taken), taken_before)
+                second = vault / ".bobine-sauvegarde-20240102-0304-2"
+                self.assertEqual((second / "ingest.py").read_text(encoding="utf-8"), "# old core\n")
+                # Nouvelle version du dépôt : nouveau dossier, qui garde la version intermédiaire.
+                (depot / "ingest.py").write_text("# newer core\n", encoding="utf-8")
+                output = self.run_update(name, depot, f"{vault}\no\n")
+                self.assertIn("Mise à jour de ton dossier Bobine : 1 fichier remplacé, "
+                              "anciens fichiers gardés dans .bobine-sauvegarde-20240102-0304-3/", output)
+                third = vault / ".bobine-sauvegarde-20240102-0304-3"
+                self.assertEqual(sorted(p.name for p in third.rglob("*")), ["ingest.py"])
+                self.assertEqual((third / "ingest.py").read_text(encoding="utf-8"), "# new core\n")
+                self.assertEqual((vault / "ingest.py").read_text(encoding="utf-8"), "# newer core\n")
+                # Rien de neuf : déjà à jour, aucun dossier de sauvegarde supplémentaire.
+                before = snapshot(vault)
+                output = self.run_update(name, depot, f"{vault}\no\n")
+                self.assertIn("Ton dossier Bobine est déjà à jour", output)
+                self.assertEqual(snapshot(vault), before)
+                self.assertEqual(len(self.backups(vault)), 3)
+
     def test_openai_choice_generates_key_and_model_without_extra_question(self):
         for name in INSTALLERS:
             with self.subTest(script=name):
@@ -859,49 +1098,70 @@ class InstallationSafety(unittest.TestCase):
                 self.assertFalse((self.sandbox / "executed").exists())
 
     def test_both_installers_regenerate_existing_page_after_dependencies_without_enrichment(self):
+        # Deux façons d'installer : .venv/bin/pip (cas habituel) et, pour un
+        # environnement créé par uv (sans pip), « uv pip ». Dans les deux cas, la
+        # page n'est générée qu'après les dépendances, et rien ne part sur le réseau.
+        variants = {
+            "pip": ["pip install --upgrade pip -q", "pip install -q -r requirements.txt", "generate"],
+            "uv": ["python -m pip --version",
+                   "uv pip install --python .venv/bin/python -q -r requirements.txt", "generate"],
+        }
         for name in INSTALLERS:
-            with self.subTest(installer=name):
-                vault = self.home / ("generation-" + Path(name).stem)
-                vault.mkdir()
-                (vault / ".venv/bin").mkdir(parents=True)
-                (vault / ".venv/bin/python").symlink_to(sys.executable)
-                pip = vault / ".venv/bin/pip"
-                pip.write_text('#!/bin/bash\nprintf "pip %s\\n" "$*" >> "$CALL_LOG"\n')
-                pip.chmod(0o755)
-                for module in ("ingest.py", "enrichir.py"):
-                    shutil.copy2(ROOT / module, vault / module)
-                # Executes the real generator; the wrapper checks dependency ordering.
-                (vault / "generate_page.py").write_text(
-                    'import os, runpy\nfrom pathlib import Path\n'
-                    'assert "install -q -r requirements.txt" in Path(os.environ["CALL_LOG"]).read_text()\n'
-                    'with open(os.environ["CALL_LOG"], "a") as f: f.write("generate\\n")\n'
-                    # Any unexpected network attempt in generation fails this test.
-                    'import socket\n'
-                    'def forbidden(*a, **k): raise AssertionError("network forbidden")\n'
-                    'socket.socket.connect = forbidden\n'
-                    'socket.create_connection = forbidden\n'
-                    f'runpy.run_path({str(ROOT / name).rsplit("/", 1)[0] + "/generate_page.py"!r}, run_name="__main__")\n')
-                (vault / "config.env").write_text("CARTE=non\nSYNC_ICLOUD=non\n")
-                (vault / "vault.html").write_text("old version without chat")
-                (vault / "index.md").write_text("# Index\n")
-                (vault / "journal.json").write_text('{"personal": true}\n')
-                data_before = (vault / "index.md").read_bytes(), (vault / "journal.json").read_bytes()
-                for command in ("ffmpeg", "sleep"):
-                    (self.bin / command).write_text("#!/bin/bash\nexit 0\n")
-                    (self.bin / command).chmod(0o755)
-                text = (ROOT / name).read_text()
-                helpers = text[text.index("if [ -t 1 ]; then"):text.index("# ------------------------------------------------------------------- bannière")]
-                deps = text.split("# ---------------------------------------------------------------- 6. dépendances\n", 1)[1]
-                # Les deux éditions génèrent la page juste après les dépendances
-                # (bloc « génération locale »), avant toute question sur Demander.
-                deps = deps.split("# ---------------------------------------------------------------- génération locale", 1)[0]
-                code = ('set -u\nSCRIPT_DIR="$1"\nPY="$2"\ncd "$1" || exit 1\nDEPOT="$3"\n'
-                        + helpers + deps + '\npreparer_page\n')
-                self.run_bash(["-c", code, "generation", vault, sys.executable, (ROOT / name).parent])
-                self.assertIn("Demander", (vault / "vault.html").read_text())
-                self.assertEqual(data_before, ((vault / "index.md").read_bytes(), (vault / "journal.json").read_bytes()))
-                self.assertEqual(self.calls.read_text().splitlines(), ["pip install --upgrade pip -q", "pip install -q -r requirements.txt", "generate"])
-                self.calls.unlink()
+            for variant, expected in variants.items():
+                with self.subTest(installer=name, variant=variant):
+                    self.check_generation_after_dependencies(name, variant, expected)
+
+    def check_generation_after_dependencies(self, name, variant, expected):
+        vault = self.home / ("generation-" + Path(name).stem + "-" + variant)
+        vault.mkdir()
+        (vault / ".venv/bin").mkdir(parents=True)
+        uv = self.bin / "uv"
+        if variant == "pip":
+            (vault / ".venv/bin/python").symlink_to(sys.executable)
+            pip = vault / ".venv/bin/pip"
+            pip.write_text('#!/bin/bash\nprintf "pip %s\\n" "$*" >> "$CALL_LOG"\n')
+            pip.chmod(0o755)
+        else:
+            # Environnement sans pip : « -m pip » et « -m ensurepip » échouent,
+            # tout le reste (la génération) passe au vrai Python.
+            self.stub_python(vault, delegate=True)
+            self.stub("uv", '#!/bin/bash\nprintf "uv %s\\n" "$*" >> "$CALL_LOG"\n')
+        for module in ("ingest.py", "enrichir.py"):
+            shutil.copy2(ROOT / module, vault / module)
+        # Executes the real generator; the wrapper checks dependency ordering.
+        (vault / "generate_page.py").write_text(
+            'import os, runpy\nfrom pathlib import Path\n'
+            'assert "-q -r requirements.txt" in Path(os.environ["CALL_LOG"]).read_text()\n'
+            'with open(os.environ["CALL_LOG"], "a") as f: f.write("generate\\n")\n'
+            # Any unexpected network attempt in generation fails this test.
+            'import socket\n'
+            'def forbidden(*a, **k): raise AssertionError("network forbidden")\n'
+            'socket.socket.connect = forbidden\n'
+            'socket.create_connection = forbidden\n'
+            f'runpy.run_path({str(ROOT / name).rsplit("/", 1)[0] + "/generate_page.py"!r}, run_name="__main__")\n')
+        (vault / "config.env").write_text("CARTE=non\nSYNC_ICLOUD=non\n")
+        (vault / "vault.html").write_text("old version without chat")
+        (vault / "index.md").write_text("# Index\n")
+        (vault / "journal.json").write_text('{"personal": true}\n')
+        data_before = (vault / "index.md").read_bytes(), (vault / "journal.json").read_bytes()
+        for command in ("ffmpeg", "sleep"):
+            (self.bin / command).write_text("#!/bin/bash\nexit 0\n")
+            (self.bin / command).chmod(0o755)
+        text = (ROOT / name).read_text()
+        helpers = text[text.index("if [ -t 1 ]; then"):text.index("# ------------------------------------------------------------------- bannière")]
+        deps = text.split("# ---------------------------------------------------------------- 6. dépendances\n", 1)[1]
+        # Les deux éditions génèrent la page juste après les dépendances
+        # (bloc « génération locale »), avant toute question sur Demander.
+        deps = deps.split("# ---------------------------------------------------------------- génération locale", 1)[0]
+        code = ('set -u\nSCRIPT_DIR="$1"\nPY="$2"\ncd "$1" || exit 1\nDEPOT="$3"\n'
+                + helpers + deps + '\npreparer_page\n')
+        self.run_bash(["-c", code, "generation", vault, sys.executable, (ROOT / name).parent])
+        self.assertIn("Demander", (vault / "vault.html").read_text())
+        self.assertEqual(data_before, ((vault / "index.md").read_bytes(), (vault / "journal.json").read_bytes()))
+        self.assertEqual(self.calls.read_text().splitlines(), expected)
+        self.calls.unlink()
+        if uv.exists():
+            uv.unlink()
 
     def test_linux_generation_uses_effective_data_vault(self):
         code = self.home / "linux-code"
@@ -1731,6 +1991,425 @@ class InstallationSafety(unittest.TestCase):
         self.assertIn("Demander        : oui", output)
         self.assertIn("./ouvrir-ma-page.sh", output)
         self.assertIn("Page régénérée localement", output)
+
+
+    # ------------------------------------------------------------ code commun Mac et Linux
+    COMMON_START = "# ------------------------------------- dépendances et réveils (même code Mac et Linux)"
+    COMMON_END = "# ---------------------------------------------- fin du code commun Mac et Linux"
+
+    def test_dependency_and_wakeup_code_is_identical_in_both_editions(self):
+        blocks = []
+        for name in INSTALLERS:
+            text = (ROOT / name).read_text(encoding="utf-8")
+            self.assertEqual(text.count(self.COMMON_START), 1, name)
+            blocks.append(text[text.index(self.COMMON_START):text.index(self.COMMON_END)])
+            self.assertIn("( installer_dependances ) > logs/install.log 2>&1 &", text)
+            self.assertNotIn(".venv/bin/pip install", text.split(self.COMMON_END, 1)[1])
+            self.assertEqual(text.count("retirer_ancien_reveil() {"), 1, name)
+        self.assertEqual(blocks[0], blocks[1])
+        for function in ("installer_dependances", "lire_reveils", "reveil_libre",
+                         "dossier_anciens_reveils", "ranger_fichier_reveil", "ranger_anciens_reveils"):
+            self.assertIn(f"\n{function}() {{", blocks[0])
+        self.assertNotIn("\u2014", blocks[0])
+
+    # ------------------------------------------------------------ dépendances sans pip
+    def stub_python(self, vault, delegate=False):
+        """Faux .venv/bin/python : « -m pip » ne marche qu'avec PIP_MODULE=1 ou
+        après un « -m ensurepip » réussi (ENSUREPIP_OK=1) ; PIP_INSTALL_FAIL=1 fait
+        échouer « -m pip install ». Chaque appel est noté dans CALL_LOG. Avec
+        delegate, tout autre appel passe au vrai Python (génération de la page)."""
+        script = ('#!/bin/bash\n'
+                  'ajoute="$(dirname "$0")/pip-ajoute"\n'
+                  'case "$1 ${2:-}" in\n'
+                  '  "-m pip")\n'
+                  '    printf "python %s\\n" "$*" >> "$CALL_LOG"\n'
+                  '    [ "${PIP_MODULE:-0}" = 1 ] || [ -e "$ajoute" ] || { echo "No module named pip" >&2; exit 1; }\n'
+                  '    [ "${3:-}" = install ] && [ "${PIP_INSTALL_FAIL:-0}" = 1 ] && exit 1\n'
+                  '    exit 0 ;;\n'
+                  '  "-m ensurepip")\n'
+                  '    printf "python %s\\n" "$*" >> "$CALL_LOG"\n'
+                  '    [ "${ENSUREPIP_OK:-0}" = 1 ] || exit 1\n'
+                  '    touch "$ajoute"; exit 0 ;;\n'
+                  'esac\n')
+        if delegate:
+            script += f'exec {shlex.quote(sys.executable)} "$@"\n'
+        else:
+            script += 'printf "python %s\\n" "$*" >> "$CALL_LOG"\nexit 0\n'
+        python = vault / ".venv/bin/python"
+        python.write_text(script)
+        python.chmod(0o755)
+        return python
+
+    def run_dependencies(self, name, vault):
+        """Exécute la vraie étape « 6. dépendances », avec ses faux outils."""
+        text = (ROOT / name).read_text()
+        helpers = text[text.index("if [ -t 1 ]; then"):text.index("# ------------------------------------------------------------------- bannière")]
+        deps = text.split("# ---------------------------------------------------------------- 6. dépendances\n", 1)[1]
+        deps = deps.split("# ---------------------------------------------------------------- génération locale", 1)[0]
+        code = ('set -u\nSCRIPT_DIR="$1"\nPY="$2"\ncd "$1" || exit 1\nDEPOT="$3"\n'
+                + helpers + deps + '\necho FIN-DES-DEPENDANCES\n')
+        return self.run_any(["-c", code, "dependances", vault, sys.executable, (ROOT / name).parent])
+
+    def check_dependencies(self, expected, log_line, pip=False, uv=False, env=None, success=True):
+        if not uv and shutil.which("uv", path=os.defpath):
+            self.skipTest("uv présent dans le PATH système : branche sans uv non testable")
+        for name in INSTALLERS:
+            with self.subTest(installer=name):
+                vault = self.home / ("dependances-" + Path(name).stem)
+                (vault / ".venv/bin").mkdir(parents=True)
+                (vault / "requirements.txt").write_text("yt-dlp\n")
+                self.stub_python(vault)
+                if pip:
+                    stub = vault / ".venv/bin/pip"
+                    stub.write_text('#!/bin/bash\nprintf "pip %s\\n" "$*" >> "$CALL_LOG"\n')
+                    stub.chmod(0o755)
+                if uv:
+                    self.stub("uv", '#!/bin/bash\nprintf "uv %s\\n" "$*" >> "$CALL_LOG"\n'
+                                    '[ "${UV_FAIL:-0}" = 1 ] && exit 1\nexit 0\n')
+                for command in ("ffmpeg", "sleep"):
+                    self.stub(command, "#!/bin/bash\nexit 0\n")
+                env_before = dict(self.env)
+                self.env.update(env or {})
+                try:
+                    code, output = self.run_dependencies(name, vault)
+                finally:
+                    self.env = env_before
+                if success:
+                    self.assertEqual(code, 0, output)
+                    self.assertIn("Dépendances installées", output)
+                    self.assertIn("FIN-DES-DEPENDANCES", output)
+                else:
+                    self.assertEqual(code, 1, output)
+                    self.assertIn("L'installation des dépendances a échoué", output)
+                    self.assertIn("détails dans logs/install.log", output)
+                    self.assertNotIn("FIN-DES-DEPENDANCES", output)
+                self.assertEqual(self.calls.read_text().splitlines(), expected)
+                log = (vault / "logs/install.log").read_text()
+                self.assertIn(log_line, log)
+                if not success:
+                    self.assertIn("Bobine : échec de l'installation des dépendances", log)
+                for jargon in ("pip", "uv ", "ensurepip", "venv/bin"):
+                    self.assertNotIn(jargon, output)
+                self.calls.unlink()
+                shutil.rmtree(vault)
+                if (self.bin / "uv").exists():
+                    (self.bin / "uv").unlink()
+
+    def test_dependencies_a_use_venv_pip_first(self):
+        # pip présent : utilisé tel quel, même si uv est là ; Python n'est pas sondé.
+        self.check_dependencies(
+            ["pip install --upgrade pip -q", "pip install -q -r requirements.txt"],
+            "Bobine : installation avec .venv/bin/pip", pip=True, uv=True, env={"PIP_MODULE": "1"})
+
+    def test_dependencies_b_use_python_module_pip_without_pip_command(self):
+        self.check_dependencies(
+            ["python -m pip --version", "python -m pip install --upgrade pip -q",
+             "python -m pip install -q -r requirements.txt"],
+            "Bobine : installation avec .venv/bin/python -m pip", uv=True, env={"PIP_MODULE": "1"})
+
+    def test_dependencies_c_use_uv_for_an_environment_without_pip(self):
+        # Environnement créé par uv : pas de pip, pas de mise à jour de pip.
+        self.check_dependencies(
+            ["python -m pip --version", "uv pip install --python .venv/bin/python -q -r requirements.txt"],
+            "Bobine : pas de pip dans .venv, installation avec uv pip", uv=True)
+
+    def test_dependencies_d_add_pip_with_ensurepip_when_nothing_else(self):
+        # ensurepip n'a pas d'option -q : appelé avec --upgrade seulement.
+        self.check_dependencies(
+            ["python -m pip --version", "python -m ensurepip --upgrade",
+             "python -m pip install --upgrade pip -q", "python -m pip install -q -r requirements.txt"],
+            "Bobine : ni pip ni uv, ajout de pip avec python -m ensurepip", env={"ENSUREPIP_OK": "1"})
+
+    def test_dependencies_total_failure_stops_with_simple_message(self):
+        self.check_dependencies(
+            ["python -m pip --version", "python -m ensurepip --upgrade"],
+            "Bobine : ni pip ni uv, ajout de pip avec python -m ensurepip", success=False)
+
+    def test_dependencies_failure_of_chosen_method_stops(self):
+        # La méthode choisie échoue (ici uv) : arrêt, détails dans le journal.
+        self.check_dependencies(
+            ["python -m pip --version", "uv pip install --python .venv/bin/python -q -r requirements.txt"],
+            "Bobine : pas de pip dans .venv, installation avec uv pip", uv=True,
+            env={"UV_FAIL": "1"}, success=False)
+
+    # ------------------------------------------------------------ réveils déjà présents
+    # (dossier des réveils, réveil de Bobine, script relevé)
+    REVEILS = {
+        "install.sh": ("Library/LaunchAgents", "com.bobine.watch.plist", "watch.sh"),
+        "linux/install-linux.sh": (".config/systemd/user", "bobine-watch.service", "watch-linux.sh"),
+    }
+
+    def reveil_harness(self, name):
+        """Exécute le vrai bloc du réveil (Mac : « réveil (launchd) », Linux : étape 7)."""
+        text = (ROOT / name).read_text()
+        helpers = text[text.index("if [ -t 1 ]; then"):text.index("# ------------------------------------------------------------------- bannière")]
+        if name == "install.sh":
+            block = text.split("# ---------------------------------------------------------------- réveil (launchd)\n", 1)[1]
+            block = block.split("# ---------------------------------------------------------------- 6. dépendances", 1)[0]
+        else:
+            block = text.split("# ---------------------------------------------------------------- 7. réveil + finitions\n", 1)[1]
+            block = block.split("# Bonus : Crush", 1)[0]
+        return ('set -u\nSCRIPT_DIR="$1"\nPY="$2"\nDEPOT="$3"\nSAUVEGARDE="$4"\nUSER=testeur\n'
+                'cd "$SCRIPT_DIR" || exit 1\n' + helpers + 'REVEIL=oui\n' + block
+                + '\nprintf "\\nREVEIL=%s\\n" "$REVEIL"\n')
+
+    def run_reveil(self, name, vault, answers="", sauvegarde=""):
+        self.stub("loginctl", '#!/bin/bash\nprintf "loginctl %s\\n" "$*" >> "$CALL_LOG"\necho Linger=yes\n')
+        self.stub("date", "#!/bin/bash\necho 20240102-0304\n")
+        return self.run_bash(["-c", self.reveil_harness(name), "reveil", vault, sys.executable,
+                              (ROOT / name).parent, sauvegarde], answers)
+
+    def reveil_vault(self, name, prefix="Mon Bobine"):
+        vault = self.home / f"{prefix} {Path(name).stem}"
+        vault.mkdir()
+        (vault / self.REVEILS[name][2]).write_text("#!/bin/bash\n")
+        return vault
+
+    def reveil_content(self, name, folder, label="com.bobine.watch"):
+        script = folder / self.REVEILS[name][2]
+        if name == "install.sh":
+            return plistlib.dumps({"Label": label, "ProgramArguments": ["/bin/bash", str(script)],
+                                   "Ancien": True})
+        return ("[Unit]\nDescription=ancien\n\n[Service]\nType=oneshot\n"
+                f"ExecStart=/bin/bash {shlex.quote(str(script))}\n").encode()
+
+    def reveil_directory(self, name):
+        directory = self.home / self.REVEILS[name][0]
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    def assert_bobine_reveil_for(self, name, vault):
+        own = self.home / self.REVEILS[name][0] / self.REVEILS[name][1]
+        self.assertFalse(own.is_symlink())
+        if name == "install.sh":
+            data = plistlib.loads(own.read_bytes())
+            self.assertEqual(data["Label"], "com.bobine.watch")
+            self.assertEqual(data["ProgramArguments"], ["/bin/bash", str(vault / "watch.sh")])
+            self.assertNotIn("Ancien", data)
+        else:
+            text = own.read_text()
+            self.assertIn(f"\nExecStart=/bin/bash {vault}/watch-linux.sh\n", text)
+            self.assertNotIn("Description=ancien", text)
+
+    def assert_reveil_activated(self, name):
+        calls = self.calls.read_text()
+        if name == "install.sh":
+            plist = self.home / "Library/LaunchAgents/com.bobine.watch.plist"
+            self.assertIn(f"launchctl bootstrap gui/{os.getuid()} {plist}\n", calls)
+        else:
+            self.assertIn("systemctl --user enable --now bobine-watch.timer\n", calls)
+            self.assertIn("systemctl --user enable --now bobine-watch.path\n", calls)
+
+    def reset_reveils(self, *paths):
+        for path in paths:
+            if path.is_symlink() or path.is_file():
+                path.unlink()
+            elif path.exists():
+                shutil.rmtree(path)
+        if self.calls.exists():
+            self.calls.unlink()
+
+    def test_reveil_of_another_folder_is_kept_by_default_and_replaced_on_yes(self):
+        for name in INSTALLERS:
+            with self.subTest(installer=name):
+                vault = self.reveil_vault(name)
+                # Même préfixe que ce dossier : ce n'est pas le même dossier.
+                other = Path(str(vault) + "-autre")
+                other.mkdir()
+                directory = self.reveil_directory(name)
+                own = directory / self.REVEILS[name][1]
+                own.write_bytes(self.reveil_content(name, other))
+                if name != "install.sh":
+                    (directory / "bobine-watch.timer").write_text("[Timer]\nOnCalendar=*:0/15\n")
+                    (directory / "bobine-watch.path").write_text(f"[Path]\nPathModified={other}/inbox.txt\n")
+                before = snapshot(directory)
+                output = self.run_reveil(name, vault, "\n")
+                # « affiche » abrège en ~ (bash 3.2 du Mac) ; bash 5.2 garde le chemin complet.
+                shown = [f"({prefix}/{other.name})." for prefix in ("~", str(self.home))]
+                self.assertTrue(any("Un réveil existe déjà pour un autre dossier Bobine " + s in output
+                                    for s in shown), output)
+                self.assertIn("Le remplacer par celui de ce dossier ? [o/N]", output)
+                self.assertIn("ce dossier n'aura pas de réveil automatique", output)
+                self.assertIn("\nREVEIL=non\n", output)
+                self.assertNotIn("Réveil installé", output)
+                self.assertNotIn("pas de réveil. Tu pourras lancer", output)
+                self.assertEqual(snapshot(directory), before)
+                self.assertFalse(self.calls.exists(), "aucun appel au gestionnaire de réveils")
+                for jargon in ("LaunchAgent", "plist", ".service"):
+                    self.assertNotIn(jargon, output)
+                # Oui : remplacé par celui de ce dossier, comme avant.
+                output = self.run_reveil(name, vault, "o\n")
+                self.assertIn("Un réveil existe déjà pour un autre dossier Bobine", output)
+                self.assertIn("\nREVEIL=oui\n", output)
+                self.assert_bobine_reveil_for(name, vault)
+                self.assert_reveil_activated(name)
+                if name == "install.sh":
+                    self.assertIn(f"launchctl bootout gui/{os.getuid()}/com.bobine.watch\n", self.calls.read_text())
+                self.reset_reveils(directory)
+
+    def test_reveil_of_same_folder_is_replaced_without_question(self):
+        for name in INSTALLERS:
+            with self.subTest(installer=name):
+                vault = self.reveil_vault(name)
+                alias = self.home / ("alias " + Path(name).stem)
+                alias.symlink_to(vault, target_is_directory=True)
+                directory = self.reveil_directory(name)
+                own = directory / self.REVEILS[name][1]
+                # Écrit avec le chemin réel ; l'installation passe par un lien : même dossier.
+                for folder in (vault, alias):
+                    own.write_bytes(self.reveil_content(name, vault))
+                    output = self.run_reveil(name, folder, "")
+                    self.assertNotIn("Un réveil existe déjà", output)
+                    self.assertNotIn("➜", output)
+                    self.assertIn("\nREVEIL=oui\n", output)
+                    self.assert_bobine_reveil_for(name, folder)
+                    self.assert_reveil_activated(name)
+                    self.calls.unlink()
+                # Ancienne unité Linux écrite sans guillemets, dossier avec espaces : reconnue.
+                if name != "install.sh":
+                    own.write_text(f"[Service]\nExecStart=/bin/bash {vault}/watch-linux.sh\n")
+                    output = self.run_reveil(name, vault, "")
+                    self.assertNotIn("Un réveil existe déjà", output)
+                    self.assert_bobine_reveil_for(name, vault)
+                self.reset_reveils(directory)
+
+    def test_linked_or_unreadable_reveil_is_treated_as_foreign(self):
+        for name in INSTALLERS:
+            with self.subTest(installer=name):
+                vault = self.reveil_vault(name)
+                directory = self.reveil_directory(name)
+                own = directory / self.REVEILS[name][1]
+                # Un lien, même vers un réveil de CE dossier : jamais reconnu.
+                target = self.sandbox / ("mes-reveils-" + Path(name).stem) / own.name
+                target.parent.mkdir()
+                target.write_bytes(self.reveil_content(name, vault))
+                own.symlink_to(target)
+                before = snapshot(directory), snapshot(target.parent)
+                output = self.run_reveil(name, vault, "\n")
+                self.assertIn("Un réveil existe déjà pour un autre dossier Bobine (dossier inconnu).", output)
+                self.assertIn("\nREVEIL=non\n", output)
+                self.assertEqual((snapshot(directory), snapshot(target.parent)), before)
+                self.assertFalse(self.calls.exists())
+                # Oui : le lien est remplacé par un vrai fichier, sa cible reste intacte.
+                output = self.run_reveil(name, vault, "o\n")
+                self.assert_bobine_reveil_for(name, vault)
+                self.assertEqual(snapshot(target.parent), before[1])
+                self.calls.unlink()
+                # Illisible : traité comme étranger, gardé par défaut.
+                own.write_text("<<< pas un réveil lisible\n")
+                before = snapshot(directory)
+                output = self.run_reveil(name, vault, "\n")
+                self.assertIn("Un réveil existe déjà pour un autre dossier Bobine", output)
+                self.assertEqual(snapshot(directory), before)
+                self.assertFalse(self.calls.exists())
+                self.reset_reveils(directory)
+
+    def old_reveil(self, name, directory, folder):
+        """Un réveil d'une ancienne installation, sous un autre nom."""
+        script = folder / self.REVEILS[name][2]
+        if name == "install.sh":
+            path = directory / "com.wahid.vaultwatch.plist"
+            path.write_bytes(plistlib.dumps({"Label": "com.wahid.vaultwatch",
+                                             "ProgramArguments": ["/bin/bash", str(script)],
+                                             "StartInterval": 900}))
+            return [path]
+        service = directory / "vaultwatch.service"
+        service.write_text(f"[Service]\nType=oneshot\nExecStart=/bin/bash {shlex.quote(str(script))}\n")
+        timer = directory / "vaultwatch.timer"  # sans Unit= : déclenche vaultwatch.service
+        timer.write_text("[Timer]\nOnCalendar=*:0/10\n\n[Install]\nWantedBy=timers.target\n")
+        path = directory / "vaultwatch.path"
+        path.write_text(f"[Path]\nPathModified={folder}/inbox.txt\nUnit=vaultwatch.service\n")
+        return [service, timer, path]
+
+    def test_old_reveil_of_this_folder_is_replaced_and_kept_in_backup(self):
+        for name in INSTALLERS:
+            for preset in (False, True):
+                with self.subTest(installer=name, backup_of_this_update=preset):
+                    vault = self.reveil_vault(name)
+                    directory = self.reveil_directory(name)
+                    old = self.old_reveil(name, directory, vault)
+                    contents = {path.name: path.read_bytes() for path in old}
+                    unrelated = []
+                    if name != "install.sh":
+                        # Même préfixe, mais il déclenche une autre unité : pas touché.
+                        other = directory / "vaultwatch.timer"
+                        other.write_text("[Timer]\nOnCalendar=daily\nUnit=autre.service\n")
+                        contents.pop("vaultwatch.timer")
+                        old.remove(other)
+                        unrelated.append(other)
+                    unrelated_before = [snapshot(path) for path in unrelated]
+                    backup = vault / (".bobine-sauvegarde-20991231-2359" if preset else ".bobine-sauvegarde-20240102-0304")
+                    output = self.run_reveil(name, vault, "\n", str(backup) if preset else "")
+                    label = "com.wahid.vaultwatch" if name == "install.sh" else "vaultwatch"
+                    self.assertIn(f"Un ancien réveil ({label}) relève déjà ce dossier.", output)
+                    self.assertIn("Le remplacer par celui de Bobine ? [O/n]", output)
+                    self.assertIn(f"Ancien réveil ({label}) arrêté, gardé dans {backup.name}/anciens-reveils/", output)
+                    for path in old:
+                        self.assertFalse(path.exists(), path)
+                        self.assertEqual((backup / "anciens-reveils" / path.name).read_bytes(), contents[path.name])
+                    self.assertEqual([snapshot(path) for path in unrelated], unrelated_before)
+                    self.assertEqual([p.name for p in vault.iterdir() if p.name.startswith(".bobine-sauvegarde-")],
+                                     [backup.name])
+                    calls = self.calls.read_text().splitlines()
+                    if name == "install.sh":
+                        stop = f"launchctl bootout gui/{os.getuid()}/com.wahid.vaultwatch"
+                        self.assertIn(stop, calls)
+                        self.assertLess(calls.index(stop), calls.index(
+                            f"launchctl bootstrap gui/{os.getuid()} {directory / 'com.bobine.watch.plist'}"))
+                    else:
+                        self.assertIn("systemctl --user disable --now vaultwatch.path", calls)
+                        self.assertIn("systemctl --user disable --now vaultwatch.service", calls)
+                        self.assertNotIn("systemctl --user disable --now vaultwatch.timer", calls)
+                        reload = calls.index("systemctl --user daemon-reload")
+                        self.assertLess(calls.index("systemctl --user disable --now vaultwatch.service"), reload)
+                    self.assert_bobine_reveil_for(name, vault)
+                    self.assert_reveil_activated(name)
+                    self.assertIn("\nREVEIL=oui\n", output)
+                    for jargon in ("LaunchAgent", "plist", ".service"):
+                        self.assertNotIn(jargon, output)
+                    self.reset_reveils(directory, vault)
+
+    def test_old_reveil_declined_is_kept_with_a_note(self):
+        for name in INSTALLERS:
+            with self.subTest(installer=name):
+                vault = self.reveil_vault(name)
+                directory = self.reveil_directory(name)
+                old = self.old_reveil(name, directory, vault)
+                before = [snapshot(path) for path in old]
+                output = self.run_reveil(name, vault, "n\n")
+                self.assertIn("deux réveils relèveront ce dossier", output)
+                self.assertEqual([snapshot(path) for path in old], before)
+                self.assertFalse(any(p.name.startswith(".bobine-sauvegarde-") for p in vault.iterdir()))
+                calls = self.calls.read_text()
+                self.assertNotIn("vaultwatch", calls)
+                self.assert_bobine_reveil_for(name, vault)
+                self.assert_reveil_activated(name)
+                self.reset_reveils(directory)
+
+    def test_old_reveil_of_another_folder_or_linked_is_never_touched(self):
+        for name in INSTALLERS:
+            with self.subTest(installer=name):
+                vault = self.reveil_vault(name)
+                other = Path(str(vault) + "-autre")
+                other.mkdir()
+                directory = self.reveil_directory(name)
+                foreign = self.old_reveil(name, directory, other)
+                # Un lien vers un ancien réveil de CE dossier : jamais touché non plus.
+                elsewhere = self.sandbox / ("ailleurs-" + Path(name).stem)
+                elsewhere.mkdir()
+                for path in self.old_reveil(name, elsewhere, vault):
+                    link = directory / ("lien-" + path.name)
+                    link.symlink_to(path)
+                    foreign.append(link)
+                before = [snapshot(path) for path in foreign], snapshot(elsewhere)
+                output = self.run_reveil(name, vault, "")
+                self.assertNotIn("Un ancien réveil", output)
+                self.assertNotIn("➜", output)
+                self.assertEqual(([snapshot(path) for path in foreign], snapshot(elsewhere)), before)
+                self.assertNotIn("vaultwatch", self.calls.read_text())
+                self.assertFalse(any(p.name.startswith(".bobine-sauvegarde-") for p in vault.iterdir()))
+                self.assert_bobine_reveil_for(name, vault)
+                self.reset_reveils(directory)
 
 
 if __name__ == "__main__":

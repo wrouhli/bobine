@@ -169,6 +169,10 @@ le dépôt Charm :
     sudo apt update && sudo apt install crush
     # puis, dans le dossier du vault :  crush
 
+## Mettre à jour
+
+Copie la nouvelle version sur le serveur (`scp -r linux/ mon-serveur:~/bobine-nouvelle`), puis relance `./install-linux.sh` depuis ce nouveau dossier en indiquant ton dossier Bobine actuel comme emplacement. L'installateur le reconnaît et propose la mise à jour : seuls les fichiers du programme sont remplacés, tes fiches et ton `config.env` ne bougent pas, et les anciens fichiers sont gardés dans `.bobine-sauvegarde-<date>`. Le réveil et la page sont réinstallés à l'identique. Garde `PAGE_ORIGIN` et ton tunnel tels quels.
+
 ## Entretien
 
 - **Mettre yt-dlp à jour** (Instagram casse souvent) :

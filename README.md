@@ -38,6 +38,7 @@ You share a video from your iPhone. A few minutes later, Bobine has downloaded i
 - [Importing an Instagram export](#importing-an-instagram-export)
 - [The costs](#the-costs)
 - [Troubleshooting: the classics](#troubleshooting-the-classics)
+- [Updating Bobine](#updating-bobine)
 - [Uninstalling Bobine](#uninstalling-bobine)
 - [Project structure](#project-structure)
 - [FAQ](#faq)
@@ -278,6 +279,19 @@ cd ~/Bobine        # your vault folder (the location you chose)
 
 </details>
 
+## Updating Bobine
+
+A new version is out? Your cards, settings and API key stay in place.
+
+1. Download the new version (the zip file of the [latest release](https://github.com/wrouhli/bobine/releases/latest)) and unzip it, for example into Downloads.
+2. Run the installer as the first time (double-click "👉 2. Installer Bobine.command").
+3. When asked for your vault location, point to your current Bobine folder (for example `~/Bobine`). Bobine recognizes it and offers: **"Ce dossier contient déjà un Bobine. Le mettre à jour en gardant tes fiches et tes réglages ?"** Answer yes.
+4. The installer replaces only the program files, keeps your settings, then asks its usual questions (Enter keeps your previous answers).
+
+The previous program files are kept in a `.bobine-sauvegarde-<date>` folder inside your Bobine folder: delete it once everything works. The downloaded folder can be deleted too.
+
+Coming from a version before v1.3.0: the new page appears right after the update, and "Demander" is offered at the end of the installation.
+
 ## Uninstalling Bobine
 
 Stop Bobine from your library folder:
@@ -351,7 +365,14 @@ And of course: **a ⭐ on the repo** helps other people discover Bobine.
 
 ## Author
 
-Created and maintained by **[Wahid Rouhli](https://www.wahidrouhli.com/)**.
+Bobine is written and maintained by **[Wahid Rouhli](https://www.wahidrouhli.com/?utm_source=bobine&utm_medium=readme)**, a digital strategy and AI consultant and trainer based in Casablanca, founder of Konnectoos.
+
+I help marketing and communication teams use AI to simplify their work and make better decisions. Bobine is an example of what I stand for: simple tools that respect your data and deliver something concrete.
+
+- **My work and methods**: [wahidrouhli.com](https://www.wahidrouhli.com/?utm_source=bobine&utm_medium=readme) (in French)
+- **Weekly, hands-on notes on digital and AI**: [my newsletter](https://www.wahidrouhli.com/ressources?utm_source=bobine&utm_medium=readme) and [LinkedIn](https://www.linkedin.com/in/wahidrouhli)
+- **A project, a training, a question?** [Get in touch](https://www.wahidrouhli.com/contact?utm_source=bobine&utm_medium=readme)
+- **Does Bobine help you?** A GitHub star and a shared screenshot of your library go a long way.
 
 ## License
 

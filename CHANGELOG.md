@@ -1,8 +1,11 @@
 # Journal des versions
 
-## Non publié
+## v1.3.0 (12 octobre 2026)
 
-En préparation 🚧
+Ta bibliothèque te répond 💬
+
+- **Mise à jour sans perte** : relancer l'installateur en indiquant un dossier Bobine existant propose de le mettre à jour. Seuls les fichiers du programme sont remplacés (les anciens sont gardés dans `.bobine-sauvegarde-<date>`), tes fiches, réglages, profil et pages restent en place. Procédure décrite dans le README, pour Mac et Linux.
+- **Signature** : les pages et le README mènent vers le site de l'auteur (liens passifs, aucune requête automatique). Nouvelle section « Auteur » dans le README.
 
 - **Demander au choix** : la dernière question de l'installation propose d'activer Demander (chat et profil modifiable depuis la page), sur Mac comme sur Linux. Réversible à tout moment sans réinstaller : « Activer Demander » / « Désactiver Demander » (double-clic sur Mac, `./activer-demander.sh` / `./desactiver-demander.sh` sur Linux). Le raccourci « Ma page » démarre la page si besoin, sinon ouvre la page fichier. Désactivé, la page reste lisible et aucune donnée n'est supprimée.
 
@@ -29,7 +32,7 @@ En préparation 🚧
 - **Sécurité** : une réponse du modèle ne peut plus fabriquer de fausse entrée ni de lien dans l'index ; seuls les liens `http(s)` deviennent cliquables ; un titre contenant un repère du modèle (`__SVG__`, `__CHIPS__`…) ne casse plus les pages ; `config.env` est lu sans être exécuté (une valeur non guillemetée avec une espace ne lance plus de commande) ; les chemins passés à AppleScript ne peuvent plus casser le script ; le jeton du serveur de liens est masqué dans les journaux, et les deux serveurs coupent les clients trop lents ; les sauvegardes `config.env.bak-*` (qui contiennent la clé) sont ignorées par git et lisibles par toi seul ; Crush n'a plus du tout accès aux outils d'écriture, de commande et d'internet.
 - **Robustesse** : une même vidéo partagée deux fois (paramètres de suivi différents) n'est plus traitée ni résumée deux fois ; écritures atomiques (journal, index, pages) et reprise automatique d'un `journal.json` abîmé ; le plafond quotidien compte aussi les essais ratés ; nettoyage des fichiers temporaires après un échec ; nom de repli stable ; `graphe.py` retrouve les fiches YouTube ; les dates des vidéos YouTube ne se mélangent plus.
 - **Installation et désinstallation** : une réinstallation garde les réglages avancés (chemins, cookies, notification, jeton, mot de passe de la page) ; un `README.md` ou `.gitignore` déjà présent n'est plus écrasé ; les dossiers déjà remplis sont refusés comme nouvelle destination ; la désinstallation arrête les services et conserve toujours les fichiers locaux, sans suppression automatique de la bibliothèque.
-- **Tests et CI** : Tests supplémentaires pour les pages, les réponses piégées, les échecs du service, le journal, la lecture de `config.env`, l'installation et la conservation des fichiers. shellcheck et ruff sont vérifiés localement ; leur ajout à la CI demande encore une modification du workflow.
+- **Tests et CI** : Tests supplémentaires pour les pages, les réponses piégées, les échecs du service, le journal, la lecture de `config.env`, l'installation et la conservation des fichiers. shellcheck et ruff tournent aussi dans la CI (tâche « lint »), à côté des tests Python 3.10 et 3.12.
 - **Documentation et projet** : README anglais par défaut (`README.fr.md` pour le français), guide Linux aussi en anglais, explications de confidentialité précisées (copie iCloud optionnelle, envois au fournisseur choisi), licence MIT standard reconnue par GitHub, modèles d'issues et de pull request, `SECURITY.md`, bouton « Star » dans l'en-tête des deux README.
 
 ## v1.2.0 (7 octobre 2026)

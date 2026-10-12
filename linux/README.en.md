@@ -130,6 +130,10 @@ See the [verification and migration guide (French)](../docs/demander-verificatio
     sudo apt update && sudo apt install crush
     # then, in the vault folder:  crush
 
+## Updating
+
+Copy the new version to the server (`scp -r linux/ my-server:~/bobine-new`), then run `./install-linux.sh` from that new folder and give your current Bobine folder as the location. The installer recognizes it and offers an update: only program files are replaced, your cards and `config.env` stay untouched, and the previous files are kept in `.bobine-sauvegarde-<date>`. The wake-up and the page are reinstalled as they were. Keep `PAGE_ORIGIN` and your tunnel as they are.
+
 ## Maintenance
 
 - **Update yt-dlp** (Instagram breaks often): `.venv/bin/pip install -U yt-dlp`
