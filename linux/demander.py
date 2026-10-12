@@ -49,6 +49,8 @@ MAX_OCTETS_BIBLIOTHEQUE = 64 * 1024 * 1024
 SANS_RESULTAT = ("Je n'ai pas trouvé de passage suffisamment pertinent dans ta "
                  "bibliothèque pour répondre. Essaie avec un sujet ou un nom plus précis.")
 SANS_INFORMATION = "Les fiches retrouvées ne permettent pas de répondre à cette question."
+REFUS_PISTES = ("Les fiches retrouvées ne permettent pas de répondre précisément à cette question. "
+                "Voici les fiches qui en parlent le plus :")
 MOTIF_ID = re.compile(r"f-[A-Za-z0-9_-]{1,180}\Z")
 
 # Les mots de conversation ne suffisent pas à rendre une fiche pertinente.
@@ -91,7 +93,10 @@ Retourne uniquement un objet JSON {"reponse": "texte sans HTML", "sources": ["ID
 La réponse est courte, sans balises, sans lien, sans Markdown de lien, sans tiret
 cadratin. Cite uniquement les ID exacts des fiches dont les extraits étayent tes
 phrases. N'invente aucune citation, URL ou source. N'utilise pas une fiche comme
-preuve d'une information absente de ses extraits. Si les extraits sont insuffisants,
+preuve d'une information absente de ses extraits. Si la question est ouverte sur
+un sujet (« qu'est-ce qu'il y a sur X ? », « que sais-tu de X ? »), présente ce
+que les extraits fournis en disent, fiche par fiche, au lieu de t'abstenir. Pour
+une question précise, si les extraits sont insuffisants,
 renvoie exactement {"reponse": "Les fiches retrouvées ne permettent pas de répondre à cette question.", "sources": []}.
 """
 
@@ -688,7 +693,13 @@ def repondre(vault, question, historique=None, fiche=None):
     if not sources:
         # Pas d'heuristique fragile « je ne sais pas » suivie de faits inventés.
         if resultat["reponse"].strip() == SANS_INFORMATION and not resultat["sources"]:
-            return {"reponse": SANS_INFORMATION, "sources": []}
+            # L'abstention du modèle reste honnête, mais des fiches ont été
+            # retrouvées : on les propose comme pistes au lieu de laisser la
+            # question sans suite.
+            return {"reponse": REFUS_PISTES, "sources": [
+                {"id": entree["id"], "titre": _texte_simple(entree["titre"])[:240],
+                 "ancre": "#" + entree["id"], "lien": generate_page.lien_sur(entree["lien"])}
+                for entree, _ in selection]}
         raise ErreurDemande("Je n'ai pas pu vérifier les sources de cette réponse. Essaie une question plus précise.",
                             "reponse_non_verifiable")
     return {"reponse": reponse, "sources": sources}

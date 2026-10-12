@@ -232,10 +232,12 @@ class Demander(unittest.TestCase):
         self.assertEqual(resultat["sources"][0]["lien"], "https://youtu.be/video001")
         self.assertNotIn("pirate", json.dumps(resultat))
 
-    def test_abstention_exacte_autorisee_mais_pas_une_fausse_limite(self):
-        self._fiche()
+    def test_abstention_exacte_devient_pistes_avec_les_fiches(self):
+        bon = self._fiche()
         self.reponse = {"reponse": demander.SANS_INFORMATION, "sources": []}
-        self.assertEqual(demander.repondre(self.vault, "vélo"), self.reponse)
+        resultat = demander.repondre(self.vault, "vélo")
+        self.assertEqual(resultat["reponse"], demander.REFUS_PISTES)
+        self.assertEqual([s["id"] for s in resultat["sources"]], [bon])
         self.reponse = {"reponse": "Je ne sais pas. Le prix est de 100 euros.", "sources": []}
         self._erreur("reponse_non_verifiable")
 
