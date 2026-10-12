@@ -1,5 +1,11 @@
 # Journal des versions
 
+## v1.3.1 (12 octobre 2026)
+
+- **Demander, questions ouvertes** : « qu'est-ce qu'il y a sur X ? » présente désormais ce que tes fiches disent du sujet, fiche par fiche, au lieu d'une abstention. Et si le modèle s'abstient malgré des fiches retrouvées, la réponse liste celles qui en parlent le plus, au lieu d'un refus sec.
+- **Recherche** : la lettre « X » seule (la plateforme) reste cherchable ; les autres lettres seules restent ignorées, comme avant.
+- **Chemins robustes** : le plist du réveil (Mac) reste lisible et reconnu même si le dossier contient `&`, `<` ou `>` ; sous Linux, les unités du réveil citent leur chemin entre guillemets, donc un dossier avec des espaces ne casse plus la relève.
+
 ## v1.3.0 (12 octobre 2026)
 
 Ta bibliothèque te répond 💬

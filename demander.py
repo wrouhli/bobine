@@ -129,8 +129,10 @@ def _racine_mot(mot):
 
 def _mots(texte):
     ignores = (MOTS_VIDES - {"notes", "note"}) | {"mieux", "better"}
+    # Une seule lettre garde du sens : « X », la plateforme. Les autres
+    # lettres seules (a, y, l…) restent du bruit volontairement filtré.
     return {_racine_mot(m) for m in re.findall(r"[a-z0-9]+", _normaliser(texte))
-            if len(m) >= 2 and m not in ignores}
+            if (len(m) >= 2 or m == "x") and m not in ignores}
 
 
 def _historique(valeur):
