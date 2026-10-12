@@ -390,6 +390,9 @@ class DemanderStatique(unittest.TestCase):
         self.assertIn(garde, self.js)
         self.assertLess(self.js.index(garde), self.js.index("fetch("))
         self.assertEqual(re.findall(r'requeteJSON\("([^"]+)"', self.js), ["/api/bobine", "/api/demander"])
+        # Safari : une politique no-referrer héritée ferait partir Origin: null.
+        self.assertIn('referrerPolicy: "same-origin"', self.js)
+        self.assertNotIn("no-referrer\"", self.js.replace('rel", "noopener noreferrer"', ""))
         for option in ('credentials: "same-origin"', 'mode: "same-origin"', 'cache: "no-store"', 'redirect: "error"'):
             self.assertIn(option, self.js)
         self.assertNotRegex(self.js, r"localhost|127\.0\.0\.1|https?://|XMLHttpRequest|sendBeacon|WebSocket")

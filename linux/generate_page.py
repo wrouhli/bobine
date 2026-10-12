@@ -773,6 +773,8 @@ __PROFIL__
     try {
       var reponse = await fetch(url, Object.assign({}, options, {
         credentials: "same-origin", mode: "same-origin", cache: "no-store",
+        // Safari envoie Origin: null si la politique est no-referrer : on fixe la nôtre.
+        referrerPolicy: "same-origin",
         redirect: "error", signal: controle.signal
       }));
       var estJSON = /^application\/json\b/i.test(reponse.headers.get("Content-Type") || "");
