@@ -2188,7 +2188,8 @@ class InstallationSafety(unittest.TestCase):
             self.assertNotIn("Ancien", data)
         else:
             text = own.read_text()
-            self.assertIn(f"\nExecStart=/bin/bash {vault}/watch-linux.sh\n", text)
+            self.assertIn(f'\nExecStart=/bin/bash "{vault}/watch-linux.sh"\n', text)
+            self.assertIn(f'\nWorkingDirectory="{vault}"\n', text)
             self.assertNotIn("Description=ancien", text)
 
     def assert_reveil_activated(self, name):
@@ -2410,6 +2411,46 @@ class InstallationSafety(unittest.TestCase):
                 self.assertFalse(any(p.name.startswith(".bobine-sauvegarde-") for p in vault.iterdir()))
                 self.assert_bobine_reveil_for(name, vault)
                 self.reset_reveils(directory)
+
+    def test_reveil_path_with_special_characters_is_written_safely_and_recognized(self):
+        # Dossier « Mon & <Bobine> » : le plist Mac doit rester lisible (échappement
+        # XML) et les unités Linux citées entre guillemets ; au passage suivant,
+        # le réveil écrit est reconnu comme celui de ce dossier, sans question.
+        for name in INSTALLERS:
+            with self.subTest(installer=name):
+                vault = self.reveil_vault(name, prefix="Mon & <Bobine>")
+                directory = self.reveil_directory(name)
+                output = self.run_reveil(name, vault, "")
+                self.assertIn("\nREVEIL=oui\n", output)
+                self.assert_bobine_reveil_for(name, vault)
+                self.assert_reveil_activated(name)
+                if name == "install.sh":
+                    data = plistlib.loads((directory / self.REVEILS[name][1]).read_bytes())
+                    self.assertEqual(data["StandardOutPath"], str(vault / "logs/launchd.out.log"))
+                    self.assertEqual(data["StandardErrorPath"], str(vault / "logs/launchd.err.log"))
+                self.calls.unlink()
+                output = self.run_reveil(name, vault, "")
+                self.assertNotIn("Un réveil existe déjà", output)
+                self.assertIn("\nREVEIL=oui\n", output)
+                self.assert_bobine_reveil_for(name, vault)
+                self.reset_reveils(directory)
+
+    def test_mac_uninstall_retires_watch_plist_of_a_special_path(self):
+        vault = self.reveil_vault("install.sh", prefix="Mon & <Bobine>")
+        shutil.copy2(ROOT / "desinstaller.sh", vault / "desinstaller.sh")
+        (vault / "ingest.py").write_text("# fixture\n", encoding="utf-8")
+        (vault / "config.env").write_text('NOM="Bobine"\nSYNC_ICLOUD="non"\n', encoding="utf-8")
+        directory = self.reveil_directory("install.sh")
+        own = directory / "com.bobine.watch.plist"
+        own.write_bytes(plistlib.dumps({"Label": "com.bobine.watch",
+                                        "ProgramArguments": ["/bin/bash", str(vault / "watch.sh")]}))
+        before = snapshot(vault)
+        output = self.run_bash([vault / "desinstaller.sh"])
+        self.assertIn("Réveil retiré", output)
+        self.assertFalse(own.exists())
+        self.assertIn(f"launchctl bootout gui/{os.getuid()}/com.bobine.watch", self.calls.read_text())
+        self.assertEqual(snapshot(vault), before)
+        self.reset_reveils(directory, vault)
 
 
 if __name__ == "__main__":
