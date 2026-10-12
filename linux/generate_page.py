@@ -19,7 +19,7 @@ from pathlib import Path
 # Outils partagés avec l'ingestion (même dossier).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ingest import ecrire_atomique, identifiant, lien_canonique  # noqa: E402
-from enrichir import FICHIER_PROFIL, lire_memo, lire_profil  # noqa: E402
+from enrichir import FICHIER_PROFIL, TAILLE_MAX_PROFIL, empreinte_profil, lire_memo, lire_profil  # noqa: E402
 
 VAULT = Path(__file__).resolve().parent
 NOM_DEFAUT = "Bobine"
@@ -298,6 +298,9 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .demander-actions .btn{background:var(--ambre);border-color:transparent;color:var(--sur-ambre)}
   .vue-demander button:disabled{opacity:.5;cursor:not-allowed}
   .demander-statut{min-height:1.6em;margin:18px 0 10px;white-space:pre-wrap}
+  .profil-form{margin:22px 0}
+  .profil-boutons{display:flex;gap:10px;flex-wrap:wrap}
+  .demander-actions .btn.btn-discret{background:var(--fond);border:1px solid var(--trait-fort);color:var(--encre)}
   .demander-statut.erreur{padding:12px 16px;border-left:4px solid var(--ambre);background:var(--surface)}
   .fiche .demander-acces{margin-right:8px}
 
@@ -941,6 +944,144 @@ __PROFIL__
   verifier();
 })();
 /* ---- fin Demander ---- */
+
+/* ---- Profil : modification depuis la page servie ---- */
+(function(){
+  "use strict";
+  // Copie locale ou iCloud : la page reste en lecture, sans aucun appel réseau.
+  if (location.protocol !== "http:" && location.protocol !== "https:") { return; }
+  if (!window.fetch || !window.AbortController) { return; }
+  var formulaire = document.getElementById("profil-form");
+  var champ = document.getElementById("profil-texte");
+  var compte = document.getElementById("profil-compte");
+  var vider = document.getElementById("profil-vider");
+  var enregistrer = document.getElementById("profil-enregistrer");
+  var statut = document.getElementById("profil-statut");
+  var fichier = document.getElementById("profil-fichier");
+  var actuel = document.getElementById("profil-actuel");
+  if (!formulaire || !champ) { return; }
+  var maximum = Number(champ.getAttribute("maxlength")) || 1500;
+  var jeton = null, version = null, enCours = false, enregistre = null;
+
+  var saisie = false; // vrai si le message affiché vient de la vérification du texte
+  function annoncer(texte, erreur, deSaisie){
+    statut.textContent = texte; statut.classList.toggle("erreur", !!erreur); saisie = !!deSaisie;
+  }
+  function probleme(){
+    var lignes = champ.value.split(/\r?\n/);
+    if (champ.value.length > maximum) { return "Ton profil est trop long : garde l’essentiel."; }
+    for (var i = 0; i < lignes.length; i++) {
+      if (/^\s*#/.test(lignes[i])) { return "Une ligne qui commence par # serait ignorée. Retire ce # ou place-le plus loin."; }
+    }
+    return "";
+  }
+  function actualiser(){
+    compte.textContent = String(champ.value.length);
+    var p = probleme();
+    enregistrer.disabled = enCours || !jeton || version === null || !!p || champ.value === enregistre;
+    vider.disabled = enCours || !jeton || !champ.value;
+    champ.readOnly = enCours;
+    formulaire.setAttribute("aria-busy", enCours ? "true" : "false");
+    if (p) { annoncer(p, true, true); } else if (saisie) { annoncer("", false); }
+  }
+  async function requete(url, options){
+    var controle = new AbortController();
+    var minuterie = setTimeout(function(){ controle.abort(); }, 100000);
+    try {
+      var reponse = await fetch(url, Object.assign({}, options, {
+        credentials: "same-origin", mode: "same-origin", cache: "no-store",
+        redirect: "error", referrerPolicy: "same-origin", signal: controle.signal
+      }));
+      var donnees = null;
+      if (/^application\/json\b/i.test(reponse.headers.get("Content-Type") || "")) {
+        try { donnees = await reponse.json(); } catch (_) { donnees = null; }
+      }
+      if (!reponse.ok) { var e = new Error("http"); e.statut = reponse.status; e.code = donnees && donnees.code; throw e; }
+      if (!donnees) { throw new Error("format"); }
+      return donnees;
+    } finally { clearTimeout(minuterie); }
+  }
+  function afficherActuel(texte){
+    // Le texte reste du texte : jamais de HTML construit à partir du profil.
+    while (actuel.firstChild) { actuel.removeChild(actuel.firstChild); }
+    var titre = document.createElement("div");
+    titre.className = "encadre-titre";
+    titre.textContent = texte ? "Ce que Bobine sait de toi" : "Pas encore de profil";
+    var corps = document.createElement("p");
+    corps.className = texte ? "profil-texte" : "";
+    corps.textContent = texte || "C’est facultatif : tout fonctionne sans.";
+    actuel.appendChild(titre); actuel.appendChild(corps);
+  }
+  function masquerPourToiPerimes(empreinte){
+    document.querySelectorAll(".encadre.pourtoi").forEach(function(bloc){
+      if (bloc.getAttribute("data-profil") === empreinte) { return; }
+      bloc.hidden = true;
+      var note = document.createElement("div");
+      note.className = "encadre platine pourtoi-attente";
+      var titre = document.createElement("div");
+      titre.className = "encadre-titre"; titre.textContent = "Pour toi";
+      var p = document.createElement("p");
+      p.textContent = "Ton profil a changé : ce bloc se met à jour au fil des prochains passages.";
+      note.appendChild(titre); note.appendChild(p);
+      if (bloc.parentNode) { bloc.parentNode.insertBefore(note, bloc.nextSibling); }
+    });
+  }
+  async function demarrer(){
+    try {
+      var etat = await requete("/api/bobine", {method: "GET", headers: {"Accept": "application/json"}});
+      if (!etat || etat.profil !== true || typeof etat.jeton !== "string" || !/^[\x21-\x7e]{1,512}$/.test(etat.jeton)) { return; }
+      var profil = await requete("/api/profil", {method: "GET", headers: {"Accept": "application/json"}});
+      if (!profil || typeof profil.texte !== "string" || typeof profil.version !== "string") { return; }
+      jeton = etat.jeton; version = profil.version; enregistre = profil.texte;
+      champ.value = profil.texte; champ.disabled = false;
+      formulaire.hidden = false;
+      if (fichier) { fichier.hidden = true; }
+      actualiser();
+    } catch (_) {
+      // Serveur absent ou ancien : la page reste en lecture, sans bouton inutilisable.
+    }
+  }
+  champ.addEventListener("input", actualiser);
+  vider.addEventListener("click", function(){
+    if (enCours) { return; }
+    champ.value = ""; actualiser(); champ.focus();
+    annoncer("Le champ est vide. Clique sur Enregistrer pour retirer ton profil.", false);
+  });
+  formulaire.addEventListener("submit", async function(ev){
+    ev.preventDefault();
+    if (enCours || !jeton || version === null || probleme()) { return; }
+    enCours = true; annoncer("Enregistrement…", false); actualiser();
+    try {
+      var r = await requete("/api/profil", {method: "POST",
+        headers: {"Content-Type": "application/json", "Accept": "application/json", "X-Bobine-Token": jeton},
+        body: JSON.stringify({texte: champ.value, version: version})});
+      version = r.version; enregistre = r.texte; champ.value = r.texte;
+      afficherActuel(r.texte);
+      masquerPourToiPerimes(typeof r.empreinte === "string" ? r.empreinte : "");
+      annoncer(r.texte
+        ? "C’est enregistré. Les blocs « Pour toi » se mettent à jour au fil des prochains passages."
+        : "Ton profil est retiré. Les blocs « Pour toi » disparaîtront au prochain passage.", false);
+    } catch (e) {
+      var messages = {
+        profil_modifie: "Ton profil a été modifié ailleurs. Recharge la page pour voir la dernière version. Ton texte reste dans le champ.",
+        profil_trop_long: "Ton profil est trop long : garde l’essentiel.",
+        profil_diese: "Une ligne qui commence par # serait ignorée. Retire ce # ou place-le plus loin.",
+        profil_invalide: "Le profil contient des caractères non pris en charge. Retire-les puis réessaie.",
+        profil_special: "Ton profil est un fichier particulier : modifie-le directement dans le dossier Bobine.",
+        occupe: "Un enregistrement est déjà en cours. Réessaie dans un instant."
+      };
+      var texte = Object.prototype.hasOwnProperty.call(messages, e.code || "") ? messages[e.code]
+        : e.statut === 401 || e.statut === 403 ? "La connexion à Bobine a expiré. Recharge la page puis réessaie."
+        : e.statut === 429 ? "Trop de demandes. Patiente une minute avant de réessayer."
+        : "L’enregistrement n’a pas abouti. Ton texte reste dans le champ : réessaie dans un instant.";
+      annoncer(texte, true);
+    } finally {
+      enCours = false; actualiser();
+    }
+  });
+  demarrer();
+})();
+/* ---- fin Profil ---- */
 </script>
 </body>
 </html>
@@ -1827,13 +1968,23 @@ def bloc_a_retenir(memo):
             + "</ol></div>")
 
 
+POUR_TOI_EN_ATTENTE = (
+    '<div class="encadre platine pourtoi-attente"><div class="encadre-titre">Pour toi</div>'
+    "<p>Ton profil a changé : ce bloc se met à jour au fil des prochains passages.</p></div>")
+
+
 def bloc_pour_toi(memo, profil):
     """« Pour toi » si le profil existe ; sinon, une invitation discrète (seulement
     quand Bobine produit déjà des mémos, donc quand une clé est configurée)."""
     if not memo:
         return ""
     if profil and memo.get("pour_toi"):
-        return ('<div class="encadre pourtoi"><div class="encadre-titre">Pour toi'
+        trace = memo.get("profil", "")
+        if trace and trace != empreinte_profil(profil):
+            # Calculé pour un ancien profil : ne pas présenter un conseil périmé.
+            return POUR_TOI_EN_ATTENTE
+        return ('<div class="encadre pourtoi" data-profil="' + html.escape(trace) + '">'
+                '<div class="encadre-titre">Pour toi'
                 '<span class="encadre-sous">d\'après ton profil</span></div><p>'
                 + html.escape(memo["pour_toi"]) + "</p></div>")
     if not profil:
@@ -1946,20 +2097,40 @@ def rendre_fiches(entrees, profil=""):
 def rendre_profil(profil, chemin=FICHIER_PROFIL):
     """La page Profil : le texte actuel, à quoi il sert, comment le changer."""
     if profil:
-        actuel = ('<div class="encadre platine"><div class="encadre-titre">Ce que Bobine sait de toi</div>'
-                  '<p class="profil-texte">' + html.escape(profil) + "</p></div>")
+        actuel = ('<div class="encadre platine" id="profil-actuel"><div class="encadre-titre">Ce que Bobine sait de toi</div>'
+                  '<p class="profil-texte" id="profil-actuel-texte">' + html.escape(profil) + "</p></div>")
     else:
-        actuel = ('<div class="encadre platine"><div class="encadre-titre">Pas encore de profil</div>'
+        actuel = ('<div class="encadre platine" id="profil-actuel"><div class="encadre-titre">Pas encore de profil</div>'
                   "<p>C'est facultatif : tout fonctionne sans. Avec quelques lignes sur toi, chaque fiche "
                   "gagne un bloc « Pour toi » qui dit ce que la vidéo t'apporte.</p></div>")
     nom = html.escape(FICHIER_PROFIL)
+    maximum = str(TAILLE_MAX_PROFIL)
+    formulaire = (
+        '<form class="demander-form profil-form" id="profil-form" hidden>'
+        '<label for="profil-texte">Modifier ton profil</label>'
+        '<textarea id="profil-texte" name="profil" rows="7" maxlength="' + maximum + '" autocomplete="off" '
+        'aria-describedby="profil-limite profil-aide" disabled '
+        'placeholder="Par exemple : je vends mes créations en ligne et je cherche des idées pour me faire connaître.">'
+        + html.escape(profil) + "</textarea>"
+        '<div class="demander-actions">'
+        '<span class="demander-note" id="profil-limite"><span id="profil-compte">'
+        + str(len(profil)) + "</span> / " + maximum + " caractères</span>"
+        '<span class="profil-boutons">'
+        '<button class="btn btn-discret" id="profil-vider" type="button" disabled>Vider</button>'
+        '<button class="btn" id="profil-enregistrer" type="submit" disabled>Enregistrer</button>'
+        "</span></div>"
+        '<p class="demander-note" id="profil-aide">Enregistrer ne coûte rien : les blocs « Pour toi » '
+        "se mettent à jour au fil des prochains passages. Une ligne ne peut pas commencer par #.</p>"
+        '<p class="demander-statut" id="profil-statut" role="status" aria-live="polite" aria-atomic="true"></p>'
+        "</form>"
+    )
     return (
         '<section class="vue-profil" id="profil" aria-label="Profil">'
         '<a class="retour" href="#bibliotheque">' + ICONE_RETOUR + "Bibliothèque</a>"
         '<h1 class="titre">Ton profil</h1>'
         '<p class="sous">Quelques lignes suffisent : ce que tu fais, ce qui t\'intéresse, ce que tu cherches dans tes vidéos.</p>'
-        '<div class="lecture" style="margin-top:24px">' + actuel
-        + '<div class="encadre"><div class="encadre-titre">Pour le modifier</div><p>'
+        '<div class="lecture" style="margin-top:24px">' + actuel + formulaire
+        + '<div class="encadre" id="profil-fichier"><div class="encadre-titre">Pour le modifier</div><p>'
         "Ouvre le fichier « " + nom + " » dans ton dossier Bobine, écris ou change quelques lignes, "
         "puis enregistre. Bobine met à jour les blocs « Pour toi » au fil des prochains passages.</p>"
         '<details class="description"><summary>Bobine tourne sur un serveur ?</summary>'

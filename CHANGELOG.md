@@ -4,6 +4,8 @@
 
 En préparation 🚧
 
+- **Profil éditable (refonte, étape 3, seconde partie)** : le profil se modifie depuis la page servie (Profil → Enregistrer), sur Mac comme via l'adresse du serveur, même sans clé API. Enregistrer ne coûte rien : la page est régénérée tout de suite, les « Pour toi » calculés pour l'ancien profil sont masqués, et se recalculent aux prochains passages. Écriture sûre, refus si le fichier a changé ailleurs, mêmes protections que Demander. La copie iCloud reste en lecture.
+
 - **Correctif Safari** : sur iPhone et Mac avec Safari, « Demander » affichait « Reconnecte Bobine » au lieu de répondre. La page imposait une politique de référent trop stricte qui faisait envoyer une origine vide, refusée par le contrôle de sécurité. Corrigé sans assouplir ce contrôle.
 
 - **Demander (refonte, étape 3, première partie)** : questions directement dans la page servie, réponses avec liens vers les fiches, recherche locale et extraits plafonnés ; une question depuis une fiche reste limitée à cette vidéo. Le serveur de page est partagé avec Mac et reste local sur Mac. La copie iCloud garde sa lecture seule, sans bouton inopérant. Clé conservée côté serveur, protections intersites, quotas persistants, échéances strictes et conversations uniquement dans l'onglet. Le profil éditable viendra dans une PR distincte.

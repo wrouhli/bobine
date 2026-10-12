@@ -1,6 +1,6 @@
 # Demander : revue et vérification avant fusion
 
-Première PR de l'étape 3. Le profil reste en lecture seule. La fusion exige la revue de Hermes et les tests du propriétaire sur oneplus, Mac et iPhone. Les déploiements sur ces machines restent chez Hermes.
+Première PR de l'étape 3 (fusionnée). La seconde PR rend le profil modifiable depuis la page : voir la section « Profil éditable » en fin de document. La fusion exige la revue de Hermes et les tests du propriétaire sur oneplus, Mac et iPhone. Les déploiements sur ces machines restent chez Hermes.
 
 ## Ce qui change
 
@@ -71,3 +71,15 @@ Toujours sauvegarder les scripts remplacés, les services, le raccourci et la co
 ## Limites assumées
 
 Recherche lexicale, pas recherche sémantique exhaustive. Les liens cités sont vérifiés contre les fiches envoyées ; le sens de chaque phrase du modèle n'est pas certifié. Le chat répond en français. Les historiques sont limités à l'onglet et les profils Mac/serveur ne sont pas synchronisés automatiquement. Le formulaire de profil n'appartient pas à cette PR.
+
+
+## Profil éditable (seconde PR)
+
+- `GET /api/profil` et `POST /api/profil` : mêmes contrôles que Demander (authentification, origine et Host exacts, `Sec-Fetch-Site`, jeton d'en-tête, JSON obligatoire, aucune CORS). Pas de clé API nécessaire : `/api/bobine` fournit le jeton même sans clé, le chat reste déclaré indisponible.
+- Texte limité à 1 500 caractères, retours à la ligne normalisés, caractères de contrôle refusés. Une ligne qui commence par `#` est refusée avec un message clair, car Bobine l'ignorerait.
+- Écriture atomique, permissions 600, en-tête explicatif conservé. Jamais à travers un lien symbolique ou un fichier spécial. Verrou entre processus.
+- Conflit : l'enregistrement porte la version lue. Si le fichier a changé ailleurs (édition à la main, autre onglet), refus 409 sans écraser, le texte reste dans le champ.
+- Après enregistrement : page régénérée tout de suite par `generate_page.py`, sans appel IA. Les « Pour toi » calculés pour un ancien profil sont masqués et remplacés par une note, dans la page régénérée comme dans l'onglet ouvert. Leur recalcul reste progressif aux relèves (10 par passage).
+- Mode fichier et copie iCloud : formulaire caché et inactif, aucun appel réseau ; les instructions pour modifier le fichier restent affichées.
+
+Scénarios manuels : enregistrer, vider, modifier le fichier à la main pendant que l'onglet est ouvert (conflit attendu), texte trop long ou ligne commençant par `#`, Safari iPhone via l'adresse serveur, copie iCloud en lecture seule. Vérifier qu'aucun appel au fournisseur n'est fait lors de l'enregistrement.
