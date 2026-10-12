@@ -149,7 +149,7 @@ For summaries in English, add `LANGUE_RESUMES=en` to `config.env`. The interface
 
 With an API key, each card gets a **Memo** tab (the main idea, key points, steps, tools mentioned) and a **Key takeaways** box. If you also describe yourself in a few lines, each card adds a **For you** block: what this video brings *you*.
 
-The installer asks the question once (press Enter to skip). You can write or change it at any time in `Mon profil.txt`, in your vault folder: a few lines about what you do and what you look for in your videos. Lines starting with `#` are ignored. Older videos get their memo gradually, 10 per run, without touching their existing summaries.
+The installer asks the question once (press Enter to skip). You can write or change it at any time from **Ma page → Profil** (Save button), or directly in `Mon profil.txt`, in your vault folder: a few lines about what you do and what you look for in your videos. Lines starting with `#` are ignored. Older videos get their memo gradually, 10 per run, without touching their existing summaries.
 
 ### *Recommended*: the iPhone shortcut (share in one gesture)
 
@@ -172,7 +172,7 @@ On Mac, the installer starts a page server reachable only from that Mac. On iPho
 
 Bobine searches locally, then sends excerpts from at most five cards, your question, short conversation history and optional profile to your AI provider. It does not browse the web. With no relevant match, it replies locally without a provider call. Citations help you check an answer; they do not guarantee every statement is correct.
 
-Conversation history lives only in the tab, not on disk. Profile editing remains in `Mon profil.txt` for this first version.
+Conversation history lives only in the tab, not on disk. You can also edit your profile from the page, under **Profil**. Saving is free: "For you" blocks are refreshed over the next runs, and outdated ones are hidden right away. The iCloud copy stays read-only.
 
 <details>
 <summary>Limits and advanced verification</summary>

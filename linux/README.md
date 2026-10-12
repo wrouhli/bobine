@@ -147,7 +147,7 @@ Avec ta clé de résumé déjà configurée, ouvre **Demander** à l'adresse hab
 
 Pour une installation existante, ajoute `PAGE_ORIGIN=https://ton-adresse-bobine` dans `config.env` (origine exacte, sans chemin ni slash final), puis redémarre le service de page après mise à jour et régénération. `activer-page-web.sh` le configure lors d'une nouvelle activation. Le tunnel doit conserver l'en-tête Host public. Garde le mot de passe ou ta protection en amont : l'origine n'est pas une authentification.
 
-Le fichier ouvert directement, la copie téléchargée et un simple serveur de fichiers restent en lecture seule. Les limites de demandes s'appliquent aussi à l'adresse publique et survivent au redémarrage. Aucun accès direct à `raw/`, à la configuration ou aux compteurs privés n'est ajouté. Le profil reste modifiable dans `Mon profil.txt`, pas dans la page.
+Le fichier ouvert directement, la copie téléchargée et un simple serveur de fichiers restent en lecture seule. Les limites de demandes s'appliquent aussi à l'adresse publique et survivent au redémarrage. Aucun accès direct à `raw/`, à la configuration ou aux compteurs privés n'est ajouté. Le profil se modifie depuis la page (**Profil**, bouton Enregistrer), avec les mêmes protections que Demander ; il n'a pas besoin de clé API. `Mon profil.txt` reste modifiable à la main.
 
 Voir [le guide de vérification et de migration](../docs/demander-verification.md). Le déploiement doit être précédé d'une sauvegarde.
 

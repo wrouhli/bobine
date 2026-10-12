@@ -340,17 +340,21 @@ class ServeurDemander(unittest.TestCase):
         self.mock.side_effect = None
         self.assertEqual(self.post()[0], 200)
 
-    def test_fichiers_secrets_et_profil_non_editable(self):
+    def test_fichiers_secrets_jamais_servis(self):
         for nom in ("config.env", "raw/a.md", "Mon%20profil.txt", "index.md", "../config.env", ".bobine-jeton"):
             self.assertEqual(self.requete(chemin="/" + nom)[0], 404)
-        self.assertEqual(self.requete("POST", "/api/profil", "{}", self.entetes())[0], 404)
+        # Le profil est modifiable (PR Profil éditable) ; un corps incomplet est refusé.
+        self.assertEqual(self.requete("POST", "/api/profil", "{}", self.entetes())[0], 400)
         (self.vault / "vault.html").unlink()
         (self.vault / "vault.html").symlink_to(self.vault / "config.env")
         self.assertEqual(self.requete(chemin="/vault.html")[0], 404)
 
     def test_sans_cle_aucun_jeton_actif(self):
         (self.vault / "config.env").unlink()
-        self.assertEqual(self.requete()[2], {"disponible": False, "jeton": ""})
+        etat = self.requete()[2]
+        # Le jeton reste fourni pour le profil ; le chat est déclaré indisponible.
+        self.assertFalse(etat["disponible"])
+        self.assertTrue(etat["profil"])
         self.assertEqual(self.post()[0], 503)
         self.mock.assert_not_called()
 
@@ -522,6 +526,180 @@ class MoteurIsole(unittest.TestCase):
             serveur.shutdown()
             serveur.server_close()
             t.join(1)
+
+
+class ServeurProfil(unittest.TestCase):
+    """Profil éditable : mêmes protections que Demander, écriture sûre, sans clé API."""
+
+    def setUp(self):
+        import os
+        import threading
+        from unittest import mock
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.vault = Path(self.tmp.name).resolve()
+        (self.vault / "vault.html").write_text("<html>page</html>", encoding="utf-8")
+        env = mock.patch.dict(os.environ, {}, clear=True)
+        env.start()
+        self.addCleanup(env.stop)
+        self.regenerer_reel = page_server.regenerer_page
+        self.regen = mock.patch.object(page_server, "regenerer_page", return_value=True).start()
+        self.addCleanup(mock.patch.stopall)
+        self.srv = page_server.ServeurBobine(("127.0.0.1", 0), self.vault, local=True)
+        self.thread = threading.Thread(target=self.srv.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True)
+        self.thread.start()
+        self.addCleanup(self._fermer)
+        self.fichier = self.vault / "Mon profil.txt"
+
+    def _fermer(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+        self.thread.join(timeout=2)
+
+    def requete(self, methode, chemin, corps=None, headers=None):
+        import http.client
+        import json
+        c = http.client.HTTPConnection("127.0.0.1", self.srv.server_address[1], timeout=3)
+        try:
+            c.request(methode, chemin, body=corps, headers=headers or {})
+            r = c.getresponse()
+            texte = r.read().decode("utf-8")
+            try:
+                return r.status, json.loads(texte)
+            except ValueError:
+                return r.status, texte
+        finally:
+            c.close()
+
+    def entetes(self, **extra):
+        origine = "http://127.0.0.1:" + str(self.srv.server_address[1])
+        h = {"Content-Type": "application/json", "Origin": origine, "Host": origine[7:],
+             "Sec-Fetch-Site": "same-origin", "X-Bobine-Token": self.srv.jeton}
+        h.update(extra)
+        return h
+
+    def lire(self):
+        return self.requete("GET", "/api/profil", headers=self.entetes())
+
+    def enregistrer(self, texte, version=None, headers=None):
+        import json
+        if version is None:
+            version = self.lire()[1]["version"]
+        return self.requete("POST", "/api/profil", json.dumps({"texte": texte, "version": version}),
+                            headers or self.entetes())
+
+    def test_sans_cle_le_profil_reste_modifiable(self):
+        statut, etat = self.requete("GET", "/api/bobine", headers=self.entetes())
+        self.assertEqual(statut, 200)
+        self.assertFalse(etat["disponible"])
+        self.assertTrue(etat["profil"])
+        self.assertEqual(etat["jeton"], self.srv.jeton)
+        statut, rep = self.enregistrer("Je vends ma céramique en ligne.")
+        self.assertEqual(statut, 200, rep)
+        self.assertEqual(rep["texte"], "Je vends ma céramique en ligne.")
+
+    def test_ecriture_atomique_privee_avec_entete_et_lecture_par_bobine(self):
+        import stat
+        from enrichir import empreinte_profil, lire_profil
+        statut, rep = self.enregistrer("  Ligne une.\r\nLigne deux #IA  \n\n")
+        self.assertEqual(statut, 200, rep)
+        contenu = self.fichier.read_text(encoding="utf-8")
+        self.assertTrue(contenu.startswith(page_server.ENTETE_PROFIL))
+        self.assertEqual(lire_profil(self.vault), "Ligne une.\nLigne deux #IA")
+        self.assertEqual(stat.S_IMODE(self.fichier.stat().st_mode), 0o600)
+        self.assertEqual(rep["empreinte"], empreinte_profil("Ligne une.\nLigne deux #IA"))
+        self.assertTrue(rep["page_actualisee"])
+        self.regen.assert_called_once_with(self.vault)
+        self.assertEqual(list(self.vault.glob(".bobine-profil-*")), [])
+
+    def test_vider_le_profil(self):
+        from enrichir import lire_profil
+        self.enregistrer("Un texte.")
+        statut, rep = self.enregistrer("")
+        self.assertEqual(statut, 200)
+        self.assertEqual(lire_profil(self.vault), "")
+        self.assertEqual(rep["empreinte"], "")
+        self.assertTrue(self.fichier.exists())  # en-tête explicatif conservé
+
+    def test_modification_faite_ailleurs_refusee_sans_ecraser(self):
+        version = self.lire()[1]["version"]
+        self.fichier.write_text("Écrit à la main ailleurs.\n", encoding="utf-8")
+        statut, rep = self.enregistrer("Texte de l'onglet.", version=version)
+        self.assertEqual(statut, 409)
+        self.assertEqual(rep["code"], "profil_modifie")
+        self.assertEqual(self.fichier.read_text(encoding="utf-8"), "Écrit à la main ailleurs.\n")
+        self.regen.assert_not_called()
+
+    def test_autre_site_ne_peut_pas_modifier_le_profil(self):
+        import json
+        corps = json.dumps({"texte": "Pirate", "version": ""})
+        refus = [self.entetes(Origin="https://pirate.example", **{"Sec-Fetch-Site": "cross-site"}),
+                 self.entetes(Origin="null"), self.entetes(**{"X-Bobine-Token": "faux"}),
+                 self.entetes(**{"Sec-Fetch-Site": "same-site"})]
+        sans = self.entetes()
+        del sans["Origin"]
+        refus.append(sans)
+        for h in refus:
+            self.assertEqual(self.requete("POST", "/api/profil", corps, h)[0], 403)
+        h = self.entetes(**{"Content-Type": "application/x-www-form-urlencoded"})
+        self.assertEqual(self.requete("POST", "/api/profil", "texte=Pirate", h)[0], 415)
+        self.assertEqual(self.requete("GET", "/api/profil",
+                                      headers=self.entetes(Origin="https://pirate.example"))[0], 403)
+        self.assertFalse(self.fichier.exists())
+        self.regen.assert_not_called()
+
+    def test_textes_refuses_avec_message_simple(self):
+        for texte, code in (("x" * 1501, "profil_trop_long"), ("Bonjour\n# titre", "profil_diese"),
+                            ("  #IA en début", "profil_diese"), ("caché\x00", "profil_invalide"),
+                            (42, "profil_invalide")):
+            statut, rep = self.enregistrer(texte)
+            self.assertEqual(statut, 400, texte)
+            self.assertEqual(rep["code"], code)
+            self.assertNotIn("Traceback", rep["erreur"])
+        for brut in ("{", "[]", '{"texte":"a"}', '{"texte":"a","version":"","chemin":"/etc"}'):
+            self.assertEqual(self.requete("POST", "/api/profil", brut, self.entetes())[0], 400)
+        self.assertEqual(self.requete("POST", "/api/profil", "x" * (page_server.MAX_CORPS_PROFIL + 1),
+                                      self.entetes())[0], 413)
+        self.assertFalse(self.fichier.exists())
+
+    def test_lien_symbolique_jamais_suivi(self):
+        cible = self.vault.parent / (self.vault.name + "-secret.txt")
+        cible.write_text("secret\n", encoding="utf-8")
+        self.addCleanup(cible.unlink)
+        self.fichier.symlink_to(cible)
+        self.assertEqual(self.lire()[0], 503)
+        statut, _ = self.enregistrer("Pirate", version="")
+        self.assertIn(statut, (409, 503))
+        self.assertEqual(cible.read_text(encoding="utf-8"), "secret\n")
+        self.assertTrue(self.fichier.is_symlink())
+
+    def test_page_non_actualisee_mais_profil_enregistre(self):
+        from enrichir import lire_profil
+        self.regen.return_value = False
+        statut, rep = self.enregistrer("Texte.")
+        self.assertEqual(statut, 200)
+        self.assertFalse(rep["page_actualisee"])
+        self.assertEqual(lire_profil(self.vault), "Texte.")
+
+    def test_enregistrements_simultanes(self):
+        import fcntl
+        import os
+        verrou = os.open(self.vault / ".bobine-profil.lock", os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(verrou, fcntl.LOCK_EX)
+            self.assertEqual(self.enregistrer("Texte.")[0], 409)
+        finally:
+            os.close(verrou)
+        self.assertEqual(self.enregistrer("Texte.")[0], 200)
+
+    def test_regeneration_reelle_sans_appel_ia(self):
+        # Vrai generate_page.py sur une petite bibliothèque, sans clé ni réseau.
+        (self.vault / "index.md").write_text("### Vidéo\n- lien : https://youtu.be/abc\n- auteur : A\n"
+                                             "- thèmes : test\n- contenu : Résumé.\n", encoding="utf-8")
+        # La carte (numpy) n'est pas l'objet du test : elle est désactivée.
+        (self.vault / "config.env").write_text("CARTE=non\n", encoding="utf-8")
+        self.assertTrue(self.regenerer_reel(self.vault))
+        self.assertIn("Résumé.", (self.vault / "vault.html").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

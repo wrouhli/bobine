@@ -114,7 +114,7 @@ With your existing summary API key, open **Demander** at your usual Bobine addre
 
 Existing installations: add `PAGE_ORIGIN=https://your-bobine-host` to `config.env` (exact origin, no path or trailing slash), then restart the page service after updating and regenerating the page. New activations through `activer-page-web.sh` set it automatically. Your tunnel must preserve the public Host header. Keep the password or upstream protection: origin checks are not authentication.
 
-Standalone/downloaded HTML and ordinary static file servers remain read-only. Request limits also protect the public address and survive restarts. No direct access to raw cards, configuration or private counters is added. Profile editing still uses `Mon profil.txt`.
+Standalone/downloaded HTML and ordinary static file servers remain read-only. Request limits also protect the public address and survive restarts. No direct access to raw cards, configuration or private counters is added. The profile can be edited from the page (**Profil**, Save button) with the same protections as Demander; no API key needed. `Mon profil.txt` can still be edited by hand.
 
 See the [verification and migration guide (French)](../docs/demander-verification.md). Back up before deployment.
 

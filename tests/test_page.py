@@ -262,13 +262,13 @@ class OutilsFiche(unittest.TestCase):
 
 
 
-def ecrire_memo_demo(racine, nom, pour_toi="", idee="Idée centrale de la vidéo."):
+def ecrire_memo_demo(racine, nom, pour_toi="", profil="", idee="Idée centrale de la vidéo."):
     import json
     (racine / "memos").mkdir(exist_ok=True)
     (racine / "memos" / (nom + ".json")).write_text(json.dumps({
         "version": 1, "a_retenir": ["Premier réflexe.", "Second réflexe."],
         "memo": {"idee": idee, "points": ["Un point clé."], "etapes": ["Étape A."], "outils": ["Outil B"]},
-        "pour_toi": pour_toi, "profil": "x"}), encoding="utf-8")
+        "pour_toi": pour_toi, "profil": profil}), encoding="utf-8")
 
 
 class MemoEtProfil(unittest.TestCase):
@@ -450,16 +450,45 @@ class DemanderStatique(unittest.TestCase):
         self.assertIn('if (ouverte && prendreFocus) { titre.focus(); }', self.js)
         self.assertIn('ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)', self.js)
 
-    def test_profil_readonly_et_fichiers_source_inchanges(self):
+    def test_formulaire_profil_cache_et_inactif_hors_serveur(self):
         (self.racine / "Mon profil.txt").write_text("Je forme des équipes.", encoding="utf-8")
         ecrire_memo_demo(self.racine, "yt_relance01", pour_toi="Utile pour tes ateliers.")
         fichiers = [self.racine / "Mon profil.txt", self.racine / "memos/yt_relance01.json"]
         avant = [p.read_bytes() for p in fichiers]
         page = generer(self.racine)
-        profil = page.split('<section class="vue-profil"', 1)[1].split("</section>", 1)[0]
-        self.assertNotRegex(profil, r"<(?:form|input|textarea|button)\b|contenteditable")
+        html = BalisesPage(page)
+        par_id = {a.get("id"): (tag, a) for tag, a in html.balises if a.get("id")}
+        self.assertIn("hidden", par_id["profil-form"][1])
+        for ident in ("profil-texte", "profil-enregistrer", "profil-vider"):
+            self.assertIn("disabled", par_id[ident][1], ident)
+        self.assertEqual(par_id["profil-texte"][1]["maxlength"], "1500")
+        self.assertNotIn("hidden", par_id["profil-fichier"][1])  # mode fichier : instructions visibles
         self.assertEqual(avant, [p.read_bytes() for p in fichiers])
+        # Le chat ne touche jamais au profil ; seul le bloc Profil l'enregistre.
         self.assertNotRegex(self.js, r"/api/(?:profil|memos|pourtoi)")
+        js_profil = page.split("/* ---- Profil : modification depuis la page servie ---- */", 1)[1].split(
+            "/* ---- fin Profil ---- */", 1)[0]
+        self.assertIn('location.protocol !== "http:" && location.protocol !== "https:"', js_profil)
+        self.assertIn('referrerPolicy: "same-origin"', js_profil)
+        self.assertNotIn("innerHTML", js_profil)
+        self.assertNotRegex(js_profil, r"localStorage|sessionStorage")
+
+    def test_pour_toi_masque_si_calcule_pour_un_ancien_profil(self):
+        from enrichir import empreinte_profil
+        profil = "Je forme des équipes."
+        (self.racine / "Mon profil.txt").write_text(profil, encoding="utf-8")
+        cas = {"a_jour": empreinte_profil(profil), "perime": empreinte_profil("Ancien profil."), "ancien": ""}
+        for nom, trace in cas.items():
+            with self.subTest(cas=nom):
+                ecrire_memo_demo(self.racine, "yt_relance01", pour_toi="Utile pour tes ateliers.", profil=trace)
+                page = generer(self.racine)
+                fiche = page.split('id="f-yt_relance01"', 1)[1].split("</article>", 1)[0]
+                if nom == "perime":
+                    self.assertNotIn("Utile pour tes ateliers.", fiche)
+                    self.assertIn("Ton profil a changé", fiche)
+                else:
+                    self.assertIn("Utile pour tes ateliers.", fiche)
+                    self.assertIn('data-profil="' + trace + '"', fiche)
 
     def test_titre_piege_secret_absent_et_pas_de_ressources_externes(self):
         piege = '<img src=x onerror="alert(1)"> __FICHES__ </script>'
@@ -807,6 +836,110 @@ class DemanderJavascript(unittest.TestCase):
 
     def test_delai_sans_nouvel_envoi(self):
         self.verifier("expiration")
+
+
+# Bloc Profil exécuté dans Node : DOM et fetch simulés, aucun réseau.
+HARNAIS_PROFIL = r"""
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const entree = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+class El {
+  constructor(tag='div', id='') { this.tagName=tag; this.id=id; this.attrs={}; this.children=[]; this.hidden=false;
+    this.disabled=false; this.readOnly=false; this.value=''; this.textContent=''; this.className=''; this.listeners={};
+    const c=new Set(); this.classList={toggle:(k,b)=>b?c.add(k):c.delete(k), contains:k=>c.has(k)}; this.parentNode=null; }
+  setAttribute(k,v){this.attrs[k]=String(v);} getAttribute(k){return this.attrs[k]===undefined?null:this.attrs[k];}
+  appendChild(e){e.parentNode=this;this.children.push(e);return e;}
+  insertBefore(e,ref){e.parentNode=this;const i=this.children.indexOf(ref);this.children.splice(i<0?this.children.length:i,0,e);return e;}
+  removeChild(e){this.children.splice(this.children.indexOf(e),1);}
+  get firstChild(){return this.children[0];}
+  get nextSibling(){const p=this.parentNode;if(!p)return null;return p.children[p.children.indexOf(this)+1]||null;}
+  addEventListener(n,fn){(this.listeners[n] ||= []).push(fn);}
+  emit(n){return Promise.all((this.listeners[n]||[]).map(fn=>fn({preventDefault(){}})));}
+  focus(){this.focused=true;}
+}
+const pause=()=>new Promise(r=>setImmediate(r));
+function env({protocol='http:', reponses=[]}={}) {
+  const ids={}; for (const id of ['profil-form','profil-texte','profil-compte','profil-vider','profil-enregistrer',
+    'profil-statut','profil-fichier','profil-actuel']) ids[id]=new El('div',id);
+  ids['profil-form'].hidden=true; ids['profil-texte'].disabled=true; ids['profil-texte'].attrs.maxlength='1500';
+  const conteneur=new El('section');
+  const perime=new El('div'); perime.attrs['data-profil']='ancien'; conteneur.appendChild(perime);
+  const ajour=new El('div'); ajour.attrs['data-profil']='nouveau'; conteneur.appendChild(ajour);
+  const appels=[], file=[...reponses];
+  const fetch=(url,options)=>{ appels.push({url,options}); assert.ok(file.length,'Appel réseau imprévu : '+url);
+    const r=file.shift(); if(r.erreur) return Promise.reject(r.erreur);
+    return Promise.resolve({ok:r.status>=200&&r.status<300,status:r.status,
+      headers:{get:()=> 'application/json'}, json:async()=>r.json}); };
+  const document={getElementById:id=>ids[id]||null, createElement:t=>new El(t),
+    querySelectorAll:q=>{assert.equal(q,'.encadre.pourtoi');return [perime,ajour];}};
+  vm.runInNewContext(entree.js,{window:{fetch,AbortController},document,location:{protocol},fetch,AbortController,
+    setTimeout:()=>1,clearTimeout:()=>{}});
+  return {ids,appels,file,perime,ajour,conteneur};
+}
+const ok=(json)=>({status:200,json});
+const decouverte=ok({disponible:false,profil:true,jeton:'jeton-test-123456'});
+(async()=>{
+  if (entree.cas==='fichier') {
+    for (const protocol of ['file:','icloud:']) { const e=env({protocol}); await pause();
+      assert.equal(e.appels.length,0); assert.ok(e.ids['profil-form'].hidden); assert.ok(e.ids['profil-texte'].disabled); }
+    const absent=env({reponses:[{status:503,json:{}}]}); await pause();
+    assert.ok(absent.ids['profil-form'].hidden); assert.equal(absent.ids['profil-fichier'].hidden,false);
+    const ancien=env({reponses:[ok({disponible:true,jeton:'jeton-test-123456'})]}); await pause();
+    assert.ok(ancien.ids['profil-form'].hidden,'serveur sans profil : pas de formulaire');
+  } else if (entree.cas==='enregistrer') {
+    const e=env({reponses:[decouverte, ok({texte:'Mon texte',version:'v1',max:1500})]}); await pause(); await pause();
+    const d=e.ids; assert.equal(d['profil-form'].hidden,false); assert.ok(d['profil-fichier'].hidden);
+    assert.equal(d['profil-texte'].value,'Mon texte'); assert.ok(d['profil-enregistrer'].disabled,'rien à enregistrer');
+    for (const c of e.appels) { assert.equal(c.options.credentials,'same-origin'); assert.equal(c.options.referrerPolicy,'same-origin'); }
+    d['profil-texte'].value='Ligne\n  # titre'; await d['profil-texte'].emit('input');
+    assert.ok(d['profil-enregistrer'].disabled); assert.ok(d['profil-statut'].classList.contains('erreur'));
+    d['profil-texte'].value='Nouveau <img src=x onerror=alert(1)>'; await d['profil-texte'].emit('input');
+    assert.equal(d['profil-enregistrer'].disabled,false); assert.equal(d['profil-statut'].textContent,'');
+    e.file.push(ok({texte:'Nouveau <img src=x onerror=alert(1)>',version:'v2',empreinte:'nouveau',page_actualisee:true}));
+    await d['profil-form'].emit('submit'); await pause();
+    const envoi=e.appels[2]; assert.equal(envoi.options.method,'POST');
+    assert.equal(envoi.options.headers['X-Bobine-Token'],'jeton-test-123456');
+    assert.deepEqual(JSON.parse(envoi.options.body),{texte:'Nouveau <img src=x onerror=alert(1)>',version:'v1'});
+    assert.equal(d['profil-actuel'].children[1].textContent,'Nouveau <img src=x onerror=alert(1)>');
+    assert.ok(e.perime.hidden,'Pour toi périmé masqué'); assert.equal(e.ajour.hidden,false);
+    assert.ok(e.conteneur.children.some(n=>n.className.includes('pourtoi-attente')));
+    assert.match(d['profil-statut'].textContent,/enregistré/);
+    // Conflit : le texte de l'utilisateur reste dans le champ, aucun écrasement.
+    d['profil-texte'].value='Encore autre chose'; await d['profil-texte'].emit('input');
+    e.file.push({status:409,json:{code:'profil_modifie',erreur:'x'}});
+    await d['profil-form'].emit('submit'); await pause();
+    assert.equal(d['profil-texte'].value,'Encore autre chose');
+    assert.match(d['profil-statut'].textContent,/modifié ailleurs/);
+    assert.ok(d['profil-statut'].classList.contains('erreur'),'erreur conservée après la fin de la requête');
+    // Vider : demande une confirmation par Enregistrer, pas d'envoi automatique.
+    const avant=e.appels.length; await d['profil-vider'].emit('click');
+    assert.equal(d['profil-texte'].value,''); assert.equal(e.appels.length,avant);
+  }
+  process.stdout.write('ok');
+})().catch(e=>{console.error(e);process.exit(1);});
+"""
+
+
+@unittest.skipUnless(shutil.which("node"), "Node facultatif pour les tests JS sans réseau")
+class ProfilJS(unittest.TestCase):
+    def setUp(self):
+        dossier = tempfile.TemporaryDirectory()
+        self.addCleanup(dossier.cleanup)
+        page = generer(vault_demo(dossier.name))
+        self.js = page.split("/* ---- Profil : modification depuis la page servie ---- */", 1)[1].split(
+            "/* ---- fin Profil ---- */", 1)[0]
+
+    def executer(self, cas):
+        r = subprocess.run([shutil.which("node"), "-e", HARNAIS_PROFIL],
+                           input=json.dumps({"cas": cas, "js": self.js}), capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(r.stdout, "ok")
+
+    def test_lecture_seule_sans_serveur(self):
+        self.executer("fichier")
+
+    def test_enregistrement_conflit_et_masquage(self):
+        self.executer("enregistrer")
 
 
 if __name__ == "__main__":

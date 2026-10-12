@@ -149,7 +149,7 @@ Pour des résumés en anglais, ajoute `LANGUE_RESUMES=en` dans `config.env`. Les
 
 Avec une clé API, chaque fiche gagne un onglet **Mémo** (l'idée centrale, les points clés, les étapes, les outils cités) et un encadré **À retenir**. Si tu te décris aussi en quelques lignes, chaque fiche ajoute un bloc **Pour toi** : ce que cette vidéo t'apporte, à toi.
 
-L'installation pose la question une fois (Entrée pour passer). Tu peux l'écrire ou le changer à tout moment dans `Mon profil.txt`, dans ton dossier Bobine : quelques lignes sur ce que tu fais et ce que tu cherches dans tes vidéos. Les lignes qui commencent par `#` sont ignorées. Les vidéos plus anciennes reçoivent leur mémo petit à petit, 10 par passage, sans toucher à leurs résumés.
+L'installation pose la question une fois (Entrée pour passer). Tu peux l'écrire ou le changer à tout moment dans **Ma page → Profil** (bouton Enregistrer), ou directement dans `Mon profil.txt`, dans ton dossier Bobine : quelques lignes sur ce que tu fais et ce que tu cherches dans tes vidéos. Les lignes qui commencent par `#` sont ignorées. Les vidéos plus anciennes reçoivent leur mémo petit à petit, 10 par passage, sans toucher à leurs résumés.
 
 ### *Recommandé* : le raccourci iPhone (partager en un geste)
 
@@ -172,7 +172,7 @@ Sur Mac, l'installation démarre la page sur ce Mac uniquement. Sur iPhone, le c
 
 Bobine cherche localement puis envoie au service d'IA jusqu'à cinq fiches sous forme d'extraits, la question, le court historique et ton profil si tu en as écrit un. Il ne fait aucune recherche sur Internet. Si rien ne correspond, il le dit sans appel au service. Les liens permettent de vérifier la réponse, pas de garantir chaque affirmation.
 
-La conversation reste dans l'onglet et n'est pas enregistrée sur disque. Le profil reste modifiable dans `Mon profil.txt` pour cette première version.
+La conversation reste dans l'onglet et n'est pas enregistrée sur disque. Ton profil se modifie aussi depuis la page, dans **Profil**. Enregistrer ne coûte rien : les blocs « Pour toi » se mettent à jour aux prochains passages, et les anciens sont masqués tout de suite. Sur la copie iCloud, le profil reste en lecture.
 
 <details>
 <summary>Limites et vérifications avancées</summary>
