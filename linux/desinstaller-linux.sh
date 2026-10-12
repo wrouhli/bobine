@@ -55,25 +55,134 @@ fi
 note "Au programme : arrêter le réveil automatique, le serveur de liens et la page web."
 note "Tes vidéos locales et tous tes autres fichiers restent en place."
 
-# Reconnaître le chemin COMPLET du script lancé, pas un simple préfixe de
-# dossier (Bobine et Bobine-autre peuvent coexister). On ne lit que ExecStart.
-service_de_ce_dossier() {  # $1 = fichier unité, $2 = script attendu
-  local ligne candidat
-  [ -f "$1" ] || return 1
-  candidat="$VAULT/$2"
-  while IFS= read -r ligne || [ -n "$ligne" ]; do
-    case "$ligne" in ExecStart=*) ;; *) continue ;; esac
-    ligne="${ligne//%h/$HOME}"
-    case "$ligne" in
-      *"$candidat"|*"$candidat "*|*"$candidat\""*|*"$candidat'"*) return 0 ;;
-    esac
-  done < "$1"
-  return 1
+# Reconnaître des arguments complets, après décodage systemd (pas du shell).
+# Tout format ambigu/personnalisé, lien ou surcharge reste volontairement intact.
+PY_SERVICE=""
+for candidat in "$VAULT/.venv/bin/python" python3 python3.13 python3.12 python3.11 python3.10; do
+  if command -v "$candidat" >/dev/null 2>&1; then PY_SERVICE="$candidat"; break; fi
+done
+service_de_ce_dossier() {  # $1 = fichier unité, $2 = script attendu (ou tunnel)
+  [ -n "$PY_SERVICE" ] && "$PY_SERVICE" -B - "$1" "$VAULT" "$2" "$HOME" <<'PYTHON'
+import json
+import re
+import sys
+from pathlib import Path
+import os
+unit, vault, script, home = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], Path(sys.argv[4])
+# Un même dossier peut apparaître sous son chemin affiché ou son chemin réel
+# (lien symbolique, ou /var -> /private/var sur macOS). L'activation de la page
+# enregistre le chemin réel ; le réveil, le chemin affiché. Seul ce dossier est
+# reconnu : la comparaison se fait sur le chemin réel, rien de plus large.
+reel = os.path.realpath(str(vault))
+
+def meme(arg, attendu):
+    """Vrai si arg désigne exactement le chemin attendu de CE dossier."""
+    return os.path.realpath(arg) == os.path.realpath(str(attendu))
+
+def arguments(text):
+    # Sous-ensemble non ambigu : mots nus ou entièrement entre guillemets,
+    # \\ et \" émis par activer-page-web.sh. Pas d'expansion shell/variable.
+    words, i = [], 0
+    while i < len(text):
+        if text[i].isspace():
+            i += 1
+            continue
+        quote = text[i] if text[i] in "\"'" else None
+        if quote:
+            i += 1
+        word = ""
+        closed = not quote
+        while i < len(text):
+            c = text[i]
+            if quote and c == quote:
+                i += 1
+                closed = True
+                if i < len(text) and not text[i].isspace():
+                    raise ValueError("guillemets ambigus")
+                break
+            if not quote and c.isspace():
+                break
+            if c == "\\":
+                i += 1
+                if i >= len(text) or text[i] not in ('\\', '"'):
+                    raise ValueError("échappement inconnu")
+                c = text[i]
+            elif c in "\"'" and not quote:
+                raise ValueError("guillemets dans un mot")
+            word += c
+            i += 1
+        if not closed:
+            raise ValueError("guillemets non fermés")
+        # Une seule passe : %%h est un %h littéral, jamais le HOME.
+        def expand(match):
+            token = match.group()
+            if token == "%%":
+                return "%"
+            if token == "$$":
+                return "$"
+            if token == "%h":
+                return str(home)
+            raise ValueError("expansion non reconnue")
+        words.append(re.sub(r"%%|\$\$|%h|[%$]", expand, word))
+    return words
+
+try:
+    if unit.is_symlink() or not unit.is_file() or unit.with_name(unit.name + ".d").exists():
+        raise ValueError("unité non ordinaire ou surchargée")
+    commands = []
+    section = None
+    for line in unit.read_text().splitlines():
+        line = line.strip()
+        if line.startswith(("#", ";")) or not line:
+            continue
+        if line.startswith("["):
+            section = line
+        elif line.startswith("ExecStart="):
+            if section != "[Service]":
+                raise ValueError("commande hors service")
+            commands.append(line.split("=", 1)[1].strip())
+    if len(commands) != 1:
+        raise ValueError("commande ambiguë")
+    args = arguments(commands[0])
+    if not args or not Path(args[0]).is_absolute():
+        raise ValueError("exécutable ambigu")
+    if script == "watch-linux.sh":
+        valid = len(args) == 2 and args[0] == "/bin/bash" and meme(args[1], vault / script)
+    elif script == "tunnel":
+        # Ce test n'est appelé que si la page appartient à ce vault. Le tunnel
+        # doit aussi utiliser un fichier dédié qui dessert sa PAGE_ORIGIN.
+        valid = (Path(args[0]).name == "cloudflared" and len(args) == 6 and
+                 args[1:4] == ["--no-autoupdate", "tunnel", "--config"] and args[5] == "run")
+        if valid:
+            yml, config = Path(args[4]), vault / "config.env"
+            if (yml.parent != home / ".cloudflared" or
+                    not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,62}\.yml", yml.name) or
+                    yml.is_symlink() or config.is_symlink()):
+                raise ValueError("configuration inconnue")
+            origins = [line.split("=", 1)[1].strip().strip('"').strip("'")
+                       for line in config.read_text().splitlines()
+                       if re.match(r"^\s*PAGE_ORIGIN\s*=", line)]
+            content = yml.read_text()
+            hosts = [line.split("hostname:", 1)[1].strip() for line in content.splitlines()
+                     if re.match(r"^\s*-\s*hostname:", line)]
+            host = json.loads(hosts[0]) if len(hosts) == 1 and hosts[0].startswith('"') else (hosts[0] if len(hosts) == 1 else "")
+            services = [line.split("service:", 1)[1].strip() for line in content.splitlines()
+                        if re.match(r"^\s*(?:-\s*)?service:", line)]
+            valid = origins == ["https://" + host] and services == ["http://127.0.0.1:8786", "http_status:404"]
+    else:
+        valid = (re.fullmatch(r"python(?:3(?:\.\d+)*)?", Path(args[0]).name) is not None and
+                 len(args) == 4 and meme(args[1], vault / script) and args[2] == "--vault"
+                 and meme(args[3], vault) and os.path.realpath(args[3]) == reel)
+except (OSError, ValueError, IndexError, TypeError):
+    valid = False
+sys.exit(0 if valid else 1)
+PYTHON
 }
 
 # ------------------------------------------------- 1. le réveil automatique
 etape "1/3 — Le réveil automatique (systemd)"
 UNIT_DIR="$HOME/.config/systemd/user"
+SERVICES_CONSERVES="non"
 if service_de_ce_dossier "$UNIT_DIR/bobine-watch.service" watch-linux.sh; then
   systemctl --user disable --now bobine-watch.timer 2>/dev/null || true
   systemctl --user disable --now bobine-watch.path 2>/dev/null || true
@@ -81,7 +190,8 @@ if service_de_ce_dossier "$UNIT_DIR/bobine-watch.service" watch-linux.sh; then
   rm -f "$UNIT_DIR/bobine-watch.service" "$UNIT_DIR/bobine-watch.timer" "$UNIT_DIR/bobine-watch.path"
   systemctl --user daemon-reload 2>/dev/null || true
   ok "Réveil retiré (plus de passage automatique ni instantané)."
-elif [ -f "$UNIT_DIR/bobine-watch.service" ]; then
+elif [ -e "$UNIT_DIR/bobine-watch.service" ] || [ -L "$UNIT_DIR/bobine-watch.service" ]; then
+  SERVICES_CONSERVES="oui"
   note "Un réveil existe, mais il surveille un autre dossier — je n'y touche pas."
 else
   note "Pas de réveil installé — rien à retirer."
@@ -95,23 +205,42 @@ if service_de_ce_dossier "$UNIT_DIR/bobine-inbox.service" inbox_server.py; then
   systemctl --user daemon-reload 2>/dev/null || true
   ok "Serveur de liens retiré."
 else
+  if [ -e "$UNIT_DIR/bobine-inbox.service" ] || [ -L "$UNIT_DIR/bobine-inbox.service" ]; then
+    SERVICES_CONSERVES="oui"
+  fi
   note "Pas de serveur de liens pour ce dossier — rien à retirer."
 fi
 
 # ------------------------------------------ 2bis. la page web (page_server)
 if service_de_ce_dossier "$UNIT_DIR/bobine-page.service" page_server.py; then
-  systemctl --user disable --now bobine-page.service bobine-tunnel.service 2>/dev/null || true
-  rm -f "$UNIT_DIR/bobine-page.service" "$UNIT_DIR/bobine-tunnel.service"
+  if service_de_ce_dossier "$UNIT_DIR/bobine-tunnel.service" tunnel; then
+    systemctl --user disable --now bobine-page.service bobine-tunnel.service 2>/dev/null || true
+    rm -f "$UNIT_DIR/bobine-tunnel.service"
+  else
+    systemctl --user disable --now bobine-page.service 2>/dev/null || true
+    if [ -e "$UNIT_DIR/bobine-tunnel.service" ] || [ -L "$UNIT_DIR/bobine-tunnel.service" ]; then
+      SERVICES_CONSERVES="oui"
+      note "Tunnel non reconnu pour ce dossier : il est conservé."
+    fi
+  fi
+  rm -f "$UNIT_DIR/bobine-page.service"
   systemctl --user daemon-reload 2>/dev/null || true
   ok "Page web retirée."
   note "Le tunnel « bobine-page » reste côté Cloudflare : pour l'effacer aussi,  cloudflared tunnel delete bobine-page"
 else
+  for unite in bobine-page.service bobine-tunnel.service; do
+    if [ -e "$UNIT_DIR/$unite" ] || [ -L "$UNIT_DIR/$unite" ]; then SERVICES_CONSERVES="oui"; fi
+  done
   note "Pas de page web pour ce dossier — rien à retirer."
 fi
 
 # --------------------------------------------------- 3. les fichiers conservés
 etape "3/3 : Tes fichiers restent en place"
-note "Bobine est arrêté pour ce dossier."
+if [ "$SERVICES_CONSERVES" = oui ]; then
+  note "Des services non reconnus ont été conservés : leur arrêt n’est pas confirmé."
+else
+  note "Bobine est arrêté pour ce dossier."
+fi
 note "Toutes tes vidéos locales et tes autres fichiers sont conservés."
 note "Après avoir vérifié son contenu, tu peux supprimer toi-même ce dossier :"
 note "$(affiche "$VAULT")"
@@ -126,5 +255,9 @@ if [ -t 1 ]; then
   done
   printf "\r%*s\r" 36 ""
 fi
-printf "${VERT}${GRAS}  ✓ C'est fait : Bobine est arrêté, tes fichiers locaux sont conservés.${FIN}\n"
+if [ "$SERVICES_CONSERVES" = oui ]; then
+  ok "Services reconnus retirés ; services non reconnus et fichiers locaux conservés."
+else
+  printf "${VERT}${GRAS}  ✓ C'est fait : Bobine est arrêté, tes fichiers locaux sont conservés.${FIN}\n"
+fi
 printf "   ${FONCE}(si un jour tu veux revenir : https://github.com/wrouhli/bobine)${FIN}\n\n"

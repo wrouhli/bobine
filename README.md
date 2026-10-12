@@ -64,7 +64,7 @@ You share a video from your iPhone. A few minutes later, Bobine has downloaded i
 
 ![Bobine's topic map](assets/capture-carte.png)
 
-**And you can ask it questions**: "Which videos talk about cooking?" The assistant reads your cards and answers *(see "ask your collection", in the installation section)*.
+**And you can ask questions** from **Demander**, with links to the source cards. Crush remains an optional Terminal alternative.
 
 *(All these screenshots come from a demo Bobine.)*
 
@@ -164,7 +164,26 @@ On your iPhone, in the **Shortcuts** app:
 
 Usage: in Instagram/TikTok/YouTube → **Share → Send to Bobine**. That's it.
 
-### *Recommended*: ask your collection (Crush)
+### Ask Bobine from the page
+
+Open **Ma page**, then **Demander**. Ask about a topic in your library, or choose **Poser une question sur cette vidéo** from a video page. Bobine answers with links to the cards it used. It uses your existing summary provider and key.
+
+On Mac, the installer starts a page server reachable only from that Mac. On iPhone, chat is available through your Linux server's protected address. The standalone `vault.html` file and its iCloud copy remain read-only, without unusable chat buttons.
+
+Bobine searches locally, then sends excerpts from at most five cards, your question, short conversation history and optional profile to your AI provider. It does not browse the web. With no relevant match, it replies locally without a provider call. Citations help you check an answer; they do not guarantee every statement is correct.
+
+Conversation history lives only in the tab, not on disk. Profile editing remains in `Mon profil.txt` for this first version.
+
+<details>
+<summary>Limits and advanced verification</summary>
+
+One question at a time, 10 admitted requests per minute and 100 per rolling 24 hours per installation, including behind a public tunnel. Failed and no-match requests also count. A private timestamp-only counter survives restarts. Context is capped at 16,000 characters and questions at 2,000. Search is lexical: use a specific topic or name.
+
+The server interrupts a request after at most 60 seconds. Disconnecting does not guarantee provider-side cancellation or a refund. API keys stay on the server, never in HTML. See the [verification guide (French)](docs/demander-verification.md).
+
+</details>
+
+### *Optional*: the Terminal alternative (Crush)
 
 [Crush](https://charm.sh/crush) is an assistant that lives in the Terminal: light, open source, no account to create. It uses **the same API key as your summaries**; and since it launches inside your vault folder, it reads your cards to answer.
 
@@ -183,7 +202,7 @@ Then ask questions in plain language: "Which videos talk about cooking?", "Summa
 
 - **On the Mac**: **double-click "Ma page"** in your vault folder (or open `vault.html`): search, topic pills, links to the videos.
 - **On the iPhone**: Files → iCloud Drive → **Bobine** → `vault.html` (updated with every new batch; the graph map stays on the Mac).
-- **To ask questions**: run `crush` in your vault folder (see "ask your collection"), or simply read the cards: they are plain Markdown files in `raw/` (a `grep`, Obsidian…).
+- **To ask questions**: open **Ma page → Demander** on Mac, or your server’s protected page. Crush is still an optional alternative. The iCloud copy does not offer chat.
 
 ## Importing an Instagram export
 
@@ -268,6 +287,8 @@ Your vault folder (the one you chose at installation) looks like this:
 Bobine/
 ├── ingest.py           # downloads + transcribes → cards (raw/)
 ├── filtre.py           # (optional) picks what to ingest from an Instagram export
+├── demander.py         # local search and source-linked answers
+├── page_server.py      # page and chat, keys kept on the server
 ├── enrichir.py         # summaries via your API key → index.md + pages
 ├── generate_page.py    # builds vault.html (readable without JavaScript) + the map
 ├── graphe.py           # (legacy) [[Topics]] links for Obsidian

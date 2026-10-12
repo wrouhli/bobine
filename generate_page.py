@@ -164,7 +164,8 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
 <style>
   /* Identité visuelle : blanc, gris platine, noir ; l'ambre seulement pour
      guider le regard ; le jaune pâle pour les encadrés. Aucune ressource
-     externe : la page fonctionne hors ligne et ne contacte personne. */
+     externe : la bibliothèque reste lisible hors ligne. Demander ne contacte
+     que le serveur de cette page, après découverte explicite de sa disponibilité. */
   :root{
     --fond:#FFFFFF; --surface:#F3F4F6; --surface-survol:#FFFFFF;
     --encre:#000000; --encre-2:rgba(0,0,0,.62); --encre-3:rgba(0,0,0,.45);
@@ -192,6 +193,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
     }
   }
   *{box-sizing:border-box}
+  [hidden]{display:none !important}
   html,body{margin:0}
   html{scroll-behavior:auto}
   body{background:var(--fond);color:var(--encre);
@@ -264,6 +266,41 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   mark{background:var(--ambre);color:var(--sur-ambre);border-radius:3px;padding:0 2px}
   .vide{color:var(--encre-2);padding:28px 0}
 
+  /* ---------- Demander : caché jusqu'à la découverte du serveur ---------- */
+  body.demander-ouvert #bibliotheque{display:none}
+  body.demander-ouvert .nav .nav-biblio{background:transparent;color:var(--encre-2)}
+  body.demander-ouvert .nav .nav-demander{background:var(--actif-fond);color:var(--actif-encre)}
+  .vue-demander{padding-top:28px;max-width:780px;margin:0 auto;overflow-wrap:anywhere}
+  .demander-entete,.demander-contexte,.demander-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .demander-entete{justify-content:space-between}
+  .vue-demander .btn{margin-top:0;cursor:pointer;white-space:normal;text-align:left}
+  .demander-contexte{padding:16px 18px;margin:24px 0 8px;background:var(--surface);border-radius:14px}
+  .demander-contexte p{margin:0;flex:1;min-width:160px}
+  .demander-contexte strong{display:block}
+  .demander-note{font-size:13px;color:var(--encre-2);margin:8px 0 18px}
+  .demander-inspiration summary{cursor:pointer;font-size:14px;font-weight:500}
+  .demander-inspiration{margin:16px 0}
+  .demander-exemples{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 24px}
+  .demander-exemples .btn{font-size:14px;font-weight:500;padding:9px 13px}
+  .demander-messages{list-style:none;padding:0;margin:24px 0;display:flex;flex-direction:column;gap:16px}
+  .demander-message{padding:18px 20px;border:1px solid var(--trait-fort);border-radius:14px;min-width:0}
+  .demander-message.user{background:var(--surface);border-color:transparent}
+  .demander-message h2{font-size:14px;margin:0 0 8px}
+  .demander-texte{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+  .demander-sources{padding-left:20px;margin:16px 0 0;font-size:14px}
+  .demander-sources li+li{margin-top:8px}
+  .demander-sources a{text-underline-offset:3px}
+  .demander-form label{display:block;font-weight:600;margin-bottom:8px}
+  .demander-form textarea{display:block;width:100%;min-height:126px;resize:vertical;padding:14px 16px;
+    border:1px solid var(--trait-fort);border-radius:12px;background:var(--fond);color:var(--encre);font:inherit}
+  .demander-form textarea:focus{border-color:var(--encre)}
+  .demander-actions{justify-content:space-between;margin-top:12px}
+  .demander-actions .btn{background:var(--ambre);border-color:transparent;color:var(--sur-ambre)}
+  .vue-demander button:disabled{opacity:.5;cursor:not-allowed}
+  .demander-statut{min-height:1.6em;margin:18px 0 10px;white-space:pre-wrap}
+  .demander-statut.erreur{padding:12px 16px;border-left:4px solid var(--ambre);background:var(--surface)}
+  .fiche .demander-acces{margin-right:8px}
+
   /* ---------- fiche ---------- */
   .fiche,.vue-profil{display:none;padding-top:28px}
   .fiche:target,.vue-profil:target{display:block}
@@ -334,7 +371,9 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   @media (max-width:640px){
     .lien-carte{display:none}
     .lien-carte-mobile{display:inline-block}
-    .tete-in{gap:8px;padding:10px 14px}
+    .tete-in{gap:8px;padding:10px 14px;flex-wrap:wrap}
+    .nav{order:3;width:100%;justify-content:center}
+    .vue-demander .demander-entete{align-items:flex-start}
     .marque{font-size:17px}
     .nav{margin-left:0;gap:2px}
     .nav a{padding:6px 9px;font-size:14px}
@@ -356,6 +395,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
     <a class="marque" href="#bibliotheque"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="6.6" r="1.5"/><circle cx="12" cy="17.4" r="1.5"/><circle cx="6.6" cy="12" r="1.5"/><circle cx="17.4" cy="12" r="1.5"/></svg>Bobine</a>
     <nav class="nav" aria-label="Navigation">
       <a class="nav-biblio" href="#bibliotheque">Bibliothèque</a>
+      <a class="nav-demander demander-acces" href="#demander" hidden>Demander</a>
       <a class="nav-profil" href="#profil">Profil</a>
     </nav>
     <div class="droite">
@@ -384,6 +424,44 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   </section>
 __FICHES__
 __PROFIL__
+  <section class="vue-demander" id="demander" aria-labelledby="demander-titre" hidden>
+    <a class="retour" href="#bibliotheque">← Bibliothèque</a>
+    <div class="demander-entete">
+      <h1 class="titre" id="demander-titre" tabindex="-1">Demander à Bobine</h1>
+      <button class="btn" id="demander-nouveau" type="button">Nouvelle conversation</button>
+    </div>
+    <p class="sous">Retrouve une idée, compare des vidéos ou prépare ton prochain pas.</p>
+    <div class="demander-contexte">
+      <p>Ta sélection<strong id="demander-selection">Toute la bibliothèque</strong></p>
+      <button class="btn" id="demander-global" type="button" hidden>Toute la bibliothèque</button>
+    </div>
+    <p class="demander-note" id="demander-aide-selection">Bobine cherche dans toute ta bibliothèque.</p>
+    <details class="demander-inspiration">
+    <summary>Besoin d’une idée de question ?</summary>
+    <div class="demander-exemples" id="demander-exemples" role="group" aria-label="Exemples de questions, à modifier avant d’envoyer">
+      <p class="demander-note">Ouvre une fiche pour poser une question</p>
+    </div>
+    </details>
+    <ol class="demander-messages" id="demander-messages" aria-label="Conversation"></ol>
+    <form class="demander-form" id="demander-form">
+      <label for="demander-question">Ta question</label>
+      <textarea id="demander-question" name="question" rows="4" maxlength="2000" required
+        autocomplete="off" aria-describedby="demander-limite demander-confidentialite"
+        placeholder="Que veux-tu retrouver dans tes vidéos ?" disabled></textarea>
+      <div class="demander-actions">
+        <span class="demander-note" id="demander-limite">2 000 caractères maximum · Ctrl ou ⌘ + Entrée pour envoyer</span>
+        <button class="btn" id="demander-envoyer" type="submit" disabled>Envoyer</button>
+      </div>
+    </form>
+    <p class="demander-statut" id="demander-statut" role="status" aria-live="polite" aria-atomic="true"></p>
+    <button class="btn" id="demander-reconnecter" type="button" hidden>Reconnecter Bobine</button>
+    <p class="demander-note">Bobine peut se tromper. Ouvre les fiches citées pour vérifier.</p>
+    <p class="demander-note" id="demander-confidentialite">Conversation gardée uniquement dans cet onglet, effacée au rechargement.
+      Les 6 derniers messages au maximum sont utilisés, avec des extraits limités.
+      Ta question, ce court historique, ton profil s’il existe et les extraits utiles sont envoyés au service d’IA configuré.</p>
+    <p class="demander-note">Une fiche sélectionnée limite les réponses à cette vidéo uniquement. Choisis « Toute la bibliothèque » pour croiser plusieurs vidéos.
+      Changer de sélection commence une nouvelle conversation. Ton brouillon est conservé.</p>
+  </section>
   <footer>Mis à jour le __DATE__ · __COUNT__<br>
   🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></footer>
 </main>
@@ -525,11 +603,342 @@ __PROFIL__
   function versHaut(){ window.scrollTo(0, 0); }
   window.addEventListener("hashchange", function(){
     var h = location.hash.slice(1);
-    if ((h.indexOf("f-") === 0 || h === "profil") && document.getElementById(h)) { versHaut(); }
+    if ((h.indexOf("f-") === 0 || h === "profil" || h === "demander") && document.getElementById(h)) { versHaut(); }
     else { window.scrollTo(0, position); }
   });
   cartes.forEach(function(c){ c.addEventListener("click", function(){ position = window.scrollY; }); });
 })();
+
+/* ---- Demander : état privé à l'onglet, aucune persistance ---- */
+(function(){
+  "use strict";
+  // Une copie locale/iCloud n'essaie jamais de contacter un serveur.
+  if (location.protocol !== "http:" && location.protocol !== "https:") { return; }
+  if (!window.fetch || !window.AbortController) { return; }
+
+  var vue = document.getElementById("demander");
+  var titre = document.getElementById("demander-titre");
+  var formulaire = document.getElementById("demander-form");
+  var question = document.getElementById("demander-question");
+  var envoyerBouton = document.getElementById("demander-envoyer");
+  var nouveau = document.getElementById("demander-nouveau");
+  var global = document.getElementById("demander-global");
+  var selection = document.getElementById("demander-selection");
+  var messages = document.getElementById("demander-messages");
+  var statut = document.getElementById("demander-statut");
+  var reconnecter = document.getElementById("demander-reconnecter");
+  var acces = Array.from(document.querySelectorAll(".demander-acces"));
+  var aideSelection = document.getElementById("demander-aide-selection");
+  var boiteExemples = document.getElementById("demander-exemples");
+  var exemples = [];
+  var navigation = Array.from(document.querySelectorAll(".nav a"));
+  var fiches = new Map();
+  document.querySelectorAll("article.fiche").forEach(function(f){
+    if (/^f-[A-Za-z0-9_-]+$/.test(f.id)) { fiches.set(f.id, f); }
+  });
+  var jeton = null, decouvert = false, enCours = false, verification = false;
+  var ficheChoisie = null, historique = [];
+
+  function annoncer(texte, erreur){
+    statut.textContent = texte;
+    statut.classList.toggle("erreur", !!erreur);
+  }
+  function actualiser(){
+    // Après une panne, la conversation reste consultable mais l'envoi est bloqué.
+    question.disabled = false;
+    question.readOnly = enCours;
+    envoyerBouton.disabled = !jeton || enCours || verification || !question.value.trim() || question.value.length > 2000;
+    envoyerBouton.textContent = enCours ? "Bobine cherche…" : "Envoyer";
+    nouveau.disabled = enCours || verification;
+    global.disabled = enCours || verification;
+    reconnecter.disabled = enCours || verification;
+    exemples.forEach(function(b){ b.disabled = enCours || verification; });
+    formulaire.setAttribute("aria-busy", enCours ? "true" : "false");
+  }
+  function naviguer(prendreFocus){
+    var ouverte = decouvert && location.hash === "#demander";
+    vue.hidden = !ouverte;
+    document.body.classList.toggle("demander-ouvert", ouverte);
+    navigation.forEach(function(a){
+      var active = a.getAttribute("href") === (ouverte ? "#demander" : location.hash === "#profil" ? "#profil" : "#bibliotheque");
+      if (active) { a.setAttribute("aria-current", "page"); } else { a.removeAttribute("aria-current"); }
+    });
+    if (ouverte && prendreFocus) { titre.focus(); }
+  }
+  function viserQuestion(){ if (!vue.hidden) { question.focus(); } }
+  function effacer(garderBrouillon){
+    historique = [];
+    while (messages.firstChild) { messages.removeChild(messages.firstChild); }
+    if (!garderBrouillon) { question.value = ""; }
+    if (jeton) { annoncer("Nouvelle conversation. À toi de poser ta question.", false); }
+    actualiser();
+  }
+  function proposerQuestions(){
+    while (boiteExemples.firstChild) { boiteExemples.removeChild(boiteExemples.firstChild); }
+    exemples = [];
+    var sujets = [], vus = new Set();
+    function ajouterSujet(texte){
+      if (typeof texte !== "string") { return; }
+      var sujet = texte.trim().replace(/\s+/g, " ").slice(0, 200);
+      if (!sujet || vus.has(sujet.toLowerCase())) { return; }
+      vus.add(sujet.toLowerCase()); sujets.push(sujet);
+    }
+    if (ficheChoisie) {
+      fiches.get(ficheChoisie).querySelectorAll(".themes-fiche [data-filtre]").forEach(function(p){
+        ajouterSujet(p.dataset.filtre);
+      });
+      if (!sujets.length) { ajouterSujet(fiches.get(ficheChoisie).querySelector("h1").textContent); }
+    } else {
+      document.querySelectorAll("#chips .chip[data-t]").forEach(function(p){ ajouterSujet(p.dataset.t); });
+      if (!sujets.length) { fiches.forEach(function(f){ ajouterSujet(f.querySelector("h1").textContent); }); }
+    }
+    sujets.slice(0, 3).forEach(function(sujet){
+      var b = document.createElement("button");
+      b.className = "btn";
+      b.setAttribute("type", "button");
+      b.dataset.question = "Que retenir sur « " + sujet + " » dans " + (ficheChoisie ? "cette vidéo ?" : "mes vidéos ?");
+      b.textContent = b.dataset.question;
+      boiteExemples.appendChild(b); exemples.push(b);
+    });
+    exemples.forEach(function(b){ b.addEventListener("click", function(){
+      if (enCours || verification) { return; }
+      question.value = b.dataset.question; actualiser(); viserQuestion();
+    }); });
+    if (!exemples.length) {
+      var aide = document.createElement("p");
+      aide.className = "demander-note";
+      aide.textContent = "Ouvre une fiche pour poser une question";
+      boiteExemples.appendChild(aide);
+    }
+  }
+  function choisirFiche(id){
+    if (enCours || verification || (id && !fiches.has(id))) { return; }
+    if (ficheChoisie !== id) { effacer(true); }
+    ficheChoisie = id;
+    selection.textContent = id ? fiches.get(id).querySelector("h1").textContent : "Toute la bibliothèque";
+    global.hidden = !id;
+    aideSelection.textContent = id
+      ? "Bobine répond uniquement à partir de cette vidéo, sans chercher dans les autres fiches."
+      : "Bobine cherche dans toute ta bibliothèque.";
+    proposerQuestions();
+  }
+  function ajouterMessage(role, texte, sources){
+    var bloc = document.createElement("li");
+    bloc.className = "demander-message " + role;
+    bloc.setAttribute("tabindex", "-1");
+    var auteur = document.createElement("h2");
+    auteur.textContent = role === "user" ? "Toi" : "Bobine";
+    var contenu = document.createElement("p");
+    contenu.className = "demander-texte";
+    contenu.textContent = texte; // Pas de Markdown, de HTML ni de liens automatiques.
+    bloc.appendChild(auteur);
+    bloc.appendChild(contenu);
+    var liste = document.createElement("ul"), vus = new Set(), bibliothequeActualisee = false;
+    liste.className = "demander-sources";
+    liste.setAttribute("aria-label", "Fiches sources");
+    (sources || []).slice(0, 20).forEach(function(source){
+      // Seules les ancres validées renvoyées par le serveur sont admises, jamais un lien du modèle.
+      if (!source || typeof source.id !== "string" || typeof source.ancre !== "string"
+          || !/^#f-[A-Za-z0-9_-]+$/.test(source.ancre) || source.ancre !== "#" + source.id
+          || source.ancre !== source.ancre.trim() || vus.has(source.id)) { return; }
+      vus.add(source.id);
+      var locale = fiches.has(source.id);
+      var li = document.createElement("li"), lien = document.createElement("a");
+      // Une fiche ajoutée depuis l'ouverture de l'onglet reste consultable sans perdre la conversation.
+      lien.setAttribute("href", locale ? source.ancre : "vault.html" + source.ancre);
+      if (!locale) {
+        lien.setAttribute("target", "_blank");
+        lien.setAttribute("rel", "noopener noreferrer");
+        bibliothequeActualisee = true;
+      }
+      lien.textContent = typeof source.titre === "string" && source.titre.trim()
+        ? source.titre.slice(0, 300) : locale ? fiches.get(source.id).querySelector("h1").textContent : "Fiche source";
+      li.appendChild(lien);
+      liste.appendChild(li);
+    });
+    if (liste.firstChild) { bloc.appendChild(liste); }
+    if (bibliothequeActualisee) {
+      var note = document.createElement("p");
+      note.className = "demander-note";
+      note.textContent = "Ta bibliothèque a été actualisée. Les nouvelles fiches s’ouvrent dans un nouvel onglet avec la page actualisée. Cette conversation reste ici.";
+      bloc.appendChild(note);
+    }
+    messages.appendChild(bloc);
+    while (messages.children.length > 6) { messages.removeChild(messages.firstChild); }
+    return bloc;
+  }
+  async function requeteJSON(url, options, delai){
+    var controle = new AbortController();
+    var minuterie = setTimeout(function(){ controle.abort(); }, delai);
+    try {
+      var reponse = await fetch(url, Object.assign({}, options, {
+        credentials: "same-origin", mode: "same-origin", cache: "no-store",
+        redirect: "error", signal: controle.signal
+      }));
+      var estJSON = /^application\/json\b/i.test(reponse.headers.get("Content-Type") || "");
+      if (!reponse.ok) {
+        var e = new Error("http");
+        e.statut = reponse.status;
+        e.attente = lireAttente(reponse.headers.get("Retry-After"));
+        if (estJSON) {
+          try {
+            var detail = await reponse.json();
+            if (detail && typeof detail.code === "string" && /^[a-z_]{1,64}$/.test(detail.code)) { e.code = detail.code; }
+            if (detail && typeof detail.erreur === "string") { e.erreur = detail.erreur.slice(0, 500); }
+          } catch (_) { /* Un corps illisible n'efface pas le statut HTTP. */ }
+        }
+        throw e;
+      }
+      if (!estJSON) { throw new Error("format"); }
+      return await reponse.json();
+    } finally { clearTimeout(minuterie); }
+  }
+  async function verifier(){
+    if (verification || enCours) { return; }
+    verification = true;
+    if (decouvert) { annoncer("Connexion à Bobine…", false); actualiser(); }
+    try {
+      var etat = await requeteJSON("/api/bobine", {method: "GET", headers: {"Accept": "application/json"}}, 5000);
+      // Le jeton opaque n'est jamais écrit dans la page, une URL ou un stockage.
+      if (!etat || etat.disponible !== true || typeof etat.jeton !== "string"
+          || !/^[\x21-\x7e]{1,512}$/.test(etat.jeton)) { throw new Error("indisponible"); }
+      jeton = etat.jeton;
+      var premiere = !decouvert;
+      decouvert = true;
+      acces.forEach(function(a){
+        a.hidden = !!a.dataset.demanderFiche && !fiches.has(a.dataset.demanderFiche);
+      });
+      reconnecter.hidden = true;
+      if (!premiere) { annoncer("Bobine est reconnecté. Tu peux envoyer ta question quand tu veux.", false); }
+      naviguer(premiere);
+    } catch (e) {
+      jeton = null;
+      // Une découverte ratée est silencieuse : la bibliothèque demeure le repli.
+      if (decouvert) {
+        annoncer("Bobine est indisponible. Ta question et la conversation restent ici. Réessaie la connexion dans un instant.", true);
+        reconnecter.hidden = false;
+      }
+    } finally {
+      verification = false;
+      if (decouvert) { actualiser(); }
+    }
+  }
+  function lireAttente(valeur){
+    if (typeof valeur !== "string") { return 0; }
+    valeur = valeur.trim();
+    var secondes = 0;
+    if (/^\d{1,6}$/.test(valeur)) { secondes = Number(valeur); }
+    else if (/^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(valeur)) {
+      secondes = Math.ceil((Date.parse(valeur) - Date.now()) / 1000);
+    }
+    // Pas de délai absurde, négatif ou dépassant une journée.
+    return Number.isFinite(secondes) && secondes > 0 && secondes <= 86400 ? secondes : 0;
+  }
+  function erreurEnvoi(e){
+    var textes = {
+      400: "Cette question n’a pas pu être envoyée. Vérifie son texte et réessaie.",
+      401: "La connexion à Bobine a expiré. Reconnecte Bobine avant d’envoyer.",
+      403: "Bobine n’autorise plus cette connexion. Reconnecte Bobine avant d’envoyer.",
+      409: "Bobine répond déjà à une question. Attends un instant avant de réessayer.",
+      429: "Bobine a reçu trop de demandes. Attends un instant avant de réessayer.",
+      502: "Le service d’IA n’a pas pu répondre. Tu peux réessayer dans un instant.",
+      503: "Bobine est indisponible. Réessaie la connexion dans un instant.",
+      504: "La réponse prend trop de temps. Attends un instant avant de réessayer."
+    };
+    var codes = {
+      cle_refusee: "Le service d’IA refuse la clé configurée. Vérifie la clé dans les réglages de Bobine avant de réessayer.",
+      cle_absente: "Ajoute une clé de service dans les réglages de Bobine pour poser une question.",
+      configuration_invalide: "Les réglages du service d’IA doivent être vérifiés avant de réessayer.",
+      compteur_indisponible: "Le compteur de demandes est indisponible. Fais vérifier le compteur de Bobine avant de réessayer.",
+      fiche_introuvable: "Cette fiche n’est plus disponible. Ouvre la bibliothèque actualisée pour choisir une vidéo.",
+      fiche_invalide: "Choisis une fiche depuis la bibliothèque avant de réessayer.",
+      question_invalide: "Écris une question de 1 à 2 000 caractères.",
+      question_trop_longue: "Cette question est trop longue. Raccourcis-la avant de réessayer.",
+      demande_trop_longue: "Cette demande est trop longue. Raccourcis ta question avant de réessayer.",
+      historique_invalide: "La conversation ne peut pas être utilisée. Commence une nouvelle conversation.",
+      bibliotheque_indisponible: "La bibliothèque n’est pas lisible pour le moment. Fais vérifier les fiches avant de réessayer.",
+      reponse_invalide: "La réponse reçue n’est pas lisible. Essaie de reformuler ta question.",
+      reponse_non_verifiable: "Bobine n’a pas pu vérifier les sources de cette réponse. Essaie une question plus précise.",
+      fournisseur_indisponible: "Le service d’IA est indisponible pour le moment. Réessaie plus tard.",
+      delai_depasse: textes[504]
+    };
+    var texte = e.name === "AbortError" ? textes[504]
+      : Object.prototype.hasOwnProperty.call(codes, e.code) ? codes[e.code]
+      : textes[e.statut] || "Impossible de recevoir la réponse de Bobine. Vérifie la connexion.";
+    if (e.statut === 429) {
+      // Le serveur emploie « limite » pour les deux quotas. Son texte sert seulement à les distinguer.
+      // Aucun message technique ni texte inconnu reçu du serveur n'est affiché tel quel.
+      var quotidienne = e.attente === 86400 || (e.code === "limite" && /quotidien|demain/i.test(e.erreur || ""));
+      if (quotidienne) { texte = "La limite quotidienne de questions est atteinte. Réessaie demain."; }
+      else if (e.attente) {
+        var minutes = Math.ceil(e.attente / 60);
+        var duree = minutes === 1 ? "une minute" : minutes <= 60 ? minutes + " minutes" : Math.ceil(minutes / 60) + " heures";
+        texte = "Bobine a reçu trop de demandes. Patiente " + duree + " avant de réessayer.";
+      } else { texte = "Bobine a reçu trop de demandes. Patiente une minute avant de réessayer."; }
+    }
+    if (!e.statut || e.statut === 401 || e.statut === 403 || e.statut === 503) {
+      jeton = null;
+      reconnecter.hidden = false;
+    }
+    annoncer(texte + " Ta question est conservée. Aucun nouvel envoi automatique.", true);
+  }
+  async function envoyer(ev){
+    ev.preventDefault();
+    if (enCours || verification || !jeton) { return; }
+    var texte = question.value.trim();
+    if (!texte || question.value.length > 2000) {
+      annoncer("Écris une question de 1 à 2 000 caractères.", true); viserQuestion(); return;
+    }
+    var demande = {question: texte, historique: historique.slice(-6)};
+    if (ficheChoisie) { demande.fiche = ficheChoisie; }
+    enCours = true;
+    actualiser();
+    annoncer("Bobine cherche dans ta sélection…", false);
+    try {
+      var resultat = await requeteJSON("/api/demander", {
+        method: "POST", headers: {"Content-Type": "application/json", "Accept": "application/json", "X-Bobine-Token": jeton},
+        body: JSON.stringify(demande)
+      }, 65000);
+      if (!resultat || typeof resultat.reponse !== "string" || !resultat.reponse.trim()
+          || resultat.reponse.length > 12000 || !Array.isArray(resultat.sources)) { throw new Error("format"); }
+      ajouterMessage("user", texte);
+      var derniereReponse = ajouterMessage("assistant", resultat.reponse, resultat.sources);
+      // Le serveur applique le même budget : 6 messages, 800 caractères chacun.
+      historique = historique.concat([
+        {role: "user", content: texte.slice(0, 800)},
+        {role: "assistant", content: resultat.reponse.slice(0, 800)}
+      ]).slice(-6);
+      question.value = "";
+      annoncer("La réponse est prête. Consulte les fiches sources pour vérifier.", false);
+    } catch (e) { erreurEnvoi(e); }
+    finally {
+      enCours = false; actualiser();
+      if (derniereReponse && !vue.hidden) { derniereReponse.focus(); } else { viserQuestion(); }
+    }
+  }
+  acces.forEach(function(a){
+    a.addEventListener("click", function(ev){
+      if (!decouvert) { ev.preventDefault(); return; }
+      if (a.dataset.demanderFiche) { choisirFiche(a.dataset.demanderFiche); }
+    });
+  });
+  nouveau.addEventListener("click", function(){
+    if (enCours || verification) { return; }
+    effacer(false); viserQuestion();
+  });
+  global.addEventListener("click", function(){ choisirFiche(null); viserQuestion(); });
+  reconnecter.addEventListener("click", verifier);
+  question.addEventListener("input", actualiser);
+  question.addEventListener("keydown", function(ev){
+    if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { envoyer(ev); }
+  });
+  formulaire.addEventListener("submit", envoyer);
+  window.addEventListener("hashchange", function(){ naviguer(true); });
+  proposerQuestions();
+  naviguer(false);
+  verifier();
+})();
+/* ---- fin Demander ---- */
 </script>
 </body>
 </html>
@@ -1513,7 +1922,10 @@ def rendre_fiche(e, par_id, profil=""):
         + '<div class="fiche-grille"><div>'
         + '<h1 id="t-' + id_ + '">' + html.escape(e["titre"]) + "</h1>"
         + '<div class="meta">' + meta_html(e, complete=True) + "</div>"
-        + bouton + niveaux
+        + bouton
+        + '<a class="btn demander-acces" href="#demander" data-demander-fiche="'
+        + html.escape(id_, quote=True) + '" hidden>Poser une question sur cette vidéo</a>'
+        + niveaux
         + '<section class="section-niveau" data-niveau="bref"><h2 class="titre-niveau">En bref</h2>' + bref + "</section>"
         + section_memo
         + '<section class="section-niveau" data-niveau="transcript"><h2 class="titre-niveau">Transcription</h2>'

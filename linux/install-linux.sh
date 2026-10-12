@@ -73,6 +73,45 @@ secret() {  # $1 = texte ; lit sans afficher (pour la clé API)
   printf '%s' "$reponse"
 }
 
+# Même dossier de données pour la génération et le serveur ; jamais de source/eval.
+resoudre_vault_effectif() {
+  "$PY" -B - "$SCRIPT_DIR" <<'PYTHON'
+import os
+import sys
+from pathlib import Path
+code = Path(sys.argv[1])
+try:
+    config = code / "config.env"
+    if config.is_symlink() or (config.exists() and not config.is_file()):
+        raise ValueError("configuration non ordinaire")
+    sys.path.insert(0, str(code))
+    from enrichir import charger_config
+    configured = charger_config(code).get("VAULT")
+    vault = Path(os.path.expandvars(configured)).expanduser() if configured else code
+    if not vault.is_absolute() or any(ord(c) < 32 or ord(c) == 127 for c in str(vault)):
+        raise ValueError("chemin de données non absolu ou ambigu")
+    print(vault)
+except (OSError, ValueError, RuntimeError, ImportError):
+    sys.exit(1)
+PYTHON
+}
+
+# Une mise à jour du générateur doit aussi actualiser une page déjà existante.
+# Génération locale uniquement : ni ingestion, ni enrichissement, ni appel d'IA.
+preparer_page() {
+  VAULT_EFFECTIF="$(resoudre_vault_effectif)" || {
+    avis "VAULT illisible ou ambigu dans config.env : la page et son service sont conservés."
+    return 1
+  }
+  mkdir -p "$SCRIPT_DIR/logs" || return 1
+  if "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/generate_page.py" --vault "$VAULT_EFFECTIF" > "$SCRIPT_DIR/logs/page-generation.log" 2>&1; then
+    ok "Page régénérée localement (sans appel d'IA)."
+  else
+    avis "La génération de la page a échoué — détails dans logs/page-generation.log."
+    return 1
+  fi
+}
+
 # ------------------------------------------------------------------- bannière
 printf "\n${CYAN}${GRAS}"
 cat <<'BANDEAU'
@@ -190,7 +229,7 @@ if [ "$GARDE" = "oui" ]; then
   ok "D'accord — ce dossier devient ton dossier Bobine (installé sur place)."
 else
   for f in ingest.py filtre.py enrichir.py generate_page.py graphe.py \
-           watch-linux.sh inbox_server.py page_server.py activer-page-web.sh install-linux.sh desinstaller-linux.sh \
+           watch-linux.sh inbox_server.py page_server.py demander.py activer-page-web.sh install-linux.sh desinstaller-linux.sh \
            requirements.txt config.example.env filtres.exemple.yaml \
            LICENSE README.md .gitignore; do
     [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
@@ -369,7 +408,7 @@ fi
   # Réglages avancés de l'ancienne configuration, gardés tels quels (chemins,
   # cookies, notification, jeton du serveur de liens, mot de passe de la page…).
   if [ -n "$ANCIENNE_CONFIG" ]; then
-    GARDES="$(grep -E '^(VAULT|INBOX|FFMPEG_DIR|COOKIES|LANGUE_RESUMES|NOTIF_CMD|INBOX_TOKEN|PAGE_PASSWORD)=' "$ANCIENNE_CONFIG" 2>/dev/null || true)"
+    GARDES="$(grep -E '^(VAULT|INBOX|FFMPEG_DIR|COOKIES|LANGUE_RESUMES|NOTIF_CMD|INBOX_TOKEN|PAGE_PASSWORD|PAGE_ORIGIN)=' "$ANCIENNE_CONFIG" 2>/dev/null || true)"
     if [ -n "$GARDES" ]; then
       echo
       echo "# Réglages repris de ta configuration précédente :"
@@ -431,6 +470,9 @@ else
     note "D'accord — plus tard :   sudo apt install ffmpeg"
   fi
 fi
+
+# ---------------------------------------------------------------- génération locale
+preparer_page || note "La page précédente reste disponible si elle existe."
 
 # ---------------------------------------------------------------- 7. réveil + finitions
 etape "7/7 — Le réveil automatique (systemd) et les finitions"
@@ -581,7 +623,7 @@ printf "        echo 'https://youtu.be/jNQXAC9IVRw' >> %s/inbox.txt\n" "$SCRIPT_
 printf "   2. Déclenche un passage tout de suite :\n"
 printf "        systemctl --user start bobine-watch.service\n"
 printf "   3. Surveille :  tail -f %s/logs/watch.log\n" "$SCRIPT_DIR"
-printf "   4. Ta page : %s/vault.html  (et graph.html)\n" "$SCRIPT_DIR"
+printf "   4. Ta page : %s/vault.html  (et graph.html)\n" "${VAULT_EFFECTIF:-$SCRIPT_DIR}"
 printf "   5. (Option) Les liens par HTTP : voir README.md, « Le serveur de liens »\n"
 printf "   6. Un jour, pour arrêter Bobine sans supprimer tes fichiers :  ./desinstaller-linux.sh\n"
 if [ -z "$GARDE" ]; then

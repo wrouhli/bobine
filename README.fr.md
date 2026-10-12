@@ -64,7 +64,7 @@ Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a
 
 ![La carte des thèmes de ton Bobine](assets/capture-carte.png)
 
-**Et tu peux lui poser des questions** : « Quelles vidéos parlent de cuisine ? » L'assistant lit tes fiches et te répond *(voir « demander à ta collection », dans l'installation)*.
+**Et tu peux lui poser des questions** depuis **Demander**, avec des liens vers les fiches utilisées. Crush reste disponible en alternative dans le Terminal.
 
 *(Toutes ces captures proviennent d'un Bobine de démonstration.)*
 
@@ -164,7 +164,26 @@ Sur ton iPhone, app **Raccourcis** (« Shortcuts ») :
 
 Usage : dans Instagram/TikTok/YouTube → **Partager → Send to Bobine**. C'est tout.
 
-### *Recommandé* : demande à ta collection (Crush)
+### Demander à Bobine, depuis la page
+
+Ouvre **Ma page**, puis **Demander**. Pose une question sur un sujet de ta bibliothèque, ou clique sur **Poser une question sur cette vidéo** dans une fiche. Bobine répond avec des liens vers les fiches utilisées. Aucune nouvelle clé : celle des résumés suffit.
+
+Sur Mac, l'installation démarre la page sur ce Mac uniquement. Sur iPhone, le chat est disponible depuis l'adresse protégée de ton serveur Linux. Le fichier `vault.html` et sa copie iCloud restent en lecture seule : aucun bouton de chat inutilisable.
+
+Bobine cherche localement puis envoie au service d'IA jusqu'à cinq fiches sous forme d'extraits, la question, le court historique et ton profil si tu en as écrit un. Il ne fait aucune recherche sur Internet. Si rien ne correspond, il le dit sans appel au service. Les liens permettent de vérifier la réponse, pas de garantir chaque affirmation.
+
+La conversation reste dans l'onglet et n'est pas enregistrée sur disque. Le profil reste modifiable dans `Mon profil.txt` pour cette première version.
+
+<details>
+<summary>Limites et vérifications avancées</summary>
+
+Une question à la fois, 10 demandes par minute et 100 sur 24 heures glissantes, par installation (y compris derrière un tunnel). Les tentatives admises comptent même en cas d'échec ou sans résultat. Un compteur privé ne conserve que des horodatages ; redémarrer ne remet pas le quota à zéro. Le contexte envoyé est plafonné à 16 000 caractères, la question à 2 000 caractères. La recherche repose sur les mots des fiches : essaie un sujet ou un nom précis.
+
+Le serveur coupe une demande au bout de 60 secondes au maximum. Interrompre la connexion ne garantit pas que le fournisseur annule sa facturation. La clé reste côté serveur, jamais dans la page. Voir [le guide de vérification](docs/demander-verification.md).
+
+</details>
+
+### *Facultatif* : l'alternative dans le Terminal (Crush)
 
 [Crush](https://charm.sh/crush) est un assistant qui vit dans le Terminal : léger, open source, sans compte à créer. Il utilise **la même clé API que tes résumés** : lancé dans le dossier de ton vault, il lit tes fiches pour répondre.
 
@@ -183,7 +202,7 @@ Puis pose tes questions en langage naturel : « Quelles vidéos parlent de cuisi
 
 - **Sur le Mac** : **double-clique sur « Ma page »** dans le dossier de ton vault (ou ouvre `vault.html`) : recherche, pastilles de thèmes, liens vers les vidéos.
 - **Sur l'iPhone** : Fichiers → iCloud Drive → **Bobine** → `vault.html` (mis à jour à chaque nouveau lot ; la carte du graphe reste sur le Mac).
-- **Pour poser des questions** : lance `crush` dans le dossier de ton vault (voir « Interroger ton vault »), ou lis les fiches directement : ce sont de simples fichiers Markdown dans `raw/` (un `grep`, Obsidian…).
+- **Pour poser des questions** : ouvre **Ma page → Demander** sur Mac, ou la même page à l’adresse protégée de ton serveur. Crush reste une alternative facultative. La copie iCloud ne propose pas le chat.
 
 ## Importer un export Instagram
 
@@ -268,6 +287,8 @@ Le dossier de ton vault (celui que tu as choisi à l'installation) ressemble à 
 Bobine/
 ├── ingest.py           # télécharge + transcrit → fiches (raw/)
 ├── filtre.py           # (option) choisit quoi ingérer depuis un export Instagram
+├── demander.py         # questions, recherche locale et réponses sourcées
+├── page_server.py      # page et chat, clé conservée côté serveur
 ├── enrichir.py         # résumés via ta clé API → index.md + pages
 ├── generate_page.py    # fabrique vault.html (lisible sans JavaScript) + la carte
 ├── graphe.py           # (héritage) liens [[Thèmes]] pour Obsidian

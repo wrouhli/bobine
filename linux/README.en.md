@@ -108,6 +108,16 @@ Combined with a tunnel (Cloudflare Tunnel, Tailscale…), the page becomes an ad
 
 Protected by Cloudflare Access (or another gatekeeper upstream)? Start the page with `--sans-mot-de-passe`: Cloudflare is the door, and the page no longer asks for anything (add the option to the ExecStart line of your service).
 
+## Ask from the page
+
+With your existing summary API key, open **Demander** at your usual Bobine address. Answers use excerpts from at most five source cards and link back to them. Starting from a card restricts the question to that video. Conversation history lives only in the tab.
+
+Existing installations: add `PAGE_ORIGIN=https://your-bobine-host` to `config.env` (exact origin, no path or trailing slash), then restart the page service after updating and regenerating the page. New activations through `activer-page-web.sh` set it automatically. Your tunnel must preserve the public Host header. Keep the password or upstream protection: origin checks are not authentication.
+
+Standalone/downloaded HTML and ordinary static file servers remain read-only. Request limits also protect the public address and survive restarts. No direct access to raw cards, configuration or private counters is added. Profile editing still uses `Mon profil.txt`.
+
+See the [verification and migration guide (French)](../docs/demander-verification.md). Back up before deployment.
+
 ## Crush (bonus)
 
 [Crush](https://charm.sh/crush) is an AI assistant for the terminal: launched in the vault folder, it reads your cards to answer ("Which videos talk about cooking?"). The installer prepares its settings file (`.crushrc`, read-only, with your key: Crush can read and search your cards, but its tools for editing files, running commands or going online are removed); you only need to install it, from the Charm repository:
