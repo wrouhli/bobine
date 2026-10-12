@@ -466,7 +466,7 @@ __PROFIL__
       Changer de sélection commence une nouvelle conversation. Ton brouillon est conservé.</p>
   </section>
   <footer>Mis à jour le __DATE__ · __COUNT__<br>
-  🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></footer>
+  🎞️ écrit et réalisé par <a href="https://www.wahidrouhli.com/?utm_source=bobine&amp;utm_medium=page" target="_blank" rel="noopener noreferrer">Wahid Rouhli</a> · <a href="https://github.com/wrouhli/bobine" target="_blank" rel="noopener noreferrer">code source</a></footer>
 </main>
 
 <script>
@@ -1196,7 +1196,7 @@ TEMPLATE_GRAPHE = r"""<!DOCTYPE html>
   <div>date : ancien <span id="degrade"></span> récent</div>
 </div>
 <div id="hint">Clique un thème pour filtrer la liste · une vidéo pour l'aperçu · glisse pour déplacer (🧲 règle le retour) · pince pour zoomer</div>
-<div id="signature">🎞️ écrit et réalisé par Wahid Rouhli · <a href="https://github.com/wrouhli/bobine">github.com/wrouhli/bobine</a></div>
+<div id="signature">🎞️ écrit et réalisé par <a href="https://www.wahidrouhli.com/?utm_source=bobine&amp;utm_medium=page" target="_blank" rel="noopener noreferrer">Wahid Rouhli</a> · <a href="https://github.com/wrouhli/bobine" target="_blank" rel="noopener noreferrer">code source</a></div>
 <div id="apercu" role="dialog" aria-label="Aperçu de la fiche">
   <button id="fermer" aria-label="Fermer">✕</button>
   <h2 id="ap-titre"></h2>

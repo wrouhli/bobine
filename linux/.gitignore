@@ -51,3 +51,6 @@ memos/
 .bobine-demandes.lock
 
 .bobine-chat.lock
+
+# Anciens fichiers du programme, gardés lors d'une mise à jour
+.bobine-sauvegarde-*/

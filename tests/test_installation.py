@@ -330,6 +330,245 @@ class InstallationSafety(unittest.TestCase):
                 self.assertIn(f"TARGET={depot}", output)
                 self.assertEqual(snapshot(depot), before)
 
+    # ------------------------------------------------------------ mise à jour
+    UPDATE_QUESTION = (
+        "Ce dossier contient déjà un Bobine. "
+        "Le mettre à jour en gardant tes fiches et tes réglages ?"
+    )
+    # Fichiers programme livrés par le dépôt de test, avec leur contenu neuf.
+    UPDATE_PROGRAM = {
+        "ingest.py": "# new core\n",
+        "LICENSE": "fixture license\n",  # identique à l'existant : ni copié, ni sauvegardé
+        "requirements.txt": "yt-dlp\n",  # absent chez l'utilisateur : ajouté
+        "graphe.py": "# new graph\n",  # lien symbolique chez l'utilisateur : conservé
+        "exemples/fiche-exemple.md": "# new example\n",
+    }
+    UPDATE_EDITION = {
+        "install.sh": {"\U0001f449 2. Installer Bobine.command": "#!/bin/bash\n# new\n"},
+        "linux/install-linux.sh": {"systemd/bobine-watch.service": "[Unit]\n# new\n"},
+    }
+    # Fichiers du dépôt qui ne doivent jamais arriver chez l'utilisateur.
+    UPDATE_FOREIGN = {
+        "README.md": "project readme\n",
+        "CHANGELOG.md": "changes\n",
+        "tests/test_x.py": "# test\n",
+        "docs/guide.md": "guide\n",
+        ".gitignore": "project ignore\n",
+    }
+    # Ce qui appartient à l'utilisateur : jamais touché, octet pour octet.
+    UPDATE_PERSONAL = {
+        "config.env": ('NOM="Mes vidéos"\nDEEPSEEK_API_KEY=sk-perso\nPAGE_PASSWORD="secret"\n'
+                       'DEMANDER=non\nNOTIF_CMD="$(touch SENTINEL)"\n'),
+        "Mon profil.txt": "Profil personnel\n",
+        "raw/family.md": "PRIVATE NOTE\n",
+        "memos/family.md": "PRIVATE MEMO\n",
+        "index.md": "My index\n",
+        "journal.json": '{"personal": true}\n',
+        "vault.html": "My page\n",
+        "graph.html": "My graph\n",
+        "logs/watch.log": "PRIVATE LOG\n",
+        "README.md": "Personal notes\n",
+        ".gitignore": "my-ignore\n",
+        "Ma page.webloc": "my shortcut\n",
+        "Activer Demander.command": "#!/bin/bash\n# personal\n",
+        "filtres.yaml": "mes: filtres\n",
+        ".crushrc": "my crush\n",
+        "inbox.txt": "https://example.org/v\n",
+        ".bobine-compteur-2024": "3\n",
+        ".venv/bin/python": "fake venv\n",
+        "exemples/ma-fiche.md": "# mine\n",
+    }
+    # Fichiers programme déjà présents chez l'utilisateur, dans leur ancienne version.
+    UPDATE_OLD = {
+        "ingest.py": "# old core\n",
+        "LICENSE": "fixture license\n",
+        "page-locale.sh": "#!/bin/bash\n# old page module\n",
+        "exemples/fiche-exemple.md": "# old example\n",
+        "\U0001f449 2. Installer Bobine.command": "#!/bin/bash\n# old\n",
+        "systemd/bobine-watch.service": "[Unit]\n# old\n",
+    }
+
+    def write_tree(self, root, files):
+        for relative, content in files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+
+    def make_update_depot(self, name):
+        depot = self.make_depot(name)
+        self.write_tree(depot, {**self.UPDATE_PROGRAM, **self.UPDATE_EDITION[name], **self.UPDATE_FOREIGN})
+        return depot
+
+    def make_existing_bobine(self, name, personal=True):
+        """A vault installed by a previous version, with data and personal files."""
+        vault = self.home / ("Bobine-" + Path(name).stem)
+        vault.mkdir()
+        self.write_tree(vault, self.UPDATE_OLD)
+        (vault / "page-locale.sh").chmod(0o755)
+        if personal:
+            self.write_tree(vault, {k: v.replace("SENTINEL", str(self.sandbox / "config-executed"))
+                                    for k, v in self.UPDATE_PERSONAL.items()})
+            (vault / "Mon profil.txt").chmod(0o600)
+            (vault / "config.env").chmod(0o600)
+        (vault / "private.txt").write_text("PRIVATE\n", encoding="utf-8")
+        (vault / "graphe.py").symlink_to("private.txt")  # un programme remplacé par un lien personnel
+        return vault
+
+    def backups(self, vault):
+        return sorted(p for p in vault.iterdir() if p.name.startswith(".bobine-sauvegarde-"))
+
+    def run_update(self, name, depot, answers, config=False):
+        code = self.installer_harness(name, config) + 'printf "NOM=%s\\n" "$NOM_VAULT"\n'
+        return self.run_bash(["-c", code, "installer-fixture", depot], answers)
+
+    def test_update_replaces_program_files_only_and_backs_up_changed_ones(self):
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                vault = self.make_existing_bobine(name)
+                before_depot = snapshot(depot)
+                before = snapshot(vault)
+                output = self.run_update(name, depot, f"{vault}\no\n")
+                self.assertIn(self.UPDATE_QUESTION, output)
+                self.assertIn("[O/n]", output)
+                self.assertNotIn(REFUSAL, output)
+                self.assertIn(f"TARGET={vault}", output)
+                self.assertIn("NOM=Mes vidéos", output)
+                self.assertIn("Nom repris de ta configuration : Mes vidéos", output)
+                self.assertEqual(snapshot(depot), before_depot, "the downloaded folder stays intact")
+                # Fichiers programme : remplacés par la version du dépôt, le lien gardé.
+                replaced = {**self.UPDATE_PROGRAM, **self.UPDATE_EDITION[name]}
+                del replaced["graphe.py"]
+                replaced["page-locale.sh"] = (depot / "page-locale.sh").read_text(encoding="utf-8")
+                for relative, content in replaced.items():
+                    self.assertEqual((vault / relative).read_text(encoding="utf-8"), content, relative)
+                self.assertEqual(stat.S_IMODE((vault / "page-locale.sh").stat().st_mode), 0o755)
+                self.assertTrue((vault / "graphe.py").is_symlink())
+                self.assertEqual(os.readlink(vault / "graphe.py"), "private.txt")
+                self.assertEqual((vault / "private.txt").read_text(encoding="utf-8"), "PRIVATE\n")
+                self.assertIn("« graphe.py » est un lien symbolique chez toi : gardé tel quel", output)
+                # Sauvegarde : seulement les anciens fichiers dont le contenu différait.
+                backups = self.backups(vault)
+                self.assertEqual(len(backups), 1, backups)
+                backup = backups[0]
+                saved = {str(p.relative_to(backup)): p.read_text(encoding="utf-8")
+                         for p in backup.rglob("*") if p.is_file()}
+                expected_saved = {k: v for k, v in self.UPDATE_OLD.items()
+                                  if k != "LICENSE" and k in replaced}
+                self.assertEqual(saved, expected_saved)
+                self.assertEqual(stat.S_IMODE((backup / "page-locale.sh").stat().st_mode), 0o755)
+                self.assertIn("Mise à jour de ton dossier Bobine : 4 fichiers remplacés, 1 fichier ajouté, "
+                              f"anciens fichiers gardés dans {backup.name}/", output)
+                # Tout le reste est intact, octet pour octet (contenu, droits, dates).
+                after = snapshot(vault)
+                untouched = {k: v for k, v in before.items()
+                             if k not in replaced and k not in ("exemples", "systemd", ".")}
+                for key, value in untouched.items():
+                    self.assertEqual(after[key], value, key)
+                self.assertEqual(before["LICENSE"], after["LICENSE"], "identical file not rewritten")
+                added = set(after) - set(before)
+                self.assertEqual(
+                    added,
+                    {"requirements.txt", backup.name,
+                     *(str(Path(backup.name) / p) for p in
+                       {*expected_saved, *{str(Path(k).parent) for k in expected_saved if "/" in k}})},
+                )
+                for relative in self.UPDATE_FOREIGN:
+                    if relative not in self.UPDATE_PERSONAL:
+                        self.assertFalse((vault / relative).exists(), relative)
+                self.assertFalse(self.calls.exists())
+
+    def test_update_then_keeps_previous_settings_like_a_reinstall(self):
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                vault = self.make_existing_bobine(name)
+                profile_before = snapshot(vault / "Mon profil.txt")
+                answers = f"{vault}\no\no\nn\nn\n" + ("n\n" if name == "install.sh" else "")
+                output = self.run_update(name, depot, answers, config=True)
+                self.assertIn("Une clé API était déjà configurée", output)
+                self.assertIn("Profil conservé", output)
+                config = (vault / "config.env").read_text(encoding="utf-8").splitlines()
+                self.assertIn('NOM="Mes vidéos"', config)
+                self.assertIn("DEEPSEEK_API_KEY=sk-perso", config)
+                self.assertIn('PAGE_PASSWORD="secret"', config)
+                self.assertIn("DEMANDER=non", config)
+                self.assertEqual(stat.S_IMODE((vault / "config.env").stat().st_mode), 0o600)
+                self.assertTrue(any(p.name.startswith("config.env.bak-") for p in vault.iterdir()))
+                self.assertEqual(snapshot(vault / "Mon profil.txt"), profile_before)
+                self.assertFalse((self.sandbox / "config-executed").exists())
+                self.assertEqual((vault / "ingest.py").read_text(encoding="utf-8"), "# new core\n")
+                self.assertNotIn("sk-perso", output)
+                self.assertFalse(self.calls.exists())
+
+    def test_update_declined_asks_again_and_touches_nothing(self):
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                # Détecté par .venv seul : pas de config.env.
+                vault = self.make_existing_bobine(name, personal=False)
+                (vault / ".venv/bin").mkdir(parents=True)
+                (vault / ".venv/bin/python").write_text("fake\n", encoding="utf-8")
+                before = snapshot(vault)
+                empty = self.home / ("empty-" + Path(name).stem)
+                output = self.run_update(name, depot, f"{vault}\nn\n{empty}\n")
+                self.assertIn(self.UPDATE_QUESTION, output)
+                self.assertNotIn(REFUSAL, output)
+                self.assertIn(f"TARGET={empty}", output)
+                self.assertIn("NOM=Bobine", output)
+                self.assertEqual(snapshot(vault), before)
+                self.assertEqual(self.backups(vault), [])
+                self.assertEqual((empty / "ingest.py").read_text(encoding="utf-8"), "# new core\n")
+
+    def test_update_is_not_offered_for_a_folder_that_is_not_bobine(self):
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                foreign = self.home / ("foreign-" + Path(name).stem)
+                foreign.mkdir()
+                self.write_tree(foreign, {"ingest.py": "private core\n", "LICENSE": "mine\n",
+                                          "raw/x.md": "private\n"})
+                before = snapshot(foreign)
+                empty = self.home / ("empty-" + Path(name).stem)
+                output = self.run_update(name, depot, f"{foreign}\no\n{empty}\n")
+                self.assertIn(REFUSAL, output)
+                self.assertNotIn("déjà un Bobine", output)
+                self.assertIn(f"TARGET={empty}", output)
+                self.assertEqual(snapshot(foreign), before)
+                self.assertEqual(self.backups(foreign), [])
+
+    def test_update_backup_folder_is_unique_and_repeat_reports_up_to_date(self):
+        # Horloge figée : deux mises à jour dans la même minute ne partagent pas de dossier.
+        self.stub("date", "#!/bin/bash\necho 20240102-0304\n")
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_update_depot(name)
+                vault = self.make_existing_bobine(name)
+                taken = vault / ".bobine-sauvegarde-20240102-0304"
+                taken.mkdir()
+                (taken / "marker").write_text("older backup\n", encoding="utf-8")
+                taken_before = snapshot(taken)
+                output = self.run_update(name, depot, f"{vault}\no\n")
+                self.assertIn("gardés dans .bobine-sauvegarde-20240102-0304-2/", output)
+                self.assertEqual(snapshot(taken), taken_before)
+                second = vault / ".bobine-sauvegarde-20240102-0304-2"
+                self.assertEqual((second / "ingest.py").read_text(encoding="utf-8"), "# old core\n")
+                # Nouvelle version du dépôt : nouveau dossier, qui garde la version intermédiaire.
+                (depot / "ingest.py").write_text("# newer core\n", encoding="utf-8")
+                output = self.run_update(name, depot, f"{vault}\no\n")
+                self.assertIn("Mise à jour de ton dossier Bobine : 1 fichier remplacé, "
+                              "anciens fichiers gardés dans .bobine-sauvegarde-20240102-0304-3/", output)
+                third = vault / ".bobine-sauvegarde-20240102-0304-3"
+                self.assertEqual(sorted(p.name for p in third.rglob("*")), ["ingest.py"])
+                self.assertEqual((third / "ingest.py").read_text(encoding="utf-8"), "# new core\n")
+                self.assertEqual((vault / "ingest.py").read_text(encoding="utf-8"), "# newer core\n")
+                # Rien de neuf : déjà à jour, aucun dossier de sauvegarde supplémentaire.
+                before = snapshot(vault)
+                output = self.run_update(name, depot, f"{vault}\no\n")
+                self.assertIn("Ton dossier Bobine est déjà à jour", output)
+                self.assertEqual(snapshot(vault), before)
+                self.assertEqual(len(self.backups(vault)), 3)
+
     def test_openai_choice_generates_key_and_model_without_extra_question(self):
         for name in INSTALLERS:
             with self.subTest(script=name):

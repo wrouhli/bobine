@@ -38,6 +38,7 @@ Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a
 - [Importer un export Instagram](#importer-un-export-instagram)
 - [Les coûts](#les-coûts)
 - [Dépannage : les classiques](#dépannage--les-classiques)
+- [Mettre à jour Bobine](#mettre-à-jour-bobine)
 - [Désinstaller Bobine](#désinstaller-bobine)
 - [La structure du projet](#la-structure-du-projet)
 - [FAQ](#faq)
@@ -278,6 +279,19 @@ cd ~/Bobine        # le dossier de ton vault (l'emplacement que tu as choisi)
 
 </details>
 
+## Mettre à jour Bobine
+
+Une nouvelle version est sortie ? Tes fiches, tes réglages et ta clé restent en place.
+
+1. Télécharge la nouvelle version (le fichier zip de la [dernière release](https://github.com/wrouhli/bobine/releases/latest)) et décompresse-la, par exemple dans Téléchargements.
+2. Lance l'installation comme la première fois (double-clic sur « 👉 2. Installer Bobine.command »).
+3. À la question « Emplacement de ton vault », indique ton dossier Bobine actuel (par exemple `~/Bobine`). Bobine le reconnaît et te propose : **« Ce dossier contient déjà un Bobine. Le mettre à jour en gardant tes fiches et tes réglages ? »** Réponds oui.
+4. L'installation remplace seulement les fichiers du programme, reprend tes réglages, puis repose ses questions habituelles (Entrée pour garder tes réponses précédentes).
+
+Les anciens fichiers du programme sont gardés dans un dossier `.bobine-sauvegarde-<date>` de ton dossier Bobine : tu peux le supprimer quand tout fonctionne. Le dossier téléchargé peut lui aussi être supprimé.
+
+Depuis une version antérieure à la v1.3.0 : la nouvelle page apparaît dès la mise à jour, et « Demander » est proposé à la fin de l'installation.
+
 ## Désinstaller Bobine
 
 Arrêter Bobine depuis le dossier de ta bibliothèque :
@@ -351,7 +365,14 @@ Et bien sûr : **une ⭐ sur le repo** aide d'autres personnes à découvrir Bob
 
 ## Auteur
 
-Créé et maintenu par **[Wahid Rouhli](https://www.wahidrouhli.com/)**.
+Bobine est écrit et maintenu par **[Wahid Rouhli](https://www.wahidrouhli.com/?utm_source=bobine&utm_medium=readme)**, consultant et formateur en stratégie digitale et IA à Casablanca, fondateur de Konnectoos.
+
+J'aide des équipes marketing et communication à utiliser l'IA pour simplifier leur travail et prendre de meilleures décisions. Bobine est un exemple de ce que je défends : des outils simples, qui respectent tes données et produisent un résultat concret.
+
+- **Mon travail et mes méthodes** : [wahidrouhli.com](https://www.wahidrouhli.com/?utm_source=bobine&utm_medium=readme)
+- **Chaque semaine, du concret sur le digital et l'IA** : [mes analyses](https://www.wahidrouhli.com/ressources?utm_source=bobine&utm_medium=readme) et [LinkedIn](https://www.linkedin.com/in/wahidrouhli)
+- **Un projet, une formation, une question ?** [Me contacter](https://www.wahidrouhli.com/contact?utm_source=bobine&utm_medium=readme)
+- **Bobine te sert ?** Une étoile sur GitHub et une capture de ta bibliothèque partagée me font avancer.
 
 ## Licence
 
