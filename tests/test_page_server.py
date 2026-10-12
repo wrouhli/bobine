@@ -702,5 +702,91 @@ class ServeurProfil(unittest.TestCase):
         self.assertIn("Résumé.", (self.vault / "vault.html").read_text(encoding="utf-8"))
 
 
+class ReglageDemander(unittest.TestCase):
+    """DEMANDER=non : page lisible, ni chat ni profil éditable, sans redémarrage."""
+
+    def setUp(self):
+        import os
+        import threading
+        from unittest import mock
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.vault = Path(self.tmp.name).resolve()
+        (self.vault / "vault.html").write_text("<html>page</html>", encoding="utf-8")
+        (self.vault / "config.env").write_text("DEEPSEEK_API_KEY=cle-test\n", encoding="utf-8")
+        env = mock.patch.dict(os.environ, {}, clear=True)
+        env.start()
+        self.addCleanup(env.stop)
+        self.moteur = mock.patch.object(page_server, "repondre_borne",
+                                        return_value={"reponse": "ok", "sources": []}).start()
+        self.regen = mock.patch.object(page_server, "regenerer_page", return_value=True).start()
+        self.addCleanup(mock.patch.stopall)
+        self.srv = page_server.ServeurBobine(("127.0.0.1", 0), self.vault, local=True)
+        self.t = threading.Thread(target=self.srv.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True)
+        self.t.start()
+        self.addCleanup(self._fermer)
+
+    def _fermer(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+        self.t.join(timeout=2)
+
+    def regler(self, valeur):
+        (self.vault / "config.env").write_text("DEEPSEEK_API_KEY=cle-test\nDEMANDER=" + valeur + "\n",
+                                               encoding="utf-8")
+
+    def requete(self, methode, chemin, corps=None):
+        import http.client
+        import json
+        origine = "http://127.0.0.1:" + str(self.srv.server_address[1])
+        h = {"Content-Type": "application/json", "Origin": origine, "Host": origine[7:],
+             "Sec-Fetch-Site": "same-origin", "X-Bobine-Token": self.srv.jeton}
+        c = http.client.HTTPConnection("127.0.0.1", self.srv.server_address[1], timeout=3)
+        try:
+            c.request(methode, chemin, body=corps, headers=h)
+            r = c.getresponse()
+            texte = r.read().decode("utf-8")
+            try:
+                return r.status, json.loads(texte)
+            except ValueError:
+                return r.status, texte
+        finally:
+            c.close()
+
+    def test_absent_vaut_oui(self):
+        statut, etat = self.requete("GET", "/api/bobine")
+        self.assertEqual(statut, 200)
+        self.assertTrue(etat["disponible"])
+        self.assertTrue(etat["profil"])
+
+    def test_desactive_lecture_seule_et_reactivation_sans_redemarrage(self):
+        import json
+        for valeur in ("non", "NON", "no", "n", "false", "0", "off"):
+            with self.subTest(valeur=valeur):
+                self.regler(valeur)
+                self.assertEqual(self.requete("GET", "/api/bobine")[1],
+                                 {"disponible": False, "profil": False, "jeton": ""})
+                self.assertEqual(self.requete("GET", "/vault.html")[0], 200)
+                statut, rep = self.requete("POST", "/api/demander", json.dumps({"question": "test"}))
+                self.assertEqual((statut, rep["code"]), (503, "demander_desactive"))
+                self.assertEqual(self.requete("GET", "/api/profil")[0], 503)
+                statut, rep = self.requete("POST", "/api/profil", json.dumps({"texte": "x", "version": ""}))
+                self.assertEqual((statut, rep["code"]), (503, "demander_desactive"))
+        self.moteur.assert_not_called()
+        self.regen.assert_not_called()
+        self.assertFalse((self.vault / "Mon profil.txt").exists())
+        self.regler("oui")
+        etat = self.requete("GET", "/api/bobine")[1]
+        self.assertTrue(etat["disponible"] and etat["profil"])
+        self.assertEqual(self.requete("POST", "/api/demander", json.dumps({"question": "test"}))[0], 200)
+
+    def test_valeurs_alignees_avec_les_scripts(self):
+        racine = Path(__file__).resolve().parents[1]
+        script = (racine / "page-locale.sh").read_text(encoding="utf-8")
+        for valeur in page_server.VALEURS_NON:
+            motif = "".join("[" + c.upper() + c.lower() + "]" if c.isalpha() else c for c in valeur)
+            self.assertIn(motif, script, valeur)
+
+
 if __name__ == "__main__":
     unittest.main()

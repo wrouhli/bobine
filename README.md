@@ -168,6 +168,13 @@ Usage: in Instagram/TikTok/YouTube → **Share → Send to Bobine**. That's it.
 
 Open **Ma page**, then **Demander**. Ask about a topic in your library, or choose **Poser une question sur cette vidéo** from a video page. Bobine answers with links to the cards it used. It uses your existing summary provider and key.
 
+**You decide.** The installer's last question offers to turn Demander on (default: yes). Change your mind at any time, without reinstalling:
+
+- **Mac**: double-click **Activer Demander** or **Désactiver Demander** in your Bobine folder. The **Ma page** shortcut opens the page with Demander when it is on, the plain file otherwise;
+- **Linux**: `./activer-demander.sh` or `./desactiver-demander.sh`, and `./ouvrir-ma-page.sh` to find the address.
+
+When off, your page stays readable; only chat and in-page profile editing go away. No data is deleted.
+
 On Mac, the installer starts a page server reachable only from that Mac. On iPhone, chat is available through your Linux server's protected address. The standalone `vault.html` file and its iCloud copy remain read-only, without unusable chat buttons.
 
 Bobine searches locally, then sends excerpts from at most five cards, your question, short conversation history and optional profile to your AI provider. It does not browse the web. With no relevant match, it replies locally without a provider call. Citations help you check an answer; they do not guarantee every statement is correct.
@@ -309,7 +316,8 @@ Bobine/
 ├── journal.json        # what has been processed (successes, failures, retries)
 ├── index.md            # the condensed index (summaries + topics)
 ├── vault.html          # the page to browse
-├── Ma page.webloc      # double-click: opens the page in your browser
+├── Ma page.app         # double-click: opens your page (with Demander when on)
+├── Activer Demander.command / Désactiver Demander.command
 ├── graph.html          # the topic map
 └── logs/               # logs (watch.log)
 ```

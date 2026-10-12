@@ -110,6 +110,8 @@ Protected by Cloudflare Access (or another gatekeeper upstream)? Start the page 
 
 ## Ask from the page
 
+Demander is opt-in: the last question of `install-linux.sh` offers it, and you can change your mind at any time with `./activer-demander.sh` or `./desactiver-demander.sh` (no reinstall). `./ouvrir-ma-page.sh` starts the page if needed and prints its address. When off, the page stays readable (including through your public address); only chat and profile editing go away. Without a public page, `activer-demander.sh` installs a local, password-protected page, reachable with `ssh -L 8786:127.0.0.1:8786`.
+
 With your existing summary API key, open **Demander** at your usual Bobine address. Answers use excerpts from at most five source cards and link back to them. Starting from a card restricts the question to that video. Conversation history lives only in the tab.
 
 Existing installations: add `PAGE_ORIGIN=https://your-bobine-host` to `config.env` (exact origin, no path or trailing slash), then restart the page service after updating and regenerating the page. New activations through `activer-page-web.sh` set it automatically. Your tunnel must preserve the public Host header. Keep the password or upstream protection: origin checks are not authentication.

@@ -73,44 +73,14 @@ secret() {  # $1 = texte ; lit sans afficher (pour la clé API)
   printf '%s' "$reponse"
 }
 
-# Même dossier de données pour la génération et le serveur ; jamais de source/eval.
-resoudre_vault_effectif() {
-  "$PY" -B - "$SCRIPT_DIR" <<'PYTHON'
-import os
-import sys
-from pathlib import Path
-code = Path(sys.argv[1])
-try:
-    config = code / "config.env"
-    if config.is_symlink() or (config.exists() and not config.is_file()):
-        raise ValueError("configuration non ordinaire")
-    sys.path.insert(0, str(code))
-    from enrichir import charger_config
-    configured = charger_config(code).get("VAULT")
-    vault = Path(os.path.expandvars(configured)).expanduser() if configured else code
-    if not vault.is_absolute() or any(ord(c) < 32 or ord(c) == 127 for c in str(vault)):
-        raise ValueError("chemin de données non absolu ou ambigu")
-    print(vault)
-except (OSError, ValueError, RuntimeError, ImportError):
-    sys.exit(1)
-PYTHON
-}
-
-# Une mise à jour du générateur doit aussi actualiser une page déjà existante.
-# Génération locale uniquement : ni ingestion, ni enrichissement, ni appel d'IA.
-preparer_page() {
-  VAULT_EFFECTIF="$(resoudre_vault_effectif)" || {
-    avis "VAULT illisible ou ambigu dans config.env : la page et son service sont conservés."
-    return 1
-  }
-  mkdir -p "$SCRIPT_DIR/logs" || return 1
-  if "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/generate_page.py" --vault "$VAULT_EFFECTIF" > "$SCRIPT_DIR/logs/page-generation.log" 2>&1; then
-    ok "Page régénérée localement (sans appel d'IA)."
-  else
-    avis "La génération de la page a échoué — détails dans logs/page-generation.log."
-    return 1
-  fi
-}
+# Page, réglage « Demander » et service de page : logique partagée avec
+# activer-demander.sh, desactiver-demander.sh et ouvrir-ma-page.sh.
+if [ ! -f "$DEPOT/page-locale.sh" ]; then
+  avis "Il manque le fichier page-locale.sh : télécharge à nouveau Bobine."
+  exit 1
+fi
+# shellcheck source=page-locale.sh
+. "$DEPOT/page-locale.sh"
 
 # ------------------------------------------------------------------- bannière
 printf "\n${CYAN}${GRAS}"
@@ -230,6 +200,7 @@ if [ "$GARDE" = "oui" ]; then
 else
   for f in ingest.py filtre.py enrichir.py generate_page.py graphe.py \
            watch-linux.sh inbox_server.py page_server.py demander.py activer-page-web.sh install-linux.sh desinstaller-linux.sh \
+           page-locale.sh activer-demander.sh desactiver-demander.sh ouvrir-ma-page.sh \
            requirements.txt config.example.env filtres.exemple.yaml \
            LICENSE README.md .gitignore; do
     [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
@@ -244,7 +215,8 @@ SCRIPT_DIR="$(pwd)"
 # ------------------------------------------------- petits plus (dossier propre)
 mkdir -p logs
 [ -f inbox.txt ] || touch inbox.txt
-chmod +x watch-linux.sh inbox_server.py page_server.py activer-page-web.sh desinstaller-linux.sh 2>/dev/null || true
+chmod +x watch-linux.sh inbox_server.py page_server.py activer-page-web.sh desinstaller-linux.sh \
+  activer-demander.sh desactiver-demander.sh ouvrir-ma-page.sh 2>/dev/null || true
 
 # Une petite page d'accueil (elle sera remplacée toute seule au premier vrai passage).
 if [ ! -f "vault.html" ]; then
@@ -408,7 +380,7 @@ fi
   # Réglages avancés de l'ancienne configuration, gardés tels quels (chemins,
   # cookies, notification, jeton du serveur de liens, mot de passe de la page…).
   if [ -n "$ANCIENNE_CONFIG" ]; then
-    GARDES="$(grep -E '^(VAULT|INBOX|FFMPEG_DIR|COOKIES|LANGUE_RESUMES|NOTIF_CMD|INBOX_TOKEN|PAGE_PASSWORD|PAGE_ORIGIN)=' "$ANCIENNE_CONFIG" 2>/dev/null || true)"
+    GARDES="$(grep -E '^(VAULT|INBOX|FFMPEG_DIR|COOKIES|LANGUE_RESUMES|NOTIF_CMD|INBOX_TOKEN|PAGE_PASSWORD|PAGE_ORIGIN|DEMANDER)=' "$ANCIENNE_CONFIG" 2>/dev/null || true)"
     if [ -n "$GARDES" ]; then
       echo
       echo "# Réglages repris de ta configuration précédente :"
@@ -472,7 +444,12 @@ else
 fi
 
 # ---------------------------------------------------------------- génération locale
-preparer_page || note "La page précédente reste disponible si elle existe."
+PAGE_PRETE="non"
+if preparer_page; then
+  PAGE_PRETE="oui"
+else
+  note "La page précédente reste disponible si elle existe."
+fi
 
 # ---------------------------------------------------------------- 7. réveil + finitions
 etape "7/7 — Le réveil automatique (systemd) et les finitions"
@@ -603,6 +580,36 @@ else
   note "Crush pré-réglé (.crushrc — il te manquera juste une clé API, une ligne t'y attend)"
 fi
 
+# ---------------------------------------------------------------- 8. Demander
+# Dernière question : rien n'est imposé. Le défaut reprend l'ancien choix.
+etape "Pour finir : Demander"
+note "Demander : pose des questions à l'IA sur tes vidéos et modifie ton profil, depuis ta page."
+note "Tu pourras changer d'avis à tout moment :  ./activer-demander.sh  ou  ./desactiver-demander.sh"
+DEFAUT_DEMANDER="o"
+DEMANDER_ACTIF="non"
+if [ "$(lire_demander)" = non ]; then DEFAUT_DEMANDER="n"; fi
+if confirmer "Activer Demander (poser des questions à l'IA depuis ta page) ?" "$DEFAUT_DEMANDER"; then
+  if [ "${PAGE_PRETE:-non}" = oui ]; then activer_demander page-prete; else activer_demander; fi
+  rc_demander=$?
+  annoncer_activation "$rc_demander"
+  if [ "$rc_demander" -eq 0 ]; then DEMANDER_ACTIF="oui"; fi
+  case "$rc_demander" in
+    0) DEMANDER_ETAT="oui (pour l'adresse :  ./ouvrir-ma-page.sh)" ;;
+    1) DEMANDER_ETAT="oui (ta page n'a pas démarré : relance  ./activer-demander.sh)" ;;
+    *) DEMANDER_ETAT="non modifié (config.env n'a pas pu être mis à jour)" ;;
+  esac
+else
+  desactiver_demander
+  rc_demander=$?
+  if [ "$rc_demander" -eq 2 ]; then
+    DEMANDER_ETAT="non modifié (config.env n'a pas pu être mis à jour)"
+  else
+    DEMANDER_ETAT="non"
+    ok "D'accord : Demander n'est pas activé. Ta page reste lisible (vault.html)."
+    note "Pour l'activer plus tard :  ./activer-demander.sh  (dans ton dossier Bobine)"
+  fi
+fi
+
 # ---------------------------------------------------------------- résumé final
 echo
 printf "${VERT}${GRAS}  ✨ C'est prêt !${FIN}\n\n"
@@ -616,6 +623,7 @@ fi
 printf "   Réveil 15 min   : %s\n" "$REVEIL"
 printf "   Carte (graphe)  : %s\n" "$CARTE"
 printf "   Boîte à liens   : %s\n" "$SCRIPT_DIR/inbox.txt"
+printf "   Demander        : %s\n" "$DEMANDER_ETAT"
 echo
 printf "   ${GRAS}Et maintenant ?${FIN}\n"
 printf "   1. Dépose un lien dans la boîte :\n"
@@ -623,7 +631,11 @@ printf "        echo 'https://youtu.be/jNQXAC9IVRw' >> %s/inbox.txt\n" "$SCRIPT_
 printf "   2. Déclenche un passage tout de suite :\n"
 printf "        systemctl --user start bobine-watch.service\n"
 printf "   3. Surveille :  tail -f %s/logs/watch.log\n" "$SCRIPT_DIR"
-printf "   4. Ta page : %s/vault.html  (et graph.html)\n" "${VAULT_EFFECTIF:-$SCRIPT_DIR}"
+if [ "${DEMANDER_ACTIF:-non}" = oui ]; then
+  printf "   4. Ta page, avec Demander :  ./ouvrir-ma-page.sh  (adresse et mot de passe)\n"
+else
+  printf "   4. Ta page : %s/vault.html  (et graph.html)\n" "${VAULT_EFFECTIF:-$SCRIPT_DIR}"
+fi
 printf "   5. (Option) Les liens par HTTP : voir README.md, « Le serveur de liens »\n"
 printf "   6. Un jour, pour arrêter Bobine sans supprimer tes fichiers :  ./desinstaller-linux.sh\n"
 if [ -z "$GARDE" ]; then

@@ -41,6 +41,9 @@ DELAI_DEMANDE = 60
 MAX_PAR_MINUTE = 10
 MAX_PAR_JOUR = 100
 FICHIER_COMPTEUR = ".bobine-demandes.json"
+# Mêmes valeurs que page-locale.sh (activer/desactiver-demander.sh).
+VALEURS_NON = ("non", "no", "n", "false", "0", "off")
+DESACTIVE = "Demander est désactivé sur cette installation. Ta page reste lisible."
 MAX_CORPS_PROFIL = 16384
 DELAI_PAGE = 90
 # Même en-tête que celui écrit par l'installation : des explications, jamais lues.
@@ -336,7 +339,18 @@ class ServeurBobine(ThreadingHTTPServer):
             self.admissions.append(maintenant)
             return True
 
+    def demander_active(self):
+        """Réglage DEMANDER de config.env (absent = oui). Relu à chaque requête :
+        activer-demander.sh / desactiver-demander.sh agissent sans redémarrage."""
+        try:
+            valeur = charger_config(Path(__file__).resolve().parent, self.vault).get("DEMANDER", "oui")
+        except (OSError, ValueError):
+            return False
+        return valeur.strip().lower() not in VALEURS_NON
+
     def disponible(self):
+        if not self.demander_active():
+            return False
         try:
             cfg = charger_config(Path(__file__).resolve().parent, self.vault)
             cle, adresse, modele = resoudre_fournisseur(cfg)
@@ -460,6 +474,10 @@ class PageHandler(BaseHTTPRequestHandler):
             if not self.server.admettre_api():
                 self._erreur(429, "Patiente un instant avant de réessayer.", "limite", {"Retry-After": "60"})
                 return
+            if not self.server.demander_active():
+                # Désactivé : page en lecture seule, ni chat ni profil éditable.
+                self._json(200, {"disponible": False, "profil": False, "jeton": ""})
+                return
             disponible = self.server.disponible()
             # Le jeton protège aussi le profil, qui fonctionne sans clé API.
             self._json(200, {"disponible": disponible, "profil": True, "jeton": self.server.jeton})
@@ -467,6 +485,9 @@ class PageHandler(BaseHTTPRequestHandler):
         if chemin == "/api/profil":
             if not self._origine_api():
                 self._erreur(403, "Ouvre Bobine depuis son adresse habituelle.", "origine_refusee")
+                return
+            if not self.server.demander_active():
+                self._erreur(503, DESACTIVE, "demander_desactive")
                 return
             if not self.server.admettre_api():
                 self._erreur(429, "Patiente un instant avant de réessayer.", "limite", {"Retry-After": "60"})
@@ -507,6 +528,9 @@ class PageHandler(BaseHTTPRequestHandler):
         if (not self._origine_api(post=True)
                 or not hmac.compare_digest(jeton.encode("utf-8"), self.server.jeton.encode("utf-8"))):
             self._erreur(403, "Recharge la page Bobine avant de réessayer.", "origine_refusee")
+            return
+        if not self.server.demander_active():
+            self._erreur(503, DESACTIVE, "demander_desactive")
             return
         if not self.server.admettre_api():
             self._erreur(429, "Patiente un instant avant de réessayer.", "limite", {"Retry-After": "60"})

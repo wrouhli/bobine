@@ -168,7 +168,14 @@ Usage : dans Instagram/TikTok/YouTube → **Partager → Send to Bobine**. C'est
 
 Ouvre **Ma page**, puis **Demander**. Pose une question sur un sujet de ta bibliothèque, ou clique sur **Poser une question sur cette vidéo** dans une fiche. Bobine répond avec des liens vers les fiches utilisées. Aucune nouvelle clé : celle des résumés suffit.
 
-Sur Mac, l'installation démarre la page sur ce Mac uniquement. Sur iPhone, le chat est disponible depuis l'adresse protégée de ton serveur Linux. Le fichier `vault.html` et sa copie iCloud restent en lecture seule : aucun bouton de chat inutilisable.
+**C'est toi qui choisis.** La dernière question de l'installation propose d'activer Demander (réponse par défaut : oui). Tu peux changer d'avis à tout moment, sans réinstaller :
+
+- **Mac** : double-clique sur **Activer Demander** ou **Désactiver Demander** dans ton dossier Bobine. Le raccourci **Ma page** ouvre la page avec Demander quand il est activé, sinon la page fichier ;
+- **Linux** : `./activer-demander.sh` ou `./desactiver-demander.sh`, et `./ouvrir-ma-page.sh` pour retrouver l'adresse.
+
+Désactivé, ta page reste lisible ; seuls le chat et la modification du profil depuis la page disparaissent. Aucune donnée n'est supprimée.
+
+Sur Mac, la page avec Demander ne tourne que sur ce Mac. Sur iPhone, le chat est disponible depuis l'adresse protégée de ton serveur Linux. Le fichier `vault.html` et sa copie iCloud restent en lecture seule : aucun bouton de chat inutilisable.
 
 Bobine cherche localement puis envoie au service d'IA jusqu'à cinq fiches sous forme d'extraits, la question, le court historique et ton profil si tu en as écrit un. Il ne fait aucune recherche sur Internet. Si rien ne correspond, il le dit sans appel au service. Les liens permettent de vérifier la réponse, pas de garantir chaque affirmation.
 
@@ -309,7 +316,8 @@ Bobine/
 ├── journal.json        # ce qui a été traité (réussites, échecs, essais)
 ├── index.md            # l'index condensé (résumés + thèmes)
 ├── vault.html          # la page à consulter
-├── Ma page.webloc      # double-clic : ouvre la page dans ton navigateur
+├── Ma page.app         # double-clic : ouvre ta page (avec Demander s'il est activé)
+├── Activer Demander.command / Désactiver Demander.command
 ├── graph.html          # la carte des thèmes
 └── logs/               # journaux (watch.log)
 ```

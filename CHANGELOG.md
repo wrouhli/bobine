@@ -4,6 +4,8 @@
 
 En préparation 🚧
 
+- **Demander au choix** : la dernière question de l'installation propose d'activer Demander (chat et profil modifiable depuis la page), sur Mac comme sur Linux. Réversible à tout moment sans réinstaller : « Activer Demander » / « Désactiver Demander » (double-clic sur Mac, `./activer-demander.sh` / `./desactiver-demander.sh` sur Linux). Le raccourci « Ma page » démarre la page si besoin, sinon ouvre la page fichier. Désactivé, la page reste lisible et aucune donnée n'est supprimée.
+
 - **Profil éditable (refonte, étape 3, seconde partie)** : le profil se modifie depuis la page servie (Profil → Enregistrer), sur Mac comme via l'adresse du serveur, même sans clé API. Enregistrer ne coûte rien : la page est régénérée tout de suite, les « Pour toi » calculés pour l'ancien profil sont masqués, et se recalculent aux prochains passages. Écriture sûre, refus si le fichier a changé ailleurs, mêmes protections que Demander. La copie iCloud reste en lecture.
 
 - **Correctif Safari** : sur iPhone et Mac avec Safari, « Demander » affichait « Reconnecte Bobine » au lieu de répondre. La page imposait une politique de référent trop stricte qui faisait envoyer une origine vide, refusée par le contrôle de sécurité. Corrigé sans assouplir ce contrôle.
