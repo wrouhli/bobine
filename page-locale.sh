@@ -265,6 +265,11 @@ app_ma_page_est_a_nous() {
 # « Ma page.app » : petite application AppleScript, relocalisable (elle calcule
 # son propre dossier) qui lance ouvrir-ma-page.sh sans ouvrir de Terminal.
 # Vrai si l'application de ce dossier est la nôtre (déjà là ou créée à l'instant).
+# Outils macOS désignables (tests uniquement) : sur un vrai Mac, retirer un faux
+# osacompile du PATH ferait retomber sur /usr/bin/osacompile. Défaut : le vrai.
+OSACOMPILE="${BOBINE_OSACOMPILE:-osacompile}"
+CODESIGN="${BOBINE_CODESIGN:-codesign}"
+
 creer_app_ma_page() {
   local app="$SCRIPT_DIR/Ma page.app" temp
   if [ -e "$app" ] || [ -L "$app" ]; then
@@ -272,12 +277,12 @@ creer_app_ma_page() {
     note "Ton « Ma page » personnel est conservé."
     return 1
   fi
-  command -v osacompile >/dev/null 2>&1 || return 1
+  command -v "$OSACOMPILE" >/dev/null 2>&1 || return 1
   mkdir -p "$SCRIPT_DIR/logs" || return 1
   temp="$(mktemp -d "$SCRIPT_DIR/.ma-page-XXXXXX")" || return 1
   # Le marqueur est ajouté avant la signature locale (codesign ad hoc) pour que
   # le paquet reste cohérent ; sans codesign, l'application fonctionne aussi.
-  if osacompile -o "$temp/Ma page.app" \
+  if "$OSACOMPILE" -o "$temp/Ma page.app" \
        -e '-- Bobine : raccourci Ma page (ouvre ta page, avec Demander si active)' \
        -e 'try' \
        -e '	set dossier to do shell script "/usr/bin/dirname " & quoted form of (POSIX path of (path to me))' \
@@ -285,8 +290,8 @@ creer_app_ma_page() {
        -e 'end try' >> "$SCRIPT_DIR/logs/raccourci.log" 2>&1 &&
      [ -d "$temp/Ma page.app/Contents/Resources" ] &&
      printf '%s\n' "$MARQUEUR_APP_TEXTE" > "$temp/Ma page.app/$MARQUEUR_APP"; then
-    if command -v codesign >/dev/null 2>&1; then
-      codesign --force --sign - "$temp/Ma page.app" >> "$SCRIPT_DIR/logs/raccourci.log" 2>&1 || true
+    if command -v "$CODESIGN" >/dev/null 2>&1; then
+      "$CODESIGN" --force --sign - "$temp/Ma page.app" >> "$SCRIPT_DIR/logs/raccourci.log" 2>&1 || true
     fi
     if [ ! -e "$app" ] && [ ! -L "$app" ] && mv "$temp/Ma page.app" "$app"; then
       rm -rf "$temp"

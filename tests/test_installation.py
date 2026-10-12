@@ -462,6 +462,9 @@ class InstallationSafety(unittest.TestCase):
         # Par défaut, pas de compilateur AppleScript : repli « Ma page.webloc ».
         self.stub("osacompile", "#!/bin/bash\nexit 1\n")
         self.stub("codesign", "#!/bin/bash\nexit 0\n")
+        # Toujours les faux outils, jamais ceux du Mac qui lance les tests.
+        self.env["BOBINE_OSACOMPILE"] = str(self.bin / "osacompile")
+        self.env["BOBINE_CODESIGN"] = str(self.bin / "codesign")
 
     def osacompile_stub(self):
         """Crée un paquet .app minimal et garde le script AppleScript reçu."""
@@ -1401,15 +1404,36 @@ class InstallationSafety(unittest.TestCase):
         for case in ("absent", "failing"):
             with self.subTest(case=case):
                 vault = self.page_fixture()
-                if case == "absent":
-                    (self.bin / "osacompile").unlink()
-                self.run_any([vault / "activer-demander.sh"])
-                self.assertFalse((vault / "Ma page.app").exists())
-                self.assertEqual(self.shortcut_url(vault), "http://127.0.0.1:8786/")
-                self.run_any([vault / "desactiver-demander.sh"])
-                self.assertEqual(self.shortcut_url(vault), (vault / "vault.html").as_uri())
-                self.assertEqual(list(vault.glob(".ma-page-*")), [])
-                shutil.rmtree(vault)
+                try:
+                    # « absent » : un chemin inexistant, fiable même sur un vrai Mac
+                    # (supprimer le faux outil retomberait sur /usr/bin/osacompile).
+                    self.env["BOBINE_OSACOMPILE"] = (str(self.sandbox / "osacompile-absent")
+                                                     if case == "absent" else str(self.bin / "osacompile"))
+                    if case == "absent":
+                        # Reproduit un vrai Mac : un osacompile qui marche plus loin
+                        # dans le PATH (comme /usr/bin) ne doit pas être utilisé.
+                        systeme = self.sandbox / "systeme"
+                        systeme.mkdir(exist_ok=True)
+                        vrai = systeme / "osacompile"
+                        vrai.write_text('#!/bin/bash\nwhile [ $# -gt 0 ]; do [ "$1" = -o ] && mkdir -p "$2/Contents/Resources"; shift; done\n')
+                        vrai.chmod(0o755)
+                        (self.bin / "osacompile").unlink()
+                        self.env["PATH"] = str(self.bin) + os.pathsep + str(systeme) + os.pathsep + os.defpath
+                    self.run_any([vault / "activer-demander.sh"])
+                    self.assertFalse((vault / "Ma page.app").exists())
+                    self.assertEqual(self.shortcut_url(vault), "http://127.0.0.1:8786/")
+                    self.run_any([vault / "desactiver-demander.sh"])
+                    self.assertEqual(self.shortcut_url(vault), (vault / "vault.html").as_uri())
+                    self.assertEqual(list(vault.glob(".ma-page-*")), [])
+                finally:
+                    # Fixture recréée à chaque cas, même si une vérification échoue.
+                    self.env["BOBINE_OSACOMPILE"] = str(self.bin / "osacompile")
+                    self.env["PATH"] = str(self.bin) + os.pathsep + os.defpath
+                    if not (self.bin / "osacompile").exists():
+                        self.stub("osacompile", "#!/bin/bash\nexit 1\n")
+                    shutil.rmtree(vault, ignore_errors=True)
+                    for etat in ("page-loaded", "page-stopped"):
+                        (self.home / etat).unlink(missing_ok=True)
 
     # ------------------------------------------------------------ Mac : ouvrir-ma-page.sh
     def opened_lines(self):
