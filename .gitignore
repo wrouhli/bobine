@@ -38,3 +38,7 @@ __pycache__/
 # Compteur privé de la relève
 .ingest-essais.json
 .watch-echecs-resume
+
+# Profil et mémos : personnels, jamais dans le dépôt
+Mon profil.txt
+memos/

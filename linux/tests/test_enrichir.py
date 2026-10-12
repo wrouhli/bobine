@@ -233,7 +233,7 @@ class AvecCle(unittest.TestCase):
         appels = []
 
         def faux_resume(*args, **kwargs):
-            appels.append(args)
+            appels.append((args, kwargs))
             return reponse
         with mock.patch.object(sys, "argv", argv), \
              mock.patch.dict(os.environ, {"DEEPSEEK_API_KEY": "cle-de-test"}, clear=True), \
@@ -280,7 +280,8 @@ class AvecCle(unittest.TestCase):
                 "- auteur : a\n- thèmes : ia\n- contenu : c\n", encoding="utf-8")
             _, appels = self._lancer(racine, {"titre": "x", "themes": [], "contenu": "y"})
             texte = (racine / "index.md").read_text(encoding="utf-8")
-        self.assertEqual(appels, [])
+        # Aucun nouveau résumé (le seul appel autorisé est le rattrapage du mémo).
+        self.assertEqual([a for a in appels if a[1].get("mode") != "memo"], [])
         self.assertEqual(texte.count("dQw4w9WgXcQ"), 1)
 
     def test_reponse_piegee_ne_cree_pas_de_lien(self):
@@ -293,3 +294,236 @@ class AvecCle(unittest.TestCase):
         self.assertEqual(sum(1 for l in lignes if l.startswith("- lien :")), 1)
         self.assertNotIn("\n- lien : javascript", texte)
         self.assertEqual(sum(1 for l in lignes if l.startswith("### ")), 1)
+
+
+def memo_modele(idee="L'idée centrale.", pour_toi=""):
+    """Une réponse complète du modèle (résumé + mémo)."""
+    reponse = {"titre": "Titre", "themes": ["ia"], "contenu": "Résumé.",
+               "a_retenir": ["Point un.", "Point deux."],
+               "memo": {"idee": idee, "points": ["Clé 1.", "Clé 2."], "etapes": [], "outils": ["Outil X"]}}
+    if pour_toi:
+        reponse["pour_toi"] = pour_toi
+    return reponse
+
+
+class Consignes(unittest.TestCase):
+    """consigne() : le bon contenu selon l'usage et la présence d'un profil."""
+
+    def test_complet_avec_et_sans_profil(self):
+        avec = enrichir.consigne("fr", "complet", True)
+        sans = enrichir.consigne("fr", "complet", False)
+        for c in (avec, sans):
+            self.assertIn('"memo"', c)
+            self.assertIn('"a_retenir"', c)
+            self.assertIn("N'invente rien", c)
+        self.assertIn('"pour_toi"', avec)
+        self.assertNotIn('"pour_toi"', sans)
+
+    def test_memo_et_pour_toi_seuls(self):
+        memo = enrichir.consigne("fr", "memo", False)
+        self.assertNotIn('"titre"', memo)
+        self.assertIn('"memo"', memo)
+        pour_toi = enrichir.consigne("fr", "pour_toi", True)
+        self.assertIn('"pour_toi"', pour_toi)
+        self.assertNotIn('"memo"', pour_toi)
+
+    def test_anglais(self):
+        self.assertIn("in English", enrichir.consigne("en", "complet", False))
+
+    def test_message_avec_profil_delimite(self):
+        avec = enrichir.message_modele("Texte de la fiche.", "fr", "Je forme des gens.")
+        self.assertIn("<<<\nJe forme des gens.\n>>>", avec)
+        self.assertIn("Texte de la fiche.", avec)
+        self.assertNotIn("<<<", enrichir.message_modele("Texte.", "fr", ""))
+
+
+class MemoPropre(unittest.TestCase):
+    """nettoyer_memo : une réponse inutilisable est refusée, le reste est assaini."""
+
+    def test_valide(self):
+        memo = enrichir.nettoyer_memo(memo_modele(pour_toi="Pour toi."), True)
+        self.assertEqual(memo["memo"]["idee"], "L'idée centrale.")
+        self.assertEqual(memo["a_retenir"], ["Point un.", "Point deux."])
+        self.assertEqual(memo["pour_toi"], "Pour toi.")
+
+    def test_refuse_sans_memo_ou_sans_idee(self):
+        self.assertIsNone(enrichir.nettoyer_memo({"titre": "x"}, False))
+        self.assertIsNone(enrichir.nettoyer_memo(memo_modele(idee=""), False))
+        self.assertIsNone(enrichir.nettoyer_memo(None, False))
+
+    def test_une_ligne_et_plafonds(self):
+        reponse = memo_modele(idee="Idée\n### Fausse entrée")
+        reponse["a_retenir"] = ["Ligne\n- lien : javascript:alert(1)"] * 9
+        memo = enrichir.nettoyer_memo(reponse, False)
+        self.assertNotIn("\n", memo["memo"]["idee"])
+        self.assertEqual(len(memo["a_retenir"]), 5)
+        self.assertTrue(all("\n" not in r for r in memo["a_retenir"]))
+
+    def test_pour_toi_ignore_sans_profil(self):
+        self.assertEqual(enrichir.nettoyer_memo(memo_modele(pour_toi="Pour toi."), False)["pour_toi"], "")
+
+
+class Profil(unittest.TestCase):
+    def test_lignes_commentaires_ignorees(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            (Path(dossier) / enrichir.FICHIER_PROFIL).write_text(
+                "# explication\n\nJe suis formateur.\n  # autre explication\nJ'aime l'IA.\n", encoding="utf-8")
+            self.assertEqual(enrichir.lire_profil(dossier), "Je suis formateur.\nJ'aime l'IA.")
+        self.assertEqual(enrichir.lire_profil("/dossier/inexistant"), "")
+
+    def test_empreinte(self):
+        self.assertEqual(enrichir.empreinte_profil(""), "")
+        self.assertEqual(enrichir.empreinte_profil("a"), enrichir.empreinte_profil("a"))
+        self.assertNotEqual(enrichir.empreinte_profil("a"), enrichir.empreinte_profil("b"))
+
+
+class Memos(unittest.TestCase):
+    """Mémos : nouvelles vidéos, rattrapage progressif, changement de profil."""
+
+    def _vault(self, dossier, nb, indexees=True, profil=""):
+        racine = Path(dossier)
+        (racine / "raw").mkdir()
+        index = ["# Index du Vault\n"]
+        for i in range(nb):
+            src = "https://www.instagram.com/reel/M%02d/" % i
+            fiche = racine / "raw" / ("insta_M%02d.md" % i)
+            fiche.write_text("---\nsource: " + src + "\nauteur: a\ntraite_le: 2026-10-01\n---\n\n# Vidéo %d\n\n"
+                             "## Transcription\nLe texte de la vidéo %d.\n" % (i, i), encoding="utf-8")
+            os.utime(fiche, (1000 + i, 1000 + i))
+            if indexees:
+                index.append("\n### Vidéo %d\n- lien : %s\n- auteur : a\n- thèmes : ia\n- contenu : Résumé %d.\n"
+                             % (i, src, i))
+        (racine / "index.md").write_text("".join(index), encoding="utf-8")
+        if profil:
+            (racine / enrichir.FICHIER_PROFIL).write_text(profil, encoding="utf-8")
+        return racine
+
+    def _lancer(self, racine, reponses, extra=()):
+        appels = []
+
+        def faux(*args, **kwargs):
+            appels.append(kwargs)
+            r = reponses(kwargs) if callable(reponses) else reponses
+            return r
+        argv = ["enrichir.py", "--vault", str(racine), "--no-pages"] + list(extra)
+        with mock.patch.object(sys, "argv", argv), \
+             mock.patch.dict(os.environ, {"DEEPSEEK_API_KEY": "cle-de-test"}, clear=True), \
+             mock.patch.object(enrichir, "demander_resume", faux), \
+             mock.patch("sys.stdout"):
+            code = enrichir.main()
+        return code, appels
+
+    def test_nouvelle_video_ecrit_son_memo(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 1, indexees=False, profil="Je forme des équipes.")
+            code, appels = self._lancer(racine, memo_modele(pour_toi="Utile pour tes ateliers."))
+            memo = enrichir.lire_memo(racine, "insta_M00")
+        self.assertEqual(code, 0)
+        self.assertEqual([a["mode"] for a in appels], ["resume"])
+        self.assertIn("Je forme des équipes.", appels[0]["message"])
+        self.assertEqual(memo["pour_toi"], "Utile pour tes ateliers.")
+        self.assertEqual(memo["profil"], enrichir.empreinte_profil("Je forme des équipes."))
+
+    def test_rattrapage_progressif_sans_toucher_au_resume(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 12)
+            index_avant = (racine / "index.md").read_text(encoding="utf-8")
+            reponse = memo_modele()
+            del reponse["titre"]
+            _, appels = self._lancer(racine, reponse)
+            self.assertEqual(len(appels), enrichir.LIMITE_MEMOS)
+            self.assertTrue(all(a["mode"] == "memo" for a in appels))
+            self.assertEqual(len(list((racine / "memos").glob("*.json"))), enrichir.LIMITE_MEMOS)
+            _, appels = self._lancer(racine, reponse)
+            self.assertEqual(len(appels), 2)
+            _, appels = self._lancer(racine, reponse)
+            self.assertEqual(appels, [])
+            self.assertEqual((racine / "index.md").read_text(encoding="utf-8"), index_avant)
+
+    def test_video_resumee_pas_rappelee_dans_le_meme_passage(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 1, indexees=False)
+            reponse = memo_modele()
+            del reponse["memo"]          # le modèle a oublié le mémo
+            _, appels = self._lancer(racine, reponse)
+        self.assertEqual([a["mode"] for a in appels], ["resume"])
+
+    def test_changement_de_profil_met_a_jour_pour_toi_seulement(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 1, profil="Ancien profil.")
+            self._lancer(racine, memo_modele(pour_toi="Ancien conseil."))
+            (racine / enrichir.FICHIER_PROFIL).write_text("Nouveau profil.", encoding="utf-8")
+            _, appels = self._lancer(racine, {"pour_toi": "Nouveau conseil."})
+            memo = enrichir.lire_memo(racine, "insta_M00")
+        self.assertEqual([a["mode"] for a in appels], ["pour_toi"])
+        self.assertIn("Nouveau profil.", appels[0]["message"])
+        self.assertNotIn("Le texte de la vidéo", appels[0]["message"])
+        self.assertEqual(memo["pour_toi"], "Nouveau conseil.")
+        self.assertEqual(memo["memo"]["idee"], "L'idée centrale.")
+        self.assertEqual(memo["profil"], enrichir.empreinte_profil("Nouveau profil."))
+
+    def test_profil_supprime_retire_pour_toi_sans_appel(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 1, profil="Mon profil.")
+            self._lancer(racine, memo_modele(pour_toi="Conseil."))
+            (racine / enrichir.FICHIER_PROFIL).unlink()
+            _, appels = self._lancer(racine, None)
+            memo = enrichir.lire_memo(racine, "insta_M00")
+        self.assertEqual(appels, [])
+        self.assertEqual(memo["pour_toi"], "")
+
+    def test_sans_cle_aucun_memo(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 2)
+            argv = ["enrichir.py", "--vault", str(racine), "--no-pages"]
+            with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, {}, clear=True), \
+                 mock.patch.object(enrichir, "demander_resume") as appel, mock.patch("sys.stdout"):
+                self.assertEqual(enrichir.main(), 0)
+            self.assertFalse(appel.called)
+            self.assertFalse((racine / "memos").exists())
+
+
+    def _compter_rendus(self, racine, reponses, cle=True):
+        appels = []
+
+        def faux_rendu(script, racine_pages):
+            appels.append(1)
+            for page in ("vault.html", "graph.html"):
+                (Path(racine_pages) / page).write_text("<html>", encoding="utf-8")
+        env = {"DEEPSEEK_API_KEY": "cle-de-test"} if cle else {}
+        argv = ["enrichir.py", "--vault", str(racine)]
+        with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, env, clear=True), \
+             mock.patch.object(enrichir, "demander_resume", lambda *a, **k: reponses), \
+             mock.patch.object(enrichir, "regenerer_pages", faux_rendu), \
+             mock.patch("sys.stdout"):
+            enrichir.main()
+        return len(appels)
+
+    def test_un_seul_rendu_quand_les_pages_sont_juste_en_retard(self):
+        # Copie fraîche (pages absentes) + rattrapage : un seul rendu, à la fin.
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 2)
+            self.assertEqual(self._compter_rendus(racine, memo_modele()), 1)
+            # Passage suivant : rien à faire, aucun rendu.
+            self.assertEqual(self._compter_rendus(racine, memo_modele()), 0)
+
+    def test_sans_cle_les_pages_en_retard_sont_refaites(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 2)
+            self.assertEqual(self._compter_rendus(racine, None, cle=False), 1)
+
+    def test_nouvelle_video_visible_tout_de_suite_puis_resumee(self):
+        # Voulu : un rendu dès l'indexation (la vidéo est visible même si l'IA
+        # traîne), un second avec le résumé.
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 1, indexees=False)
+            self.assertEqual(self._compter_rendus(racine, memo_modele()), 2)
+
+    def test_memo_illisible_est_refait(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = self._vault(dossier, 1)
+            (racine / "memos").mkdir()
+            (racine / "memos" / "insta_M00.json").write_text("{pas du json", encoding="utf-8")
+            self.assertIsNone(enrichir.lire_memo(racine, "insta_M00"))
+            _, appels = self._lancer(racine, memo_modele())
+        self.assertEqual([a["mode"] for a in appels], ["memo"])

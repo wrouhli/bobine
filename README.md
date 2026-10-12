@@ -137,6 +137,12 @@ For summaries in English, add `LANGUE_RESUMES=en` to `config.env`. The interface
 
 </details>
 
+### *Optional*: your profile (the "For you" block)
+
+With an API key, each card gets a **Memo** tab (the main idea, key points, steps, tools mentioned) and a **Key takeaways** box. If you also describe yourself in a few lines, each card adds a **For you** block: what this video brings *you*.
+
+The installer asks the question once (press Enter to skip). You can write or change it at any time in `Mon profil.txt`, in your vault folder: a few lines about what you do and what you look for in your videos. Lines starting with `#` are ignored. Older videos get their memo gradually, 10 per run, without touching their existing summaries.
+
 ### *Recommended*: the iPhone shortcut (share in one gesture)
 
 On your iPhone, in the **Shortcuts** app:
@@ -269,6 +275,8 @@ Bobine/
 ├── filtres.yaml        # (if you import) your sorting rules, they stay with you
 ├── LICENSE
 ├── raw/                # YOUR cards (never in the repo)
+├── memos/              # the memo of each video (with an API key; never in the repo)
+├── Mon profil.txt      # (optional) a few lines about you, for "For you"
 ├── journal.json        # what has been processed (successes, failures, retries)
 ├── index.md            # the condensed index (summaries + topics)
 ├── vault.html          # the page to browse
@@ -283,7 +291,7 @@ Bobine/
 Windows: no. Bobine is designed and tested for Mac + iPhone, and that's a deliberate choice. **Linux: yes.** A complete Linux/VPS edition exists (installer, systemd wake-up, HTTPS page, local inbox) → **[linux/](linux/README.en.md)**. Same core, same license, same philosophy: everything at home.
 
 **Where does my data go?**
-Bobine keeps your knowledge base on your machine: no account, no server of ours, no telemetry. A few things do leave your machine, all transparent: the video downloads from Instagram, TikTok and YouTube (like any downloader), using your browser's login cookies for Instagram and TikTok only (on the Mac, Chrome by default: macOS may ask once for access to "Chrome Safe Storage"; change it with `COOKIES=…`); the one-time downloads of the Python dependencies and the transcription model; and, only if you turn on the AI features (summaries, asking questions with Crush), the relevant texts (transcripts, cards, your questions) sent to the provider you chose (DeepSeek, OpenAI, OpenRouter…) with your own API key. On the Mac edition, the generated page can also be synced through iCloud (offered at installation, you can decline it).
+Bobine keeps your knowledge base on your machine: no account, no server of ours, no telemetry. A few things do leave your machine, all transparent: the video downloads from Instagram, TikTok and YouTube (like any downloader), using your browser's login cookies for Instagram and TikTok only (on the Mac, Chrome by default: macOS may ask once for access to "Chrome Safe Storage"; change it with `COOKIES=…`); the one-time downloads of the Python dependencies and the transcription model; and, only if you turn on the AI features (summaries, asking questions with Crush), the relevant texts (transcripts, cards, your questions, your profile if you wrote one) sent to the provider you chose (DeepSeek, OpenAI, OpenRouter…) with your own API key. On the Mac edition, the generated page can also be synced through iCloud (offered at installation, you can decline it).
 
 **What if I don't use an API key?**
 Everything runs fine: each card is still created with its transcription and description, in `raw/`, and it appears on your page right away, marked "(summary pending)". Add a key whenever you want: at the next run (within 15 minutes), Bobine replaces the pending entries with real summaries and topics, automatically.

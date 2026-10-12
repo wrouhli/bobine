@@ -25,7 +25,9 @@ double-clic : un minuteur systemd, une relève immédiate dès qu'un lien arrive
 2. Dès qu'un lien arrive dans la boîte (sinon au plus tard 15 minutes plus
    tard, en filet de sécurité), Bobine relève : télécharge, transcrit,
    écrit une fiche dans `raw/` ;
-3. S'il y a une clé API : résumé + thèmes → `index.md` ;
+3. S'il y a une clé API : résumé + thèmes → `index.md`, et un mémo par vidéo
+   → `memos/` (avec un bloc « Pour toi » si tu as rempli `Mon profil.txt`,
+   facultatif ; l'installation propose de l'écrire) ;
 4. `vault.html` (liste) et `graph.html` (carte des thèmes) sont régénérés.
 
 *Sans clé API : les fiches apparaissent quand même dans la page, marquées « résumé en attente », et Bobine les remplacera par les vrais résumés dès que tu ajoutes une clé.*
