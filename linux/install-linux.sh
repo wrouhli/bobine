@@ -73,6 +73,253 @@ secret() {  # $1 = texte ; lit sans afficher (pour la clé API)
   printf '%s' "$reponse"
 }
 
+# ------------------------------------- dépendances et réveils (même code Mac et Linux)
+# Ce bloc est identique, octet pour octet, dans install.sh et linux/install-linux.sh
+# (vérifié par tests/test_installation.py). Les détails techniques vont dans
+# logs/install.log ; les messages affichés restent simples.
+
+# Installe requirements.txt dans .venv. L'appelant redirige tout vers
+# logs/install.log. Méthode, dans cet ordre :
+#   a) .venv/bin/pip (cas habituel) ;
+#   b) .venv/bin/python -m pip (pip présent sans son raccourci) ;
+#   c) uv pip, si uv est installé (un environnement créé par uv n'a pas de pip) ;
+#   d) python -m ensurepip pour ajouter pip, puis b).
+# ensurepip n'a pas d'option -q : sa sortie va simplement dans le journal.
+# La méthode retenue est notée en tête du journal.
+installer_dependances() {
+  local py=.venv/bin/python rc
+  if [ -x .venv/bin/pip ]; then
+    echo "Bobine : installation avec .venv/bin/pip"
+    .venv/bin/pip install --upgrade pip -q &&
+      .venv/bin/pip install -q -r requirements.txt
+  elif "$py" -m pip --version >/dev/null 2>&1; then
+    echo "Bobine : installation avec .venv/bin/python -m pip"
+    "$py" -m pip install --upgrade pip -q &&
+      "$py" -m pip install -q -r requirements.txt
+  elif command -v uv >/dev/null 2>&1; then
+    echo "Bobine : pas de pip dans .venv, installation avec uv pip ($(command -v uv))"
+    uv pip install --python "$py" -q -r requirements.txt
+  else
+    echo "Bobine : ni pip ni uv, ajout de pip avec python -m ensurepip puis python -m pip"
+    "$py" -m ensurepip --upgrade &&
+      "$py" -m pip install --upgrade pip -q &&
+      "$py" -m pip install -q -r requirements.txt
+  fi
+  rc=$?
+  if [ "$rc" -ne 0 ]; then echo "Bobine : échec de l'installation des dépendances (code $rc)"; fi
+  return "$rc"
+}
+
+# Lecture des réveils, en Python (bibliothèque standard seulement). Un réveil est
+# un fichier .plist sur Mac (clés ProgramArguments et Label) ou une unité
+# .service sous Linux (lignes ExecStart). Un lien symbolique ou un fichier
+# illisible n'est jamais reconnu comme relevant ce dossier.
+#   lire_reveils examiner FICHIER SCRIPT
+#     code 0 si FICHIER lance SCRIPT (même chemin réel), 1 sinon ; dans ce cas,
+#     affiche le dossier relevé quand il se lit.
+#   lire_reveils anciens DOSSIER SCRIPT EXCLU...
+#     liste « fichier<tabulation>nom » des réveils de DOSSIER (même extension que
+#     le premier EXCLU, sans les EXCLUS) qui lancent SCRIPT ; nom = Label sur Mac,
+#     nom de l'unité sans .service sous Linux.
+#   lire_reveils declenche FICHIER UNITE
+#     code 0 si le .timer ou le .path FICHIER (fichier ordinaire) déclenche UNITE.
+lire_reveils() {
+  "${PY:-python3}" - "$@" <<'PYTHON'
+import os
+import plistlib
+import re
+import shlex
+import sys
+
+
+def ordinaire(fichier):
+    return not os.path.islink(fichier) and os.path.isfile(fichier)
+
+
+def lire(fichier):
+    """(mots, commandes, nom) d'un réveil, ou None s'il est illisible."""
+    if not ordinaire(fichier):
+        return None
+    try:
+        if fichier.endswith(".plist"):
+            with open(fichier, "rb") as f:
+                donnees = plistlib.load(f)
+            mots = donnees.get("ProgramArguments") if isinstance(donnees, dict) else None
+            if not isinstance(mots, list) or not all(isinstance(m, str) for m in mots):
+                return None
+            nom = donnees.get("Label")
+            return mots, [], nom if isinstance(nom, str) else ""
+        home = os.path.expanduser("~")
+        mots, commandes = [], []
+        with open(fichier, encoding="utf-8") as f:
+            for ligne in f:
+                ligne = ligne.strip()
+                if not ligne.startswith("ExecStart="):
+                    continue
+                commande = re.sub(r"%%|%h", lambda m: "%" if m.group() == "%%" else home,
+                                  ligne.split("=", 1)[1].strip())
+                try:
+                    morceaux = shlex.split(commande)
+                except ValueError:
+                    morceaux = commande.split()
+                if morceaux:
+                    morceaux[0] = morceaux[0].lstrip("-@:+!|")
+                mots += morceaux
+                commandes.append(commande)
+        return mots, commandes, os.path.basename(fichier).rsplit(".", 1)[0]
+    except Exception:
+        return None
+
+
+def lance(lu, script):
+    """Le réveil lu lance-t-il script ? Chemin réel identique, ou chemin cité
+    tel quel dans une commande (entre espaces ou guillemets : un chemin avec
+    des espaces écrit sans guillemets reste reconnu, sans confondre
+    /x/Bobine et /x/Bobine-autre)."""
+    mots, commandes = lu[0], lu[1]
+    reel = os.path.realpath(script)
+    if any(os.path.isabs(m) and os.path.realpath(m) == reel for m in mots):
+        return True
+    for commande in commandes:
+        for chemin in {os.path.abspath(script), reel}:
+            debut = commande.find(chemin)
+            while debut >= 0:
+                fin = debut + len(chemin)
+                if ((debut == 0 or commande[debut - 1] in " \t\"'")
+                        and (fin == len(commande) or commande[fin] in " \t\"';")):
+                    return True
+                debut = commande.find(chemin, debut + 1)
+    return False
+
+
+mode = sys.argv[1]
+if mode == "examiner":
+    fichier, script = sys.argv[2], sys.argv[3]
+    lu = lire(fichier)
+    if lu and lance(lu, script):
+        sys.exit(0)
+    if lu:
+        for mot in lu[0]:
+            if os.path.isabs(mot) and os.path.basename(mot) == os.path.basename(script):
+                print(os.path.dirname(mot))
+                break
+    sys.exit(1)
+elif mode == "anciens":
+    dossier, script, exclus = sys.argv[2], sys.argv[3], sys.argv[4:]
+    extension = os.path.splitext(exclus[0])[1]
+    try:
+        noms = sorted(os.listdir(dossier))
+    except OSError:
+        noms = []
+    for nom in noms:
+        if not nom.endswith(extension) or nom in exclus or "\t" in nom or "\n" in nom:
+            continue
+        fichier = os.path.join(dossier, nom)
+        lu = lire(fichier)
+        if lu and lu[2] and "\t" not in lu[2] and "\n" not in lu[2] and lance(lu, script):
+            print(fichier + "\t" + lu[2])
+elif mode == "declenche":
+    fichier, unite = sys.argv[2], sys.argv[3]
+    if not ordinaire(fichier):
+        sys.exit(1)
+    try:
+        with open(fichier, encoding="utf-8") as f:
+            lignes = [ligne.strip() for ligne in f]
+    except Exception:
+        sys.exit(1)
+    cibles = [ligne.split("=", 1)[1].strip() for ligne in lignes if ligne.startswith("Unit=")]
+    defaut = os.path.basename(fichier).rsplit(".", 1)[0] + ".service"
+    sys.exit(0 if set(cibles or [defaut]) == {unite} else 1)
+else:
+    sys.exit(2)
+PYTHON
+}
+
+# Avant d'écrire le réveil de Bobine : s'il existe déjà et relève un AUTRE dossier
+# (ou s'il ne se lit pas, ou si c'est un lien symbolique), on demande avant de le
+# remplacer. Le même dossier : remplacement sans question.
+# Code 0 : on peut écrire le réveil ; 1 : on n'y touche pas.
+reveil_libre() {  # $1 = fichier du réveil de Bobine, $2 = script relevé par ce dossier
+  local autre
+  if [ ! -e "$1" ] && [ ! -L "$1" ]; then return 0; fi
+  if autre="$(lire_reveils examiner "$1" "$2" 2>/dev/null)"; then return 0; fi
+  if [ -z "$autre" ]; then autre="dossier inconnu"; else autre="$(affiche "$autre")"; fi
+  avis "Un réveil existe déjà pour un autre dossier Bobine ($autre)."
+  if confirmer "Le remplacer par celui de ce dossier ?" "n"; then
+    return 0
+  fi
+  note "D'accord, on n'y touche pas : ce dossier n'aura pas de réveil automatique."
+  note "Tu pourras relancer l'installation plus tard pour changer d'avis."
+  return 1
+}
+
+# Le dossier de sauvegarde de ce passage : celui de la mise à jour s'il est déjà
+# choisi, sinon un nouveau (horodaté, rendu unique au besoin). Jamais supprimé.
+dossier_anciens_reveils() {
+  local horodatage n=1
+  if [ -z "${SAUVEGARDE:-}" ]; then
+    horodatage="$(date '+%Y%m%d-%H%M')"
+    SAUVEGARDE="$SCRIPT_DIR/.bobine-sauvegarde-$horodatage"
+    while [ -e "$SAUVEGARDE" ] || [ -L "$SAUVEGARDE" ]; do
+      n=$((n + 1)); SAUVEGARDE="$SCRIPT_DIR/.bobine-sauvegarde-$horodatage-$n"
+    done
+  fi
+  mkdir -p "$SAUVEGARDE/anciens-reveils" 2>/dev/null
+}
+
+ranger_fichier_reveil() {  # $1 = fichier mis de côté dans anciens-reveils/ (jamais écrasé)
+  local destination="$SAUVEGARDE/anciens-reveils/${1##*/}"
+  [ ! -e "$destination" ] && [ ! -L "$destination" ] && mv "$1" "$destination"
+}
+
+# Anciens réveils d'un autre nom qui relèvent CE dossier (d'anciennes installations
+# en ont un, par exemple com.wahid.vaultwatch) : avec celui de Bobine, ce dossier
+# serait relevé deux fois. Pour chacun, on propose de le remplacer ; son fichier
+# est rangé dans le dossier de sauvegarde (retirer_ancien_reveil, propre à chaque
+# édition). Un réveil qui relève un autre dossier n'est jamais touché.
+ranger_anciens_reveils() {  # $1 = dossier des réveils, $2 = script de ce dossier, $3... = réveils de Bobine
+  local liste fichier nom
+  liste="$(lire_reveils anciens "$@" 2>/dev/null)" || liste=""
+  [ -n "$liste" ] || return 0
+  # Lecture sur le descripteur 3 : les réponses, elles, viennent du clavier.
+  while IFS=$'\t' read -r fichier nom <&3; do
+    [ -n "$fichier" ] || continue
+    avis "Un ancien réveil ($nom) relève déjà ce dossier."
+    if confirmer "Le remplacer par celui de Bobine ?" "o"; then
+      retirer_ancien_reveil "$fichier" "$nom"
+    else
+      note "D'accord, il est gardé : deux réveils relèveront ce dossier."
+    fi
+  done 3<<<"$liste"
+}
+# ---------------------------------------------- fin du code commun Mac et Linux
+
+# Linux : arrêter une ancienne unité (avec son .timer et son .path du même nom
+# s'ils la déclenchent) puis ranger ses fichiers dans le dossier de sauvegarde.
+retirer_ancien_reveil() {  # $1 = fichier .service, $2 = nom de l'unité (sans .service)
+  local dossier="${1%/*}" type declencheurs="" ranges="oui"
+  for type in timer path; do
+    if lire_reveils declenche "$dossier/$2.$type" "$2.service" 2>/dev/null; then
+      systemctl --user disable --now "$2.$type" 2>/dev/null || true
+      declencheurs="$declencheurs $type"
+    fi
+  done
+  systemctl --user disable --now "$2.service" 2>/dev/null || true
+  if dossier_anciens_reveils && ranger_fichier_reveil "$1"; then
+    for type in $declencheurs; do
+      ranger_fichier_reveil "$dossier/$2.$type" || ranges="non"
+    done
+  else
+    ranges="non"
+  fi
+  systemctl --user daemon-reload 2>/dev/null || true
+  if [ "$ranges" = "oui" ]; then
+    ok "Ancien réveil ($2) arrêté, gardé dans ${SAUVEGARDE##*/}/anciens-reveils/"
+  else
+    avis "L'ancien réveil ($2) est arrêté, mais ses fichiers n'ont pas pu être rangés : ils restent en place."
+  fi
+}
+
 # Page, réglage « Demander » et service de page : logique partagée avec
 # activer-demander.sh, desactiver-demander.sh et ouvrir-ma-page.sh.
 if [ ! -f "$DEPOT/page-locale.sh" ]; then
@@ -493,10 +740,8 @@ if [ ! -d .venv ]; then
   "$PY" -m venv .venv || { avis "Impossible de créer l'environnement."; note "Souvent, il manque :  sudo apt install python3-venv"; exit 1; }
 fi
 if [ -x .venv/bin/python ]; then
-  (
-    .venv/bin/pip install --upgrade pip -q &&
-    .venv/bin/pip install -q -r requirements.txt
-  ) > logs/install.log 2>&1 &
+  # En arrière-plan, pour afficher l'attente ; méthode et détails : logs/install.log.
+  ( installer_dependances ) > logs/install.log 2>&1 &
   pid=$!
   tours=0
   while kill -0 "$pid" 2>/dev/null; do
@@ -547,9 +792,20 @@ fi
 
 # ---------------------------------------------------------------- 7. réveil + finitions
 etape "7/7 — Le réveil automatique (systemd) et les finitions"
-if [ "$REVEIL" = "oui" ]; then
-  UNIT_DIR="$HOME/.config/systemd/user"
+# Bobine n'en fait tourner qu'un à la fois : celui d'un autre dossier n'est
+# remplacé qu'avec ton accord (reveil_libre). Les anciennes unités d'un autre nom
+# qui relèvent CE dossier sont proposées au remplacement (ranger_anciens_reveils).
+UNIT_DIR="$HOME/.config/systemd/user"
+if [ "$REVEIL" = "oui" ] && ! reveil_libre "$UNIT_DIR/bobine-watch.service" "$SCRIPT_DIR/watch-linux.sh"; then
+  REVEIL="non"
+elif [ "$REVEIL" = "oui" ]; then
+  ranger_anciens_reveils "$UNIT_DIR" "$SCRIPT_DIR/watch-linux.sh" \
+    bobine-watch.service bobine-page.service bobine-inbox.service bobine-tunnel.service
   mkdir -p "$UNIT_DIR"
+  # Un lien symbolique est remplacé par un vrai fichier : sa cible n'est jamais réécrite.
+  for unite in bobine-watch.service bobine-watch.timer bobine-watch.path; do
+    if [ -L "$UNIT_DIR/$unite" ]; then rm -f "$UNIT_DIR/$unite"; fi
+  done
   cat > "$UNIT_DIR/bobine-watch.service" <<EOF
 [Unit]
 Description=Bobine — relève la boîte de réception et prépare les fiches
