@@ -4,6 +4,8 @@
 
 En préparation 🚧
 
+- **Demander (refonte, étape 3, première partie)** : questions directement dans la page servie, réponses avec liens vers les fiches, recherche locale et extraits plafonnés ; une question depuis une fiche reste limitée à cette vidéo. Le serveur de page est partagé avec Mac et reste local sur Mac. La copie iCloud garde sa lecture seule, sans bouton inopérant. Clé conservée côté serveur, protections intersites, quotas persistants, échéances strictes et conversations uniquement dans l'onglet. Le profil éditable viendra dans une PR distincte.
+
 - **Finitions et captures** : encadrés mieux équilibrés (« Pour toi », Profil), texte de la recherche raccourci pour tenir sur iPhone, captures du README refaites à partir d'une bibliothèque fictive (liste, fiche, iPhone, carte), deux fois plus légères au total.
 
 - **Mémo, « À retenir » et « Pour toi » (refonte, étape 2)** : avec une clé API, chaque fiche gagne un onglet Mémo (idée centrale, points clés, étapes, outils cités) et un encadré « À retenir ». Un profil facultatif (`Mon profil.txt`, proposé à l'installation) ajoute un bloc « Pour toi » : ce que la vidéo t'apporte. Les nouvelles vidéos reçoivent tout en une seule demande ; les anciennes sont rattrapées petit à petit (10 par passage) sans toucher à leurs titres ni à leurs résumés. Quand le profil change, seuls les blocs « Pour toi » sont refaits ; sans profil, aucun texte personnel n'est envoyé. Nouvelle page Profil, recherche étendue aux mémos, en-tête compact sur mobile. Sans clé, rien ne change.

@@ -141,6 +141,16 @@ Protégée par Cloudflare Access (ou un autre videur en amont) ? Lance la page
 avec `--sans-mot-de-passe` : Cloudflare fait la porte, la page ne demande plus
 rien (ajoute l'option à la ligne ExecStart de ton service).
 
+## Demander depuis la page
+
+Avec ta clé de résumé déjà configurée, ouvre **Demander** à l'adresse habituelle de Bobine. Les réponses s'appuient sur jusqu'à cinq fiches et leurs extraits, avec des liens pour les vérifier. Depuis une fiche, la question reste limitée à cette vidéo. La conversation ne reste que dans l'onglet.
+
+Pour une installation existante, ajoute `PAGE_ORIGIN=https://ton-adresse-bobine` dans `config.env` (origine exacte, sans chemin ni slash final), puis redémarre le service de page après mise à jour et régénération. `activer-page-web.sh` le configure lors d'une nouvelle activation. Le tunnel doit conserver l'en-tête Host public. Garde le mot de passe ou ta protection en amont : l'origine n'est pas une authentification.
+
+Le fichier ouvert directement, la copie téléchargée et un simple serveur de fichiers restent en lecture seule. Les limites de demandes s'appliquent aussi à l'adresse publique et survivent au redémarrage. Aucun accès direct à `raw/`, à la configuration ou aux compteurs privés n'est ajouté. Le profil reste modifiable dans `Mon profil.txt`, pas dans la page.
+
+Voir [le guide de vérification et de migration](../docs/demander-verification.md). Le déploiement doit être précédé d'une sauvegarde.
+
 ## Crush (bonus)
 
 [Crush](https://charm.sh/crush) est un assistant IA pour le terminal : lancé

@@ -44,3 +44,10 @@ __pycache__/
 # Profil et mémos : personnels, jamais dans le dépôt
 Mon profil.txt
 memos/
+
+# Quota des questions : horodatages locaux, aucune conversation
+.bobine-demandes.json
+.bobine-compteur-*
+.bobine-demandes.lock
+
+.bobine-chat.lock
