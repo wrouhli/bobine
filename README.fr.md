@@ -48,9 +48,17 @@ Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a
 
 ## Aperçu
 
-**La page de ton Bobine.** Recherche instantanée, pastilles de thèmes, fiches avec résumés :
+**Ta bibliothèque.** Recherche instantanée (jusque dans les transcriptions), filtres par thème, une carte par vidéo :
 
-![La page de ton Bobine : recherche, thèmes, fiches](assets/capture-liste.png)
+![Ta bibliothèque Bobine : recherche, thèmes, une carte par vidéo](assets/capture-liste.png)
+
+**Une page par vidéo.** Le résumé, les points à retenir et un bloc « Pour toi » d'après ton profil *(avec une clé API)*, plus le mémo complet et la transcription :
+
+![Une fiche : résumé, à retenir, pour toi](assets/capture-fiche.png)
+
+**Sur ton iPhone aussi.** La même page dans ta poche, via iCloud sur Mac ou l'adresse de ton serveur sous Linux :
+
+![Bobine sur iPhone : la bibliothèque et une fiche](assets/capture-iphone.png)
 
 **La carte des thèmes.** Les sujets de ta collection, reliés entre eux :
 

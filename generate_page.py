@@ -316,6 +316,8 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .memo ul,.memo ol{margin:0;padding-left:22px}
   .memo li+li{margin-top:6px}
   .encadre a{color:inherit;font-weight:600}
+  .encadre p{margin:0}
+  .encadre p+p{margin-top:10px}
   .profil-texte{white-space:pre-line}
   .description code{font-size:14px;background:var(--surface);padding:2px 6px;border-radius:6px;word-break:break-all}
   .cote h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--encre-3);margin:0 0 10px}
@@ -373,7 +375,7 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
     <p class="sous" id="stats">__COMPTE__</p>
     <label class="recherche">
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-      <input id="q" type="search" placeholder="Cherche un sujet, un outil, une personne…" autocomplete="off" aria-label="Chercher dans tes vidéos">
+      <input id="q" type="search" placeholder="Cherche un sujet, un outil…" autocomplete="off" aria-label="Chercher dans tes vidéos">
     </label>
     <a class="lien-carte-mobile" href="graph.html">Voir la carte des thèmes</a>
     <div class="chips" id="chips" role="group" aria-label="Filtrer par thème">__CHIPS__</div>
