@@ -49,7 +49,9 @@ class InstallationSafety(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="bobine-installation-")
         self.addCleanup(temporary.cleanup)
-        self.sandbox = Path(temporary.name)
+        # Chemin réel : sur macOS, /var est un lien vers /private/var. Les cas de
+        # liens symboliques sont testés explicitement, pas par accident.
+        self.sandbox = Path(temporary.name).resolve()
         self.home = self.sandbox / "home"
         self.home.mkdir()
         self.bin = self.sandbox / "bin"
@@ -60,6 +62,8 @@ class InstallationSafety(unittest.TestCase):
             HOME=str(self.home),
             PATH=str(self.bin) + os.pathsep + os.defpath,
             CALL_LOG=str(self.calls),
+            # Le python3 d'Apple écrirait sinon son cache dans ~/Library/Caches.
+            PYTHONDONTWRITEBYTECODE="1",
         )
         for command in ("launchctl", "systemctl"):
             stub = self.bin / command
@@ -573,6 +577,26 @@ class InstallationSafety(unittest.TestCase):
                 self.run_page(vault)
                 self.assertEqual(snapshot(path), before)
 
+    def test_mac_uninstall_through_symlink_stops_own_page_only(self):
+        vault = self.make_vault("desinstaller.sh")
+        lien = self.home / "Bobine-lien"
+        lien.symlink_to(vault, target_is_directory=True)
+        for own in (True, False):
+            with self.subTest(own=own):
+                cible = vault if own else Path(str(vault) + "-autre")
+                plist = self.page_plist(vault, cible)
+                before = snapshot(vault)
+                if self.calls.exists():
+                    self.calls.unlink()
+                self.run_bash([lien / "desinstaller.sh"])
+                self.assertEqual(snapshot(vault), before)
+                if own:
+                    self.assertFalse(plist.exists())
+                    self.assertIn("/com.bobine.page", self.calls.read_text())
+                else:
+                    self.assertTrue(plist.exists())
+                    self.assertFalse(self.calls.exists())
+
     def test_mac_uninstall_stops_exact_page_only_and_retains_secrets_profile(self):
         vault = self.make_vault("desinstaller.sh")
         for name in (".bobine-jeton", "Mon profil.txt", "demander.py", "page_server.py"):
@@ -928,6 +952,44 @@ class InstallationSafety(unittest.TestCase):
                 self.assertIn("non reconnus", output)
                 self.assertEqual(snapshot(units), before)
                 self.assertFalse(self.calls.exists())
+
+    def test_linux_uninstall_recognizes_vault_reached_through_symlink(self):
+        # L'activation enregistre le chemin réel (pwd -P) ; le désinstallateur,
+        # lancé via un lien, voit le chemin affiché. Même dossier : reconnu.
+        reel = self.activation_fixture()
+        lien = self.home / "Bobine-lien"
+        lien.symlink_to(reel, target_is_directory=True)
+        shutil.copy2(ROOT / "linux/desinstaller-linux.sh", reel / "desinstaller-linux.sh")
+        for nom in ("watch-linux.sh", "ingest.py"):
+            (reel / nom).write_text("fixture\n")
+        (reel / "config.env").write_text("")
+        self.run_activation(lien)
+        units = self.home / ".config/systemd/user"
+        self.assertTrue((units / "bobine-page.service").exists())
+        before = snapshot(reel)
+        self.calls.unlink()
+        self.run_bash([lien / "desinstaller-linux.sh"])
+        self.assertEqual(snapshot(reel), before)
+        self.assertIn("systemctl --user disable --now bobine-page.service bobine-tunnel.service\n",
+                      self.calls.read_text())
+        self.assertEqual(sorted(p.name for p in units.iterdir()), [])
+
+    def test_linux_uninstall_symlink_still_refuses_other_vault(self):
+        # Un lien vers un AUTRE dossier ne rend pas ses services reconnaissables.
+        autre = self.activation_fixture()
+        (autre / "config.env").write_text("")
+        self.run_activation(autre)
+        units = self.home / ".config/systemd/user"
+        ici = self.home / "ici"
+        ici.mkdir()
+        for nom in ("watch-linux.sh", "ingest.py"):
+            (ici / nom).write_text("fixture\n")
+        shutil.copy2(ROOT / "linux/desinstaller-linux.sh", ici / "desinstaller-linux.sh")
+        before = snapshot(units)
+        self.calls.unlink()
+        self.run_bash([ici / "desinstaller-linux.sh"])
+        self.assertEqual(snapshot(units), before)
+        self.assertFalse(self.calls.exists() and "disable" in self.calls.read_text())
 
     def test_linux_uninstall_keeps_unrelated_tunnel_even_if_page_is_owned(self):
         vault = self.activation_fixture()

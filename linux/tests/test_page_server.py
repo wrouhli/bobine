@@ -101,7 +101,8 @@ class ServeurDemander(unittest.TestCase):
         from unittest import mock
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.vault = Path(self.tmp.name)
+        # Chemin réel : le serveur résout son dossier (macOS : /var -> /private/var).
+        self.vault = Path(self.tmp.name).resolve()
         (self.vault / "vault.html").write_text("<html>Bibliothèque fictive</html>", encoding="utf-8")
         (self.vault / "graph.html").write_text("<html>Carte</html>", encoding="utf-8")
         (self.vault / "config.env").write_text("DEEPSEEK_API_KEY=cle-secrete-test\n", encoding="utf-8")

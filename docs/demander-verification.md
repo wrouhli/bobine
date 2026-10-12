@@ -8,7 +8,7 @@ Première PR de l'étape 3. Le profil reste en lecture seule. La fusion exige la
 - `page_server.py` : partagé entre les deux éditions. La commande Mac `--local` refuse toute adresse autre que `127.0.0.1`. Le mode distant conserve Basic ou une protection amont explicitement configurée.
 - `generate_page.py` : découverte du chat via une requête de même origine, seulement en HTTP(S). Aucun appel réseau du chat en `file://`, aucun jeton dans les fichiers HTML. Pas de stockage de conversation dans localStorage, sessionStorage ou sur disque.
 - Installateurs : copie des nouveaux fichiers, régénération gratuite des pages existantes ; LaunchAgent Mac distinct du réveil, raccourci HTTP seulement après vérification de démarrage, secours fichier conservé. Les chemins avec espaces et caractères spéciaux, le VAULT personnalisé et les services d'autres installations sont testés.
-- Désinstallateurs : services reconnus uniquement, jamais suppression de la bibliothèque. Le désinstallateur Linux reconnaît les chemins échappés produits par l'activation.
+- Désinstallateurs : services reconnus uniquement, jamais suppression de la bibliothèque. Le désinstallateur Linux reconnaît les chemins échappés produits par l'activation. Un même dossier est reconnu sous son chemin affiché comme sous son chemin réel (lien symbolique, ou /var vers /private/var sur macOS), sans jamais admettre un autre dossier.
 
 ## Modèle de protection
 
