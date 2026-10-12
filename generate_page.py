@@ -865,6 +865,7 @@ __PROFIL__
       reponse_invalide: "La réponse reçue n’est pas lisible. Essaie de reformuler ta question.",
       reponse_non_verifiable: "Bobine n’a pas pu vérifier les sources de cette réponse. Essaie une question plus précise.",
       fournisseur_indisponible: "Le service d’IA est indisponible pour le moment. Réessaie plus tard.",
+      demander_desactive: "Demander a été désactivé sur cette installation. Ta page reste lisible.",
       delai_depasse: textes[504]
     };
     var texte = e.name === "AbortError" ? textes[504]
@@ -1068,7 +1069,8 @@ __PROFIL__
         profil_diese: "Une ligne qui commence par # serait ignorée. Retire ce # ou place-le plus loin.",
         profil_invalide: "Le profil contient des caractères non pris en charge. Retire-les puis réessaie.",
         profil_special: "Ton profil est un fichier particulier : modifie-le directement dans le dossier Bobine.",
-        occupe: "Un enregistrement est déjà en cours. Réessaie dans un instant."
+        occupe: "Un enregistrement est déjà en cours. Réessaie dans un instant.",
+        demander_desactive: "La modification du profil a été désactivée sur cette installation. Ton profil reste dans Mon profil.txt."
       };
       var texte = Object.prototype.hasOwnProperty.call(messages, e.code || "") ? messages[e.code]
         : e.statut === 401 || e.statut === 403 ? "La connexion à Bobine a expiré. Recharge la page puis réessaie."

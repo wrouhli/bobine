@@ -70,7 +70,9 @@ else
   note "Pas de réveil installé — rien à retirer."
 fi
 
-# La page locale est indépendante du réveil. Ne jamais arrêter celle d'un autre vault.
+# La page locale (Demander) est indépendante du réveil. Ne jamais arrêter celle d'un
+# autre vault. Même reconnaissance que page-locale.sh (desactiver-demander.sh) ; le
+# raccourci « Ma page » et le réglage DEMANDER restent en place, comme tous les fichiers.
 PAGE_PLIST="$HOME/Library/LaunchAgents/com.bobine.page.plist"
 PY_PAGE=""
 for candidat in "$VAULT/.venv/bin/python" python3 python3.13 python3.12 python3.11 python3.10; do

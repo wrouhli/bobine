@@ -258,6 +258,8 @@ class InstallationSafety(unittest.TestCase):
         depot.mkdir()
         (depot / "LICENSE").write_text("fixture license\n", encoding="utf-8")
         (depot / "ingest.py").write_text("# fixture core\n", encoding="utf-8")
+        # Le dépôt livre toujours page-locale.sh : l'installateur le charge au départ.
+        shutil.copy2((ROOT / name).parent / "page-locale.sh", depot / "page-locale.sh")
         return depot
 
     def run_installer(self, name, depot, answers, config=False):
@@ -355,7 +357,8 @@ class InstallationSafety(unittest.TestCase):
         helpers = text[text.index("if [ -t 1 ]; then"):
                        text.index("# ------------------------------------------------------------------- bannière")]
         block = text[text.index("# Profil (facultatif)"):text.index("# écrire config.env")]
-        code = "set -u\ncd \"$1\" || exit 1\n" + helpers + block
+        code = ("set -u\ncd \"$1\" || exit 1\nDEPOT=" + shlex.quote(str((ROOT / name).parent)) + "\n"
+                + helpers + block)
         return self.run_bash(["-c", code, "profile-fixture", folder], answers)
 
     def test_profile_question_is_optional_and_never_overwrites(self):
@@ -406,6 +409,8 @@ class InstallationSafety(unittest.TestCase):
                 settings = ('PAGE_PASSWORD="secret personnel"\n'
                             'PAGE_ORIGIN="https://bobine.example.org"\n'
                             'INBOX_TOKEN="token-personnel"\n'
+                            # Choix précédent de Demander : repris pour le défaut de la dernière question.
+                            'DEMANDER=non\n'
                             f'NOTIF_CMD="$(touch {sentinel})"\n')
                 (depot / "config.env").write_text('NOM="Bobine"\n' + settings)
                 (depot / "Mon profil.txt").write_text("Profil personnel\n")
@@ -419,6 +424,56 @@ class InstallationSafety(unittest.TestCase):
                 self.assertEqual(stat.S_IMODE((depot / "config.env").stat().st_mode), 0o600)
                 self.assertFalse(self.calls.exists())
 
+    # Scripts partagés de la page locale, copiés par les installateurs.
+    DEMANDER_SCRIPTS = ("page-locale.sh", "activer-demander.sh", "desactiver-demander.sh", "ouvrir-ma-page.sh")
+
+    def stub(self, name, content):
+        path = self.bin / name
+        path.write_text(content)
+        path.chmod(0o755)
+        return path
+
+    def mac_stubs(self):
+        """launchd, sonde HTTP, navigateur et compilateur AppleScript : tous simulés.
+
+        Aucun service réel, aucune connexion : curl simule la sonde de
+        127.0.0.1:8786 d'après l'état fictif du service (fichiers dans HOME).
+        """
+        self.opened = self.sandbox / "opened"
+        self.env["OPEN_LOG"] = str(self.opened)
+        self.stub("sleep", "#!/bin/bash\nexit 0\n")
+        self.stub("launchctl",
+                  '#!/bin/bash\nprintf "launchctl %s\\n" "$*" >> "$CALL_LOG"\n'
+                  'case "$1" in\n'
+                  ' print) if [ -e "$HOME/page-loaded" ]; then\n'
+                  '   printf "state = %s\\npid = 12345\\n" "${PAGE_STATE:-running}"; exit 0\n'
+                  '   elif [ "${UNMANAGED_SERVICE:-0}" = 1 ]; then exit 0; else exit 1; fi ;;\n'
+                  ' bootstrap) [ "${BOOTSTRAP_FAIL:-0}" = 1 ] && exit 1; touch "$HOME/page-loaded" ;;\n'
+                  ' bootout) rm -f "$HOME/page-loaded" "$HOME/page-stopped" ;;\n'
+                  ' kickstart) [ "${KICKSTART_FAIL:-0}" = 1 ] && exit 1; rm -f "$HOME/page-stopped" ;;\n'
+                  'esac\nexit 0\n')
+        self.stub("curl",
+                  '#!/bin/bash\n'
+                  'if [ -e "$HOME/page-loaded" ] && [ ! -e "$HOME/page-stopped" ] && [ "${HEALTH_FAIL:-0}" != 1 ]; then\n'
+                  '  printf "ok\\n\\n200"; exit 0\nfi\n'
+                  'if [ "${PORT_OCCUPE:-0}" = 1 ] || [ -e "$HOME/page-loaded" ]; then printf "autre\\n404"; exit 0; fi\n'
+                  'exit 7\n')
+        self.stub("open", '#!/bin/bash\nprintf "%s\\n" "$*" >> "$OPEN_LOG"\n')
+        # Par défaut, pas de compilateur AppleScript : repli « Ma page.webloc ».
+        self.stub("osacompile", "#!/bin/bash\nexit 1\n")
+        self.stub("codesign", "#!/bin/bash\nexit 0\n")
+
+    def osacompile_stub(self):
+        """Crée un paquet .app minimal et garde le script AppleScript reçu."""
+        self.stub("osacompile",
+                  '#!/bin/bash\nsortie=""; source_as=""\n'
+                  'while [ $# -gt 0 ]; do\n'
+                  '  case "$1" in -o) sortie="$2"; shift 2 ;; -e) source_as="$source_as$2\n"; shift 2 ;; *) shift ;; esac\n'
+                  'done\n'
+                  'mkdir -p "$sortie/Contents/Resources/Scripts" "$sortie/Contents/MacOS"\n'
+                  'printf "%s" "$source_as" > "$sortie/Contents/Resources/Scripts/main.scpt"\n'
+                  'printf "osacompile %s\\n" "$sortie" >> "$CALL_LOG"\n')
+
     def page_fixture(self):
         vault = self.home / 'Bobine & <amis> "chez moi"'
         vault.mkdir()
@@ -429,38 +484,26 @@ class InstallationSafety(unittest.TestCase):
             (vault / file).write_text("fixture only\n")
         for module in ("generate_page.py", "enrichir.py", "ingest.py"):
             shutil.copy2(ROOT / module, vault / module)
+        for script in self.DEMANDER_SCRIPTS:
+            shutil.copy2(ROOT / script, vault / script)
         (vault / "config.env").write_text(
             f'X="$(touch {self.sandbox / "executed"})"\nSYNC_ICLOUD=non\nCARTE=non\n')
-        sleep = self.bin / "sleep"
-        sleep.write_text("#!/bin/bash\nexit 0\n")
-        sleep.chmod(0o755)
-        launchctl = self.bin / "launchctl"
-        launchctl.write_text(
-            '#!/bin/bash\nprintf "launchctl %s\\n" "$*" >> "$CALL_LOG"\n'
-            'case "$1" in\n'
-            ' print) if [ -e "$HOME/page-loaded" ]; then\n'
-            '   printf "state = %s\\npid = 12345\\n" "${PAGE_STATE:-running}"; exit 0\n'
-            '   elif [ "${UNMANAGED_SERVICE:-0}" = 1 ]; then exit 0; else exit 1; fi ;;\n'
-            ' bootstrap) [ "${BOOTSTRAP_FAIL:-0}" = 1 ] && exit 1; touch "$HOME/page-loaded" ;;\n'
-            ' bootout) rm -f "$HOME/page-loaded" ;;\n'
-            'esac\nexit 0\n'
-        )
-        launchctl.chmod(0o755)
+        self.mac_stubs()
         return vault
 
-    def page_harness(self):
-        text = (ROOT / "install.sh").read_text()
-        helpers = text[text.index("if [ -t 1 ]; then"):
-                       text.index("# ------------------------------------------------------------------- bannière")]
-        block = text.split("# ---------------------------------------------------------------- page locale (launchd)\n", 1)[1]
-        block = block.split("# ---------------------------------------------------------------- 7. bonus : Crush", 1)[0]
-        return ('set -u\nSCRIPT_DIR="$1"\nPY="$2"\ncd "$SCRIPT_DIR" || exit 1\n' + helpers +
-                # No network socket or real service is ever opened in these tests.
-                'port_page_libre() { [ "${PORT_OCCUPE:-0}" = 0 ]; }\n'
-                'page_locale_repond() { [ "${HEALTH_FAIL:-0}" = 0 ]; }\n' + block)
+    def run_any(self, args, answers="", env=None):
+        """Comme run_bash, sans exiger un code de retour nul : (code, sortie)."""
+        result = subprocess.run(
+            [shutil.which("bash"), *map(str, args)],
+            input=answers, capture_output=True, text=True,
+            env=env or self.env, cwd=self.sandbox, timeout=20,
+        )
+        return result.returncode, result.stdout + result.stderr
 
     def run_page(self, vault):
-        return self.run_bash(["-c", self.page_harness(), "page-fixture", vault, sys.executable])
+        # Ancien bloc « page locale » d'install.sh : désormais activer-demander.sh
+        # (mêmes fonctions, partagées dans page-locale.sh).
+        return self.run_any([vault / "activer-demander.sh"])[1]
 
     def page_plist(self, vault, target=None, effective=None):
         target = target or vault
@@ -793,9 +836,22 @@ class InstallationSafety(unittest.TestCase):
                 else:
                     config.mkdir()
                 before = snapshot(vault), snapshot(plist)
+                original = config.read_text() if config.is_file() and not config.is_symlink() else None
                 self.run_page(vault)
                 self.run_bash([vault / "desinstaller.sh"])
-                self.assertEqual((snapshot(vault), snapshot(plist)), before)
+                after = snapshot(vault), snapshot(plist)
+                if original is None:
+                    # Lien ou dossier : DEMANDER n'est même pas écrit.
+                    self.assertEqual(after, before)
+                else:
+                    # Fichier ordinaire : seul le réglage DEMANDER s'ajoute (remplacement
+                    # atomique, d'où la date du dossier) ; rien d'autre ne bouge.
+                    ignore = (".", "config.env")
+                    self.assertEqual({k: v for k, v in after[0].items() if k not in ignore},
+                                     {k: v for k, v in before[0].items() if k not in ignore})
+                    self.assertEqual(after[1], before[1])
+                    self.assertTrue(config.read_text().startswith(original))
+                    self.assertTrue(config.read_text().endswith("DEMANDER=oui\n"))
                 self.assertFalse(self.calls.exists())
                 self.assertFalse((self.sandbox / "executed").exists())
 
@@ -833,10 +889,12 @@ class InstallationSafety(unittest.TestCase):
                 text = (ROOT / name).read_text()
                 helpers = text[text.index("if [ -t 1 ]; then"):text.index("# ------------------------------------------------------------------- bannière")]
                 deps = text.split("# ---------------------------------------------------------------- 6. dépendances\n", 1)[1]
-                stop = "# ---------------------------------------------------------------- page locale (launchd)" if name == "install.sh" else "# ---------------------------------------------------------------- génération locale"
-                deps = deps.split(stop, 1)[0]
-                code = 'set -u\nSCRIPT_DIR="$1"\nPY="$2"\ncd "$1" || exit 1\n' + helpers + deps + '\npreparer_page\n'
-                self.run_bash(["-c", code, "generation", vault, sys.executable])
+                # Les deux éditions génèrent la page juste après les dépendances
+                # (bloc « génération locale »), avant toute question sur Demander.
+                deps = deps.split("# ---------------------------------------------------------------- génération locale", 1)[0]
+                code = ('set -u\nSCRIPT_DIR="$1"\nPY="$2"\ncd "$1" || exit 1\nDEPOT="$3"\n'
+                        + helpers + deps + '\npreparer_page\n')
+                self.run_bash(["-c", code, "generation", vault, sys.executable, (ROOT / name).parent])
                 self.assertIn("Demander", (vault / "vault.html").read_text())
                 self.assertEqual(data_before, ((vault / "index.md").read_bytes(), (vault / "journal.json").read_bytes()))
                 self.assertEqual(self.calls.read_text().splitlines(), ["pip install --upgrade pip -q", "pip install -q -r requirements.txt", "generate"])
@@ -857,8 +915,8 @@ class InstallationSafety(unittest.TestCase):
         text = (ROOT / "linux/install-linux.sh").read_text()
         helpers = text[text.index("if [ -t 1 ]; then"):text.index("# ------------------------------------------------------------------- bannière")]
         block = text.split("# ---------------------------------------------------------------- génération locale\n", 1)[1].split("# ---------------------------------------------------------------- 7.", 1)[0]
-        self.run_bash(["-c", 'SCRIPT_DIR="$1"\nPY="$2"\n' + helpers + block,
-                       "generation", code, sys.executable])
+        self.run_bash(["-c", 'SCRIPT_DIR="$1"\nPY="$2"\nDEPOT="$3"\n' + helpers + block,
+                       "generation", code, sys.executable, ROOT / "linux"])
         self.assertIn("Demander", (data / "vault.html").read_text())
         self.assertEqual((code / "vault.html").read_text(), "keep code folder page\n")
         self.assertFalse(self.calls.exists())
@@ -1005,6 +1063,650 @@ class InstallationSafety(unittest.TestCase):
         self.assertEqual(snapshot(tunnel), before)
         self.assertNotIn("bobine-tunnel.service", self.calls.read_text())
         self.assertIn("disable --now bobine-page.service\n", self.calls.read_text())
+
+    # ------------------------------------------------------------------
+    # Demander activable : scripts, installateurs, réglage, raccourci.
+    # ------------------------------------------------------------------
+
+    EDITIONS = (ROOT, ROOT / "linux")
+
+    def test_demander_scripts_exist_are_executable_and_parse(self):
+        for edition in self.EDITIONS:
+            for script in self.DEMANDER_SCRIPTS:
+                with self.subTest(edition=edition.name, script=script):
+                    path = edition / script
+                    self.assertTrue(path.is_file())
+                    if script != "page-locale.sh":  # chargé (source), jamais lancé
+                        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o755)
+                    result = subprocess.run([shutil.which("bash"), "-n", str(path)],
+                                            capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    # Ni tiret cadratin, ni jargon technique dans les messages affichés.
+                    text = path.read_text(encoding="utf-8")
+                    self.assertNotIn("\u2014", text)  # tiret cadratin
+                    for line in text.splitlines():
+                        if line.lstrip().startswith(("ok ", "note ", "avis ", "printf ")):
+                            for jargon in ("LaunchAgent", "systemd", " port "):
+                                self.assertNotIn(jargon, line)
+        for script in ("install.sh", "desinstaller.sh", "linux/install-linux.sh",
+                       "linux/desinstaller-linux.sh", "👉 2. Installer Bobine.command"):
+            with self.subTest(script=script):
+                result = subprocess.run([shutil.which("bash"), "-n", str(ROOT / script)],
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+        # Les installateurs copient les scripts et les rendent exécutables.
+        for installer in INSTALLERS:
+            text = (ROOT / installer).read_text(encoding="utf-8")
+            for script in self.DEMANDER_SCRIPTS:
+                self.assertIn(script, text.split("for f in", 1)[1].split("done", 1)[0])
+
+    def test_install_copies_demander_scripts_executable(self):
+        for name in INSTALLERS:
+            with self.subTest(script=name):
+                depot = self.make_depot(name)
+                for script in self.DEMANDER_SCRIPTS:
+                    shutil.copy2((ROOT / name).parent / script, depot / script)
+                for script in self.DEMANDER_SCRIPTS[1:]:
+                    (depot / script).chmod(0o644)  # l'installateur rétablit 755
+                target = self.home / ("demander-" + Path(name).stem)
+                code = self.installer_harness(name)
+                if name == "linux/install-linux.sh":
+                    # Sous Linux, les droits sont rétablis dans « petits plus ».
+                    text = (ROOT / name).read_text()
+                    extra = text.split("# ------------------------------------------------- petits plus (dossier propre)\n", 1)[1]
+                    code = code.replace('\nprintf "\\nTARGET=', '\n' + extra.split("# Une petite page", 1)[0] + 'printf "\\nTARGET=')
+                self.run_bash(["-c", code, "installer-fixture", depot], f"{target}\n")
+                for script in self.DEMANDER_SCRIPTS:
+                    self.assertEqual((target / script).read_bytes(), (depot / script).read_bytes())
+                for script in self.DEMANDER_SCRIPTS[1:]:
+                    self.assertEqual(stat.S_IMODE((target / script).stat().st_mode), 0o755, script)
+
+    # ------------------------------------------------------------ installateur Mac
+    def mac_final_harness(self):
+        text = (ROOT / "install.sh").read_text()
+        helpers = text[text.index("if [ -t 1 ]; then"):
+                       text.index("# ------------------------------------------------------------------- bannière")]
+        block = text.split("# ---------------------------------------------------------------- 8. Demander\n", 1)[1]
+        block = block.split("# ---------------------------------------------------------- générique de fin", 1)[0]
+        return ('set -u\nSCRIPT_DIR="$1"\nPY="$2"\nDEPOT="$3"\ncd "$SCRIPT_DIR" || exit 1\n' + helpers +
+                'NOM_VAULT=Bobine\nAPI_BLOC=""\nREVEIL=oui\nCARTE=non\nSYNC=non\nCRUSH_PRET=non\n'
+                'GARDE=reinstall\nCIBLE="$SCRIPT_DIR"\n' + block)
+
+    def run_mac_final(self, vault, answers):
+        return self.run_bash(["-c", self.mac_final_harness(), "final", vault, sys.executable, ROOT], answers)
+
+    def demander_lines(self, vault):
+        return [line for line in (vault / "config.env").read_text().splitlines() if line.startswith("DEMANDER")]
+
+    def test_mac_installer_last_question_yes_activates_and_summary_reflects_it(self):
+        vault = self.page_fixture()
+        output = self.run_mac_final(vault, "\n")  # défaut : O
+        self.assertIn("Activer Demander (poser des questions à l'IA depuis ta page) ?", output)
+        self.assertIn("[O/n]", output)
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=oui"])
+        self.assertTrue((self.home / "Library/LaunchAgents/com.bobine.page.plist").exists())
+        self.assertIn("Demander est activé. Ouvre « Ma page ».", output)
+        self.assertIn("Pas encore de clé API", output)
+        self.assertIn("Demander        : oui", output)
+        self.assertIn("http://127.0.0.1:8786/, ce Mac uniquement", output)
+        self.assertEqual(self.shortcut_url(vault), "http://127.0.0.1:8786/")
+        for jargon in ("LaunchAgent", "launchd", "port "):
+            self.assertNotIn(jargon, output)
+
+    def test_mac_installer_no_then_activate_later(self):
+        vault = self.page_fixture()
+        output = self.run_mac_final(vault, "n\n")
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=non"])
+        self.assertFalse((self.home / "Library/LaunchAgents/com.bobine.page.plist").exists())
+        self.assertFalse(self.calls.exists(), "aucun service installé")
+        self.assertIn("double-clique « Activer Demander »", output)
+        self.assertIn("Demander        : non", output)
+        self.assertIn("3. Ta page : double-clique « Ma page » (" + str(vault / "vault.html"), output)
+        self.assertNotIn("8786", output)
+        self.assertEqual(self.shortcut_url(vault), (vault / "vault.html").as_uri())
+        # Défaut repris de l'ancien choix : Entrée garde « non ».
+        output = self.run_mac_final(vault, "\n")
+        self.assertIn("[o/N]", output)
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=non"])
+        self.assertFalse(self.calls.exists())
+        # Plus tard, sans réinstaller.
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=oui"])
+        self.assertTrue((self.home / "Library/LaunchAgents/com.bobine.page.plist").exists())
+        self.assertEqual(self.shortcut_url(vault), "http://127.0.0.1:8786/")
+
+    def test_mac_installer_no_retires_own_previous_service(self):
+        vault = self.page_fixture()
+        self.run_any([vault / "activer-demander.sh"])
+        self.run_mac_final(vault, "n\n")
+        self.assertFalse((self.home / "Library/LaunchAgents/com.bobine.page.plist").exists())
+        self.assertIn("bootout", self.calls.read_text())
+
+    def test_mac_commands_created_once_and_never_overwritten(self):
+        text = (ROOT / "install.sh").read_text()
+        helpers = text[text.index("if [ -t 1 ]; then"):
+                       text.index("# ------------------------------------------------------------------- bannière")]
+        block = text.split("# ----------------------------------------------------- petits plus (macOS)\n", 1)[1]
+        block = block.split("# Un petit README", 1)[0]
+        code = 'set -u\ncd "$1" || exit 1\nDEPOT="$2"\n' + helpers + block
+        folder = self.home / "commandes"
+        folder.mkdir()
+        self.run_bash(["-c", code, "petits-plus", folder, ROOT])
+        for name, script in (("Activer Demander.command", "activer-demander.sh"),
+                             ("Désactiver Demander.command", "desactiver-demander.sh")):
+            path = folder / name
+            self.assertEqual(path.read_text(), f'#!/bin/bash\ncd "$(dirname "$0")" || exit 1\nexec bash ./{script}\n')
+            self.assertTrue(path.stat().st_mode & stat.S_IXUSR)
+        # Personnalisé ou lien : jamais écrasé.
+        (folder / "Activer Demander.command").write_text("#!/bin/bash\necho perso\n")
+        (folder / "Désactiver Demander.command").unlink()
+        target = self.sandbox / "perso.command"
+        target.write_text("mon script\n")
+        (folder / "Désactiver Demander.command").symlink_to(target)
+        before = snapshot(folder), snapshot(target)
+        self.run_bash(["-c", code, "petits-plus", folder, ROOT])
+        self.assertEqual((snapshot(folder), snapshot(target)), before)
+
+    # ------------------------------------------------------------ réglage DEMANDER
+    def test_demander_setting_is_atomic_private_and_never_executed(self):
+        for edition in self.EDITIONS:
+            with self.subTest(edition=edition.name):
+                folder = self.home / ("reglage-" + edition.name)
+                folder.mkdir()
+                for script in self.DEMANDER_SCRIPTS:
+                    shutil.copy2(edition / script, folder / script)
+                for module in ("enrichir.py",):
+                    shutil.copy2(edition / module, folder / module)
+                self.mac_stubs()
+                sentinel = self.sandbox / ("execute-" + edition.name)
+                config = folder / "config.env"
+                head = ("# mes réglages\nNOM=\"Bobine\"\nDEMANDER=oui\n"
+                        f'NOTIF_CMD="$(touch {sentinel})"\n# commentaire gardé\n')
+                config.write_text(head + "  DEMANDER = peut-être\nAPI_MODEL=perso")
+                config.chmod(0o644)
+                inode = config.stat().st_ino
+                code, output = self.run_any([folder / "desactiver-demander.sh"])
+                self.assertEqual(code, 0, output)
+                expected = head.replace("DEMANDER=oui", "DEMANDER=non") + "API_MODEL=perso\n"
+                self.assertEqual(config.read_text(), expected)
+                self.assertNotEqual(config.stat().st_ino, inode, "remplacement atomique")
+                self.assertEqual(stat.S_IMODE(config.stat().st_mode), 0o600)
+                self.assertFalse(sentinel.exists())
+                self.assertEqual(list(folder.glob(".config-demander-*")), [])
+                # Idempotent : relancer ne réécrit pas un fichier déjà correct.
+                inode = config.stat().st_ino
+                self.run_any([folder / "desactiver-demander.sh"])
+                self.assertEqual(config.read_text(), expected)
+                self.assertEqual(config.stat().st_ino, inode)
+                # Absent : ajouté à la fin, avec une ligne d'explication.
+                config.write_text("NOM=Bobine\n")
+                self.run_any([folder / "desactiver-demander.sh"])
+                lines = config.read_text().splitlines()
+                self.assertEqual(lines[0], "NOM=Bobine")
+                self.assertEqual(lines[-1], "DEMANDER=non")
+                self.assertTrue(lines[-2].startswith("# Demander"))
+                self.assertNotIn("\u2014", config.read_text())
+
+    def test_demander_refuses_linked_or_special_config_without_changes(self):
+        for edition in self.EDITIONS:
+            for script in ("activer-demander.sh", "desactiver-demander.sh"):
+                for case in ("symlink", "directory"):
+                    with self.subTest(edition=edition.name, script=script, case=case):
+                        folder = self.home / f"lien-{edition.name}-{script}-{case}"
+                        folder.mkdir()
+                        for name in self.DEMANDER_SCRIPTS:
+                            shutil.copy2(edition / name, folder / name)
+                        shutil.copy2(edition / "enrichir.py", folder / "enrichir.py")
+                        self.mac_stubs()
+                        target = self.sandbox / f"perso-{edition.name}-{script}-{case}.env"
+                        target.write_text("DEMANDER=oui\nPERSONNEL=1\n")
+                        if case == "symlink":
+                            (folder / "config.env").symlink_to(target)
+                        else:
+                            (folder / "config.env").mkdir()
+                        before = snapshot(folder), snapshot(target)
+                        code, output = self.run_any([folder / script])
+                        self.assertNotEqual(code, 0)
+                        self.assertIn("rien n'a été modifié", output)
+                        self.assertEqual((snapshot(folder), snapshot(target)), before)
+                        self.assertFalse(self.calls.exists())
+
+    # ------------------------------------------------------------ Mac : cycle de vie
+    def test_mac_disable_then_enable_keeps_data_and_is_idempotent(self):
+        vault = self.page_fixture()
+        for name in ("Mon profil.txt", "index.md", ".bobine-jeton"):
+            (vault / name).write_text("personnel\n")
+        (vault / "raw").mkdir()
+        (vault / "raw/video.mp4").write_bytes(b"video")
+        plist = self.home / "Library/LaunchAgents/com.bobine.page.plist"
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(code, 0, output)
+        first = plist.read_bytes()
+        config_first = (vault / "config.env").read_bytes()
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertEqual(plist.read_bytes(), first)
+        self.assertEqual((vault / "config.env").read_bytes(), config_first)
+        data = {name: snapshot(vault / name) for name in ("Mon profil.txt", "index.md", ".bobine-jeton", "raw")}
+        self.calls.unlink()
+        code, output = self.run_any([vault / "desactiver-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertIn("Demander est désactivé", output)
+        self.assertIn("Aucune donnée n'a été supprimée", output)
+        self.assertFalse(plist.exists())
+        self.assertIn("launchctl bootout gui/", self.calls.read_text())
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=non"])
+        self.assertEqual(self.shortcut_url(vault), (vault / "vault.html").as_uri())
+        self.calls.unlink()
+        code, output = self.run_any([vault / "desactiver-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertFalse(self.calls.exists(), "désactiver deux fois ne touche à rien")
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertEqual(plist.read_bytes(), first)
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=oui"])
+        self.assertEqual({name: snapshot(vault / name) for name in data}, data)
+
+    def test_mac_disable_never_removes_foreign_service(self):
+        vault = self.page_fixture()
+        for case in ("other-vault", "symlink", "malformed"):
+            with self.subTest(case=case):
+                plist = self.page_plist(vault, Path(str(vault) + "-autre"))
+                if case == "symlink":
+                    target = self.sandbox / "perso.plist"
+                    target.write_bytes(plist.read_bytes().replace(b"-autre", b""))
+                    plist.unlink()
+                    plist.symlink_to(target)
+                elif case == "malformed":
+                    plist.write_text("<plist>")
+                before = snapshot(plist.parent), snapshot(vault / "vault.html")
+                code, output = self.run_any([vault / "desactiver-demander.sh"])
+                self.assertEqual(code, 0, output)
+                self.assertIn("elle est conservée", output)
+                self.assertEqual((snapshot(plist.parent), snapshot(vault / "vault.html")), before)
+                self.assertFalse(self.calls.exists())
+                plist.unlink()
+
+    def test_mac_port_busy_or_foreign_service_is_kept_by_activation(self):
+        vault = self.page_fixture()
+        self.env["PORT_OCCUPE"] = "1"
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertNotEqual(code, 0)
+        self.assertIn("Une autre application utilise déjà l'adresse de ta page", output)
+        self.assertNotIn("bootstrap", self.calls.read_text() if self.calls.exists() else "")
+        self.assertFalse((self.home / "Library/LaunchAgents/com.bobine.page.plist").exists())
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=oui"])
+
+    def test_mac_uninstall_after_activation_is_symmetric(self):
+        vault = self.page_fixture()
+        self.osacompile_stub()
+        shutil.copy2(ROOT / "desinstaller.sh", vault / "desinstaller.sh")
+        (vault / "watch.sh").write_text("fixture\n")
+        self.run_any([vault / "activer-demander.sh"])
+        plist = self.home / "Library/LaunchAgents/com.bobine.page.plist"
+        self.assertTrue(plist.exists())
+        before = snapshot(vault)
+        self.run_bash([vault / "desinstaller.sh"])
+        self.assertFalse(plist.exists())
+        self.assertEqual(snapshot(vault), before, "raccourci, réglage et données conservés")
+
+    # ------------------------------------------------------------ Mac : « Ma page »
+    def test_mac_app_shortcut_is_relocatable_marked_and_migrates_our_webloc(self):
+        vault = self.page_fixture()
+        self.osacompile_stub()
+        webloc = vault / "Ma page.webloc"
+        webloc.write_bytes(plistlib.dumps({"URL": (vault / "vault.html").as_uri()}))
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(code, 0, output)
+        app = vault / "Ma page.app"
+        self.assertEqual((app / "Contents/Resources/bobine-ma-page.txt").read_text(),
+                         "Bobine : raccourci Ma page (version 1)\n")
+        source = (app / "Contents/Resources/Scripts/main.scpt").read_text()
+        self.assertIn("path to me", source)
+        self.assertIn('"/usr/bin/dirname "', source)
+        self.assertIn('"/bin/bash " & quoted form of (dossier & "/ouvrir-ma-page.sh")', source)
+        self.assertNotIn(str(vault), source, "l'application calcule son dossier : relocalisable")
+        self.assertFalse(webloc.exists(), "notre ancien raccourci est remplacé")
+        self.assertEqual(list(vault.glob(".ma-page-*")), [])
+        before = snapshot(app)
+        self.run_any([vault / "desactiver-demander.sh"])
+        self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(snapshot(app), before, "jamais recréée")
+        self.assertFalse(webloc.exists())
+
+    def test_mac_app_keeps_personal_webloc_and_foreign_app(self):
+        vault = self.page_fixture()
+        self.osacompile_stub()
+        webloc = vault / "Ma page.webloc"
+        webloc.write_bytes(plistlib.dumps({"URL": "https://perso.example.org/"}))
+        before = snapshot(webloc)
+        self.run_any([vault / "activer-demander.sh"])
+        self.assertTrue((vault / "Ma page.app/Contents/Resources/bobine-ma-page.txt").exists())
+        self.assertEqual(snapshot(webloc), before)
+        # Une application « Ma page.app » sans notre marqueur n'est jamais touchée ;
+        # le raccourci de secours .webloc prend le relais.
+        shutil.rmtree(vault / "Ma page.app")
+        webloc.unlink()
+        foreign = vault / "Ma page.app"
+        (foreign / "Contents/Resources").mkdir(parents=True)
+        (foreign / "Contents/Resources/bobine-ma-page.txt").write_text("autre chose\n")
+        before = snapshot(foreign)
+        output = self.run_any([vault / "activer-demander.sh"])[1]
+        self.assertIn("Ton « Ma page » personnel est conservé.", output)
+        self.assertEqual(snapshot(foreign), before)
+        self.assertEqual(self.shortcut_url(vault), "http://127.0.0.1:8786/")
+
+    def test_mac_shortcut_falls_back_to_webloc_without_osacompile(self):
+        for case in ("absent", "failing"):
+            with self.subTest(case=case):
+                vault = self.page_fixture()
+                if case == "absent":
+                    (self.bin / "osacompile").unlink()
+                self.run_any([vault / "activer-demander.sh"])
+                self.assertFalse((vault / "Ma page.app").exists())
+                self.assertEqual(self.shortcut_url(vault), "http://127.0.0.1:8786/")
+                self.run_any([vault / "desactiver-demander.sh"])
+                self.assertEqual(self.shortcut_url(vault), (vault / "vault.html").as_uri())
+                self.assertEqual(list(vault.glob(".ma-page-*")), [])
+                shutil.rmtree(vault)
+
+    # ------------------------------------------------------------ Mac : ouvrir-ma-page.sh
+    def opened_lines(self):
+        return self.opened.read_text().splitlines() if self.opened.exists() else []
+
+    def test_mac_open_page_uses_local_address_when_healthy_or_restartable(self):
+        vault = self.page_fixture()
+        self.run_any([vault / "activer-demander.sh"])
+        cases = {
+            "healthy": lambda: None,
+            "unloaded": lambda: (self.home / "page-loaded").unlink(),
+            "stopped": lambda: (self.home / "page-stopped").write_text(""),
+        }
+        for case, prepare in cases.items():
+            with self.subTest(case=case):
+                prepare()
+                if self.calls.exists():
+                    self.calls.unlink()
+                if self.opened.exists():
+                    self.opened.unlink()
+                code, output = self.run_any([vault / "ouvrir-ma-page.sh"])
+                self.assertEqual(code, 0, output)
+                self.assertEqual(self.opened_lines(), ["http://127.0.0.1:8786/"])
+                calls = self.calls.read_text() if self.calls.exists() else ""
+                if case == "unloaded":
+                    self.assertIn("launchctl bootstrap gui/", calls)
+                elif case == "stopped":
+                    self.assertIn("launchctl kickstart gui/", calls)
+                else:
+                    self.assertEqual(calls, "")
+
+    def test_mac_open_page_falls_back_to_file(self):
+        vault = self.page_fixture()
+        page = str(vault / "vault.html")
+        self.run_any([vault / "activer-demander.sh"])
+        # Échec de redémarrage : la page fichier s'ouvre, sans erreur.
+        (self.home / "page-stopped").write_text("")
+        self.env["KICKSTART_FAIL"] = "1"
+        code, output = self.run_any([vault / "ouvrir-ma-page.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertEqual(self.opened_lines(), [page])
+        del self.env["KICKSTART_FAIL"]
+        # Désactivé : jamais l'adresse locale, aucun service lancé.
+        self.run_any([vault / "desactiver-demander.sh"])
+        self.opened.unlink()
+        self.calls.unlink()
+        self.assertEqual(self.run_any([vault / "ouvrir-ma-page.sh"])[0], 0)
+        self.assertEqual(self.opened_lines(), [page])
+        self.assertFalse(self.calls.exists())
+        # Activé dans config.env mais service d'un autre dossier : page fichier.
+        (vault / "config.env").write_text("DEMANDER=oui\n")
+        self.page_plist(vault, Path(str(vault) + "-autre"))
+        self.opened.unlink()
+        self.assertEqual(self.run_any([vault / "ouvrir-ma-page.sh"])[0], 0)
+        self.assertEqual(self.opened_lines(), [page])
+        self.assertFalse(self.calls.exists())
+        # Sans le fichier partagé : la page fichier quand même.
+        (vault / "page-locale.sh").unlink()
+        self.opened.unlink()
+        self.assertEqual(self.run_any([vault / "ouvrir-ma-page.sh"])[0], 0)
+        self.assertEqual(self.opened_lines(), [page])
+
+    # ------------------------------------------------------------ Linux
+    def linux_fixture(self):
+        vault = self.home / 'Linux Demander & "citation" $argent %suite'
+        vault.mkdir()
+        (vault / ".venv/bin").mkdir(parents=True)
+        # Jamais lancé comme service : systemctl et la sonde HTTP sont simulés.
+        (vault / ".venv/bin/python").symlink_to(sys.executable)
+        (vault / "page_server.py").write_text("fixture only\n")
+        for module in ("generate_page.py", "enrichir.py", "ingest.py"):
+            shutil.copy2(ROOT / "linux" / module, vault / module)
+        for script in self.DEMANDER_SCRIPTS + ("desinstaller-linux.sh",):
+            shutil.copy2(ROOT / "linux" / script, vault / script)
+        (vault / "watch-linux.sh").write_text("fixture\n")
+        (vault / "config.env").write_text(f'X="$(touch {self.sandbox / "executed"})"\nCARTE=non\n')
+        self.linux_stubs()
+        for variable in ("DISPLAY", "WAYLAND_DISPLAY"):
+            self.env.pop(variable, None)
+        return vault
+
+    def linux_stubs(self):
+        self.opened = self.sandbox / "opened"
+        self.env["OPEN_LOG"] = str(self.opened)
+        self.stub("sleep", "#!/bin/bash\nexit 0\n")
+        self.stub("systemctl",
+                  '#!/bin/bash\nprintf "systemctl %s\\n" "$*" >> "$CALL_LOG"\n'
+                  '[ "${SYSTEMD_ABSENT:-0}" = 1 ] && exit 1\n'
+                  'case "$*" in\n'
+                  '  *is-active*) [ -e "$HOME/page-active" ]; exit $? ;;\n'
+                  '  *"show -p LoadState"*) [ "${UNITE_AILLEURS:-0}" = 1 ] && echo loaded; exit 0 ;;\n'
+                  '  *"disable --now"*|*" stop "*) rm -f "$HOME/page-active" ;;\n'
+                  '  *"enable --now"*|*restart*|*" start "*) [ "${START_FAIL:-0}" = 1 ] || touch "$HOME/page-active" ;;\n'
+                  'esac\nexit 0\n')
+        self.stub("curl",
+                  '#!/bin/bash\n'
+                  'if [ -e "$HOME/page-active" ]; then printf "ok\\n\\n200"; exit 0; fi\n'
+                  'if [ "${PORT_OCCUPE:-0}" = 1 ]; then printf "autre\\n404"; exit 0; fi\n'
+                  'exit 7\n')
+        self.stub("xdg-open", '#!/bin/bash\nprintf "%s\\n" "$*" >> "$OPEN_LOG"\n')
+
+    def unit_path(self):
+        return self.home / ".config/systemd/user/bobine-page.service"
+
+    def unit_args(self):
+        command = next(line.split("=", 1)[1] for line in self.unit_path().read_text().splitlines()
+                       if line.startswith("ExecStart="))
+        return [arg.replace("%%", "%").replace("$$", "$") for arg in shlex.split(command)]
+
+    def test_linux_activation_installs_marked_local_page_with_password(self):
+        vault = self.linux_fixture()
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(code, 0, output)
+        unit = self.unit_path().read_text()
+        self.assertIn("\n# Créé par activer-demander.sh\n", unit)
+        self.assertEqual(self.unit_args(), [str(vault / ".venv/bin/python"), str(vault / "page_server.py"),
+                                            "--vault", str(vault)])
+        for option in ("--password", "--bind", "--port", "--local"):
+            self.assertNotIn(option, unit)
+        config = (vault / "config.env").read_text()
+        password = next(line.split("=", 1)[1].strip('"') for line in config.splitlines()
+                        if line.startswith("PAGE_PASSWORD="))
+        self.assertEqual(len(password), 32)
+        self.assertNotIn(password, self.calls.read_text())
+        self.assertNotIn(password, output)
+        self.assertEqual(stat.S_IMODE((vault / "config.env").stat().st_mode), 0o600)
+        self.assertIn("systemctl --user enable --now bobine-page.service", self.calls.read_text())
+        self.assertIn("ssh -L 8786:127.0.0.1:8786", output)
+        self.assertIn("ligne PAGE_PASSWORD", output)
+        self.assertIn("Pas encore de clé API", output)
+        self.assertFalse((self.sandbox / "executed").exists())
+        for jargon in ("systemd", "LaunchAgent"):
+            self.assertNotIn(jargon, output)
+        # Idempotent : relancer redémarre la même page, sans nouveau mot de passe.
+        before = self.unit_path().read_bytes(), (vault / "config.env").read_bytes()
+        self.calls.unlink()
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertEqual((self.unit_path().read_bytes(), (vault / "config.env").read_bytes()), before)
+        self.assertIn("systemctl --user restart bobine-page.service", self.calls.read_text())
+        # Reconnue (et retirée) par le désinstallateur, données conservées.
+        data = snapshot(vault)
+        self.calls.unlink()
+        self.run_bash([vault / "desinstaller-linux.sh"])
+        self.assertFalse(self.unit_path().exists())
+        self.assertIn("systemctl --user disable --now bobine-page.service\n", self.calls.read_text())
+        self.assertEqual(snapshot(vault), data)
+
+    def test_linux_activation_keeps_foreign_or_busy_and_handles_missing_systemd(self):
+        vault = self.linux_fixture()
+        units = self.unit_path().parent
+        units.mkdir(parents=True)
+        foreign = Path(str(vault) + "-autre")
+        self.unit_path().write_text("[Service]\nExecStart=/usr/bin/python3 " + shlex.quote(str(foreign / "page_server.py"))
+                                    + " --vault " + shlex.quote(str(foreign)) + "\n")
+        before = snapshot(units)
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertNotEqual(code, 0)
+        self.assertIn("elle est conservée", output)
+        self.assertEqual(snapshot(units), before)
+        self.assertNotIn("restart", self.calls.read_text())
+        self.assertNotIn("enable", self.calls.read_text())
+        self.unit_path().unlink()
+        for variable, message in (("PORT_OCCUPE", "Une autre application utilise déjà"),
+                                  ("UNITE_AILLEURS", "déjà installée ailleurs"),
+                                  ("SYSTEMD_ABSENT", "ne permet pas de lancer ta page en arrière-plan")):
+            with self.subTest(case=variable):
+                self.env[variable] = "1"
+                self.calls.unlink()
+                code, output = self.run_any([vault / "activer-demander.sh"])
+                self.assertNotEqual(code, 0)
+                self.assertIn(message, output)
+                self.assertFalse(self.unit_path().exists())
+                self.assertNotIn("enable", self.calls.read_text())
+                self.assertEqual(self.demander_lines(vault), ["DEMANDER=oui"])
+                del self.env[variable]
+        # Démarrage raté : l'unité créée n'est pas laissée en boucle.
+        self.env["START_FAIL"] = "1"
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertNotEqual(code, 0)
+        self.assertIn("Ta page n'a pas démarré", output)
+        self.assertFalse(self.unit_path().exists())
+        self.assertIn("disable --now bobine-page.service", self.calls.read_text())
+
+    def test_linux_disable_removes_marked_unit_without_tunnel(self):
+        vault = self.linux_fixture()
+        self.run_any([vault / "activer-demander.sh"])
+        data = {name: snapshot(vault / name) for name in ("vault.html", "page_server.py", ".venv")}
+        self.calls.unlink()
+        code, output = self.run_any([vault / "desactiver-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertFalse(self.unit_path().exists())
+        self.assertIn("systemctl --user disable --now bobine-page.service", self.calls.read_text())
+        self.assertIn("Aucune donnée n'a été supprimée", output)
+        self.assertIn(str(vault / "vault.html"), output)
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=non"])
+        self.assertTrue(any(line.startswith("PAGE_PASSWORD=") for line in (vault / "config.env").read_text().splitlines()))
+        self.assertEqual({name: snapshot(vault / name) for name in data}, data)
+        # Réactivation : la page locale revient.
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertTrue(self.unit_path().exists())
+
+    def test_linux_disable_with_public_tunnel_restarts_and_keeps_units(self):
+        vault = self.activation_fixture()
+        self.run_activation(vault)  # page web publique (activer-page-web.sh)
+        for script in self.DEMANDER_SCRIPTS:
+            shutil.copy2(ROOT / "linux" / script, vault / script)
+        shutil.copy2(ROOT / "linux/enrichir.py", vault / "enrichir.py")
+        self.linux_stubs()
+        units = self.unit_path().parent
+        before = snapshot(units)
+        self.calls.unlink()
+        code, output = self.run_any([vault / "desactiver-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertIn("systemctl --user restart bobine-page.service", self.calls.read_text())
+        self.assertNotIn("disable", self.calls.read_text())
+        self.assertEqual(snapshot(units), before)
+        self.assertIn("reste en ligne", output)
+        # Réactivation : même page publique, redémarrée, adresse publique affichée.
+        self.calls.unlink()
+        code, output = self.run_any([vault / "activer-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertIn("systemctl --user restart bobine-page.service", self.calls.read_text())
+        self.assertEqual(snapshot(units), before)
+        self.assertIn("Ta page : https://bobine.example.org", output)
+        self.assertNotIn("ssh -L", output)
+
+    def test_linux_disable_never_touches_foreign_unit(self):
+        vault = self.linux_fixture()
+        self.run_any([vault / "activer-demander.sh"])
+        unit = self.unit_path()
+        unit.write_text(unit.read_text().replace("page_server.py", "page_server.py-autre"))
+        before = snapshot(unit.parent)
+        self.calls.unlink()
+        code, output = self.run_any([vault / "desactiver-demander.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertIn("elle est conservée", output)
+        self.assertEqual(snapshot(unit.parent), before)
+        self.assertFalse(self.calls.exists())
+
+    def test_linux_open_page_starts_and_shows_address_or_file(self):
+        vault = self.linux_fixture()
+        self.run_any([vault / "activer-demander.sh"])
+        (self.home / "page-active").unlink()  # arrêtée
+        self.calls.unlink()
+        code, output = self.run_any([vault / "ouvrir-ma-page.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertIn("systemctl --user start bobine-page.service", self.calls.read_text())
+        self.assertIn("ssh -L 8786:127.0.0.1:8786", output)
+        self.assertFalse(self.opened.exists(), "pas d'écran : pas de navigateur")
+        self.env["DISPLAY"] = ":0"
+        self.run_any([vault / "ouvrir-ma-page.sh"])
+        self.assertEqual(self.opened_lines(), ["http://127.0.0.1:8786/"])
+        with open(vault / "config.env", "a") as config:
+            config.write('PAGE_ORIGIN="https://bobine.example.org"\n')
+        output = self.run_any([vault / "ouvrir-ma-page.sh"])[1]
+        self.assertIn("Ta page : https://bobine.example.org", output)
+        # Désactivé : chemin de vault.html et astuce de copie, aucun service lancé.
+        self.run_any([vault / "desactiver-demander.sh"])
+        self.opened.unlink()
+        self.calls.unlink()
+        code, output = self.run_any([vault / "ouvrir-ma-page.sh"])
+        self.assertEqual(code, 0, output)
+        self.assertIn(str(vault / "vault.html"), output)
+        self.assertIn("scp ", output)
+        self.assertEqual(self.opened_lines(), [str(vault / "vault.html")])
+        self.assertFalse(self.calls.exists())
+
+    def linux_final_harness(self):
+        text = (ROOT / "linux/install-linux.sh").read_text()
+        helpers = text[text.index("if [ -t 1 ]; then"):
+                       text.index("# ------------------------------------------------------------------- bannière")]
+        block = text.split("# ---------------------------------------------------------------- 8. Demander\n", 1)[1]
+        block = block.split("# ---------------------------------------------------------- générique de fin", 1)[0]
+        return ('set -u\nSCRIPT_DIR="$1"\nPY="$2"\nDEPOT="$3"\ncd "$SCRIPT_DIR" || exit 1\n' + helpers +
+                'NOM_VAULT=Bobine\nAPI_BLOC=""\nREVEIL=oui\nCARTE=non\nGARDE=reinstall\nCIBLE="$SCRIPT_DIR"\n' + block)
+
+    def test_linux_installer_last_question_yes_or_no(self):
+        vault = self.linux_fixture()
+        harness = self.linux_final_harness()
+        output = self.run_bash(["-c", harness, "final", vault, sys.executable, ROOT / "linux"], "n\n")
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=non"])
+        self.assertFalse(self.unit_path().exists())
+        self.assertNotIn("enable", self.calls.read_text() if self.calls.exists() else "")
+        self.assertIn("./activer-demander.sh", output)
+        self.assertIn("Demander        : non", output)
+        self.assertIn("4. Ta page : " + str(vault / "vault.html"), output)
+        output = self.run_bash(["-c", harness, "final", vault, sys.executable, ROOT / "linux"], "\n")
+        self.assertIn("[o/N]", output)
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=non"])
+        output = self.run_bash(["-c", harness, "final", vault, sys.executable, ROOT / "linux"], "o\n")
+        self.assertEqual(self.demander_lines(vault), ["DEMANDER=oui"])
+        self.assertIn("# Créé par activer-demander.sh", self.unit_path().read_text())
+        self.assertIn("Demander        : oui", output)
+        self.assertIn("./ouvrir-ma-page.sh", output)
+        self.assertIn("Page régénérée localement", output)
 
 
 if __name__ == "__main__":

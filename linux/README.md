@@ -143,6 +143,8 @@ rien (ajoute l'option à la ligne ExecStart de ton service).
 
 ## Demander depuis la page
 
+Demander est un choix : la dernière question de `install-linux.sh` le propose, et tu peux changer d'avis à tout moment avec `./activer-demander.sh` ou `./desactiver-demander.sh` (sans réinstaller). `./ouvrir-ma-page.sh` démarre la page si besoin et affiche son adresse. Désactivé, la page reste lisible (y compris via ton adresse publique) ; seuls le chat et la modification du profil disparaissent. Sans page web publique, `activer-demander.sh` installe une page locale protégée par mot de passe, à ouvrir avec `ssh -L 8786:127.0.0.1:8786`.
+
 Avec ta clé de résumé déjà configurée, ouvre **Demander** à l'adresse habituelle de Bobine. Les réponses s'appuient sur jusqu'à cinq fiches et leurs extraits, avec des liens pour les vérifier. Depuis une fiche, la question reste limitée à cette vidéo. La conversation ne reste que dans l'onglet.
 
 Pour une installation existante, ajoute `PAGE_ORIGIN=https://ton-adresse-bobine` dans `config.env` (origine exacte, sans chemin ni slash final), puis redémarre le service de page après mise à jour et régénération. `activer-page-web.sh` le configure lors d'une nouvelle activation. Le tunnel doit conserver l'en-tête Host public. Garde le mot de passe ou ta protection en amont : l'origine n'est pas une authentification.

@@ -83,3 +83,14 @@ Recherche lexicale, pas recherche sémantique exhaustive. Les liens cités sont 
 - Mode fichier et copie iCloud : formulaire caché et inactif, aucun appel réseau ; les instructions pour modifier le fichier restent affichées.
 
 Scénarios manuels : enregistrer, vider, modifier le fichier à la main pendant que l'onglet est ouvert (conflit attendu), texte trop long ou ligne commençant par `#`, Safari iPhone via l'adresse serveur, copie iCloud en lecture seule. Vérifier qu'aucun appel au fournisseur n'est fait lors de l'enregistrement.
+
+
+## Demander au choix (PR empilée sur Profil éditable)
+
+- Réglage `DEMANDER=oui|non` dans `config.env` (absent = oui, pour ne rien changer aux installations existantes). Valeurs lues comme « non », identiques côté scripts et serveur : non, no, n, false, 0, off. Relu à chaque requête : pas de redémarrage nécessaire.
+- Désactivé : `/api/bobine` répond `{disponible: false, profil: false, jeton: ""}`, `/api/demander` et `/api/profil` répondent 503 `demander_desactive` sans appel au moteur ni écriture. La page reste servie (lecture à distance sur Linux).
+- Scripts aux mêmes noms dans les deux éditions : `activer-demander.sh`, `desactiver-demander.sh`, `ouvrir-ma-page.sh`, avec la logique partagée dans `page-locale.sh`. Mac : `Activer Demander.command` et `Désactiver Demander.command` (jamais écrasés s'ils sont personnalisés) et le raccourci `Ma page.app` (osacompile, relocalisable, marqueur `Contents/Resources/bobine-ma-page.txt`, repli `.webloc`).
+- Installateurs : dernière question « Activer Demander ? », défaut oui ou repris de l'ancien réglage. Non : aucun service, `DEMANDER=non`, raccourci vers la page fichier.
+- Linux : sans page publique, `activer-demander.sh` crée une page locale avec mot de passe (unité marquée « Créé par activer-demander.sh ») ; `desactiver-demander.sh` la retire. Avec page publique (`activer-page-web.sh`), le service est seulement redémarré : la page reste lisible, chat et profil cachés.
+
+À vérifier sur un vrai Mac (impossible ici) : osacompile, l'applet sans Terminal, `path to me`, codesign ad hoc, launchd (`bootstrap`, `kickstart`, `print`), `open`, bash 3.2. Scénarios : installation avec « non » puis activation par double-clic ; désactivation puis réactivation ; Ma page avec service arrêté (redémarrage puis page servie) ; Ma page désactivé (page fichier) ; désinstallation.

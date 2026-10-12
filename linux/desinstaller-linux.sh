@@ -212,10 +212,15 @@ else
 fi
 
 # ------------------------------------------ 2bis. la page web (page_server)
+# Même format pour la page publique (activer-page-web.sh) et la page locale de
+# Demander (activer-demander.sh, marquée « # Créé par activer-demander.sh » : le
+# commentaire n'entre pas dans la reconnaissance, seuls les arguments comptent).
+TUNNEL_RETIRE="non"
 if service_de_ce_dossier "$UNIT_DIR/bobine-page.service" page_server.py; then
   if service_de_ce_dossier "$UNIT_DIR/bobine-tunnel.service" tunnel; then
     systemctl --user disable --now bobine-page.service bobine-tunnel.service 2>/dev/null || true
     rm -f "$UNIT_DIR/bobine-tunnel.service"
+    TUNNEL_RETIRE="oui"
   else
     systemctl --user disable --now bobine-page.service 2>/dev/null || true
     if [ -e "$UNIT_DIR/bobine-tunnel.service" ] || [ -L "$UNIT_DIR/bobine-tunnel.service" ]; then
@@ -226,7 +231,9 @@ if service_de_ce_dossier "$UNIT_DIR/bobine-page.service" page_server.py; then
   rm -f "$UNIT_DIR/bobine-page.service"
   systemctl --user daemon-reload 2>/dev/null || true
   ok "Page web retirée."
-  note "Le tunnel « bobine-page » reste côté Cloudflare : pour l'effacer aussi,  cloudflared tunnel delete bobine-page"
+  if [ "$TUNNEL_RETIRE" = oui ]; then
+    note "Le tunnel « bobine-page » reste côté Cloudflare : pour l'effacer aussi,  cloudflared tunnel delete bobine-page"
+  fi
 else
   for unite in bobine-page.service bobine-tunnel.service; do
     if [ -e "$UNIT_DIR/$unite" ] || [ -L "$UNIT_DIR/$unite" ]; then SERVICES_CONSERVES="oui"; fi

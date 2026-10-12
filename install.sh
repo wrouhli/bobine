@@ -70,200 +70,14 @@ secret() {  # $1 = texte ; lit sans afficher (pour la clé API)
   printf '%s' "$reponse"
 }
 
-# Même dossier de données pour la génération et le serveur ; jamais de source/eval.
-resoudre_vault_effectif() {
-  "$PY" -B - "$SCRIPT_DIR" <<'PYTHON'
-import os
-import sys
-from pathlib import Path
-code = Path(sys.argv[1])
-try:
-    config = code / "config.env"
-    if config.is_symlink() or (config.exists() and not config.is_file()):
-        raise ValueError("configuration non ordinaire")
-    sys.path.insert(0, str(code))
-    from enrichir import charger_config
-    configured = charger_config(code).get("VAULT")
-    vault = Path(os.path.expandvars(configured)).expanduser() if configured else code
-    if not vault.is_absolute() or any(ord(c) < 32 or ord(c) == 127 for c in str(vault)):
-        raise ValueError("chemin de données non absolu ou ambigu")
-    print(vault)
-except (OSError, ValueError, RuntimeError, ImportError):
-    sys.exit(1)
-PYTHON
-}
-
-# Une mise à jour du générateur doit aussi actualiser une page déjà existante.
-# Génération locale uniquement : ni ingestion, ni enrichissement, ni appel d'IA.
-preparer_page() {
-  VAULT_EFFECTIF="$(resoudre_vault_effectif)" || {
-    avis "VAULT illisible ou ambigu dans config.env : la page et son service sont conservés."
-    return 1
-  }
-  mkdir -p "$SCRIPT_DIR/logs" || return 1
-  if "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/generate_page.py" --vault "$VAULT_EFFECTIF" > "$SCRIPT_DIR/logs/page-generation.log" 2>&1; then
-    ok "Page régénérée localement (sans appel d'IA)."
-  else
-    avis "La génération de la page a échoué — détails dans logs/page-generation.log."
-    return 1
-  fi
-}
-
-# La page est un service distinct du réveil. Aucune configuration n'est exécutée.
-page_plist_appartient() {
-  [ ! -L "$1" ] && "$PY" - "$1" "$SCRIPT_DIR" "$VAULT_EFFECTIF" <<'PYTHON'
-import plistlib
-from xml.parsers.expat import ExpatError
-import sys
-from pathlib import Path
-try:
-    with open(sys.argv[1], "rb") as stream:
-        data = plistlib.load(stream)
-    vault = Path(sys.argv[2])
-    expected = [str(vault / ".venv/bin/python"), str(vault / "page_server.py"),
-                "--vault", sys.argv[3], "--local"]
-    valid = data.get("Label") == "com.bobine.page" and data.get("ProgramArguments") == expected
-except (OSError, ValueError, TypeError, AttributeError, ExpatError):
-    valid = False
-sys.exit(0 if valid else 1)
-PYTHON
-}
-
-ecrire_raccourci_page() {
-  "$PY" - "$SCRIPT_DIR" "$1" "${VAULT_EFFECTIF:-$SCRIPT_DIR}" <<'PYTHON'
-import os
-import plistlib
-from xml.parsers.expat import ExpatError
-import sys
-import tempfile
-from pathlib import Path
-vault = Path(sys.argv[1])
-shortcut = vault / "Ma page.webloc"
-fallback = (Path(sys.argv[3]) / "vault.html").as_uri()
-legacy = (vault / "vault.html").as_uri()
-local = "http://127.0.0.1:8786/"
-data = {"URL": local if sys.argv[2] == "serveur" else fallback}
-try:
-    if shortcut.is_symlink():
-        sys.exit(1)
-    if shortcut.exists():
-        with shortcut.open("rb") as stream:
-            old = plistlib.load(stream)
-        if old not in ({"URL": fallback}, {"URL": legacy}, {"URL": local}):
-            sys.exit(1)
-        if old == data:
-            sys.exit(0)
-    fd, temp = tempfile.mkstemp(prefix=".ma-page-", dir=vault)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            plistlib.dump(data, stream)
-        os.replace(temp, shortcut)
-    finally:
-        if os.path.exists(temp):
-            os.unlink(temp)
-except (OSError, ValueError, TypeError, ExpatError):
-    sys.exit(1)
-PYTHON
-}
-
-port_page_libre() {
-  "$PY" - <<'PYTHON'
-import socket
-import sys
-try:
-    with socket.socket() as listener:
-        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listener.bind(("127.0.0.1", 8786))
-except OSError:
-    sys.exit(1)
-PYTHON
-}
-
-page_locale_repond() {
-  # Connexion directe locale : aucun proxy d'environnement ni accès au LAN.
-  "$PY" - <<'PYTHON'
-import http.client
-import sys
-connection = http.client.HTTPConnection("127.0.0.1", 8786, timeout=0.5)
-try:
-    connection.request("GET", "/health")
-    response = connection.getresponse()
-    valid = response.status == 200 and response.read(16).strip() == b"ok"
-except (OSError, http.client.HTTPException):
-    valid = False
-finally:
-    connection.close()
-sys.exit(0 if valid else 1)
-PYTHON
-}
-
-installer_page_locale() {
-  local plist="$HOME/Library/LaunchAgents/com.bobine.page.plist"
-  local service existant=non etat tentative
-  service="gui/$(id -u)/com.bobine.page"
-  [ -x "$SCRIPT_DIR/.venv/bin/python" ] && [ -f "$SCRIPT_DIR/page_server.py" ] &&
-    [ -f "$SCRIPT_DIR/demander.py" ] || return 1
-  if [ -e "$plist" ] || [ -L "$plist" ]; then
-    if ! page_plist_appartient "$plist"; then
-      avis "Un service de page existe pour un autre dossier ou a été personnalisé : il est conservé."
-      return 1
-    fi
-    existant=oui
-  elif launchctl print "$service" >/dev/null 2>&1; then
-    avis "Un service de page est déjà chargé sans fichier reconnu : il est conservé."
-    return 1
-  fi
-  if [ "$existant" = oui ]; then
-    launchctl bootout "$service" 2>/dev/null || true
-  fi
-  if ! port_page_libre; then
-    avis "Le port local 8786 est déjà utilisé : aucun autre serveur n'est remplacé."
-    return 1
-  fi
-  mkdir -p "$HOME/Library/LaunchAgents" "$SCRIPT_DIR/logs" || return 1
-  # plistlib échappe le XML ; chaque argument reste distinct, même avec des espaces.
-  "$PY" - "$plist" "$SCRIPT_DIR" "$VAULT_EFFECTIF" <<'PYTHON' || return 1
-import os
-import plistlib
-import sys
-import tempfile
-from pathlib import Path
-path, vault = Path(sys.argv[1]), Path(sys.argv[2])
-data = {
-    "Label": "com.bobine.page",
-    "ProgramArguments": [str(vault / ".venv/bin/python"), str(vault / "page_server.py"),
-                         "--vault", sys.argv[3], "--local"],
-    "WorkingDirectory": str(vault),
-    "RunAtLoad": True,
-    "KeepAlive": True,
-    "ThrottleInterval": 10,
-    "StandardOutPath": str(vault / "logs/page.out.log"),
-    "StandardErrorPath": str(vault / "logs/page.err.log"),
-}
-fd, temp = tempfile.mkstemp(prefix=".bobine-page-", dir=path.parent)
-try:
-    with os.fdopen(fd, "wb") as stream:
-        plistlib.dump(data, stream)
-    os.replace(temp, path)
-finally:
-    if os.path.exists(temp):
-        os.unlink(temp)
-PYTHON
-  if ! launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
-    return 1
-  fi
-  for ((tentative=0; tentative<10; tentative++)); do
-    etat="$(launchctl print "$service" 2>/dev/null || true)"
-    if printf '%s\n' "$etat" | grep -qE '^[[:space:]]*state = running[[:space:]]*$' &&
-       printf '%s\n' "$etat" | grep -qE '^[[:space:]]*pid = [1-9][0-9]*[[:space:]]*$' && page_locale_repond; then
-      return 0
-    fi
-    sleep 0.5
-  done
-  # Un chargement réussi n'est pas une preuve de démarrage. Ne pas laisser boucler.
-  launchctl bootout "$service" 2>/dev/null || true
-  return 1
-}
+# Page locale, raccourci « Ma page » et réglage « Demander » : logique partagée
+# avec activer-demander.sh, desactiver-demander.sh et ouvrir-ma-page.sh.
+if [ ! -f "$DEPOT/page-locale.sh" ]; then
+  avis "Il manque le fichier page-locale.sh : télécharge à nouveau Bobine."
+  exit 1
+fi
+# shellcheck source=page-locale.sh
+. "$DEPOT/page-locale.sh"
 
 # ------------------------------------------------------------------- bannière
 printf "\n${CYAN}${GRAS}"
@@ -397,7 +211,8 @@ elif [ "$GARDE" = "oui" ]; then
   ok "D'accord — ce dossier devient ton dossier Bobine (il ne sera pas supprimé)."
 else
   for f in ingest.py enrichir.py generate_page.py graphe.py filtre.py page_server.py demander.py watch.sh install.sh \
-           desinstaller.sh requirements.txt config.example.env filtres.exemple.yaml \
+           desinstaller.sh page-locale.sh activer-demander.sh desactiver-demander.sh ouvrir-ma-page.sh \
+           requirements.txt config.example.env filtres.exemple.yaml \
            LICENSE .gitignore; do
     [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
   done
@@ -407,6 +222,7 @@ else
 fi
 cd "$CIBLE" || exit 1
 SCRIPT_DIR="$(pwd)"
+chmod 755 activer-demander.sh desactiver-demander.sh ouvrir-ma-page.sh 2>/dev/null || true
 
 # ----------------------------------------------------- petits plus (macOS)
 # Double-clic pour désinstaller : ce fichier naît ici même — macOS ne le bloquera jamais.
@@ -418,6 +234,15 @@ exec bash ./desinstaller.sh
 CMD
 chmod +x "Désinstaller Bobine.command"
 fi
+# Double-clic pour activer ou désactiver Demander, à tout moment. Créés ici, comme
+# le précédent ; un fichier déjà présent (personnalisé ou lien) n'est jamais écrasé.
+for commande in "Activer Demander:activer-demander.sh" "Désactiver Demander:desactiver-demander.sh"; do
+  fichier="${commande%%:*}.command"
+  if [ ! -e "$fichier" ] && [ ! -L "$fichier" ]; then
+    printf '#!/bin/bash\ncd "$(dirname "$0")" || exit 1\nexec bash ./%s\n' "${commande#*:}" > "$fichier"
+    chmod +x "$fichier"
+  fi
+done
 
 # Un petit README pour le vault — le guide complet reste sur la page du projet.
 if [ ! -f "README.md" ]; then
@@ -431,6 +256,7 @@ ici — téléchargée, transcrite et résumée automatiquement.
 
 - **Partager** : Instagram, TikTok ou YouTube → Partager → le raccourci « Send to Bobine ».
 - **La page** : double-clique « Ma page » (recherche, pastilles de thèmes, fiches).
+- **Demander** : double-clique « Activer Demander » ou « Désactiver Demander » (questions à l'IA depuis ta page).
 - **Le réveil** : relève la boîte toutes les 15 minutes — journal : logs/watch.log
 - **À la main** : launchctl kickstart -k gui/\$(id -u)/com.bobine.watch
 
@@ -481,9 +307,9 @@ if [ ! -f "vault.html" ]; then
 PAGE
 fi
 
-# Raccourci local de secours, conservé si le serveur ne démarre pas.
-# Un raccourci personnel (autre URL ou lien symbolique) n'est jamais remplacé.
-ecrire_raccourci_page fichier || note "Ton raccourci Ma page est conservé."
+# Raccourci « Ma page » dès maintenant : il ouvre la page fichier tant que
+# Demander n'est pas activé. Un raccourci personnel n'est jamais remplacé.
+installer_raccourci fichier
 
 # ---------------------------------------------------------------- 4. clé API
 etape "4/7 — Les résumés automatiques (clé API)"
@@ -621,7 +447,7 @@ fi
   # Réglages avancés de l'ancienne configuration, gardés tels quels (chemins,
   # cookies, notification, jeton du serveur de liens, mot de passe de la page…).
   if [ -n "$ANCIENNE_CONFIG" ]; then
-    GARDES="$(grep -E '^(VAULT|INBOX|FFMPEG_DIR|COOKIES|LANGUE_RESUMES|NOTIF_CMD|INBOX_TOKEN|PAGE_PASSWORD|PAGE_ORIGIN)=' "$ANCIENNE_CONFIG" 2>/dev/null || true)"
+    GARDES="$(grep -E '^(VAULT|INBOX|FFMPEG_DIR|COOKIES|LANGUE_RESUMES|NOTIF_CMD|INBOX_TOKEN|PAGE_PASSWORD|PAGE_ORIGIN|DEMANDER)=' "$ANCIENNE_CONFIG" 2>/dev/null || true)"
     if [ -n "$GARDES" ]; then
       echo
       echo "# Réglages repris de ta configuration précédente :"
@@ -709,16 +535,12 @@ else
   note "Installe-le avec :   brew install ffmpeg   (nécessaire pour la transcription)"
 fi
 
-# ---------------------------------------------------------------- page locale (launchd)
-PAGE_LOCALE="non"
-if preparer_page && installer_page_locale; then
-  PAGE_LOCALE="oui"
-  ecrire_raccourci_page serveur || note "Ton raccourci Ma page est conservé."
-  ok "Ta page est disponible sur http://127.0.0.1:8786/ (ce Mac uniquement)."
-  note "Demander utilise ta clé API ; sans clé, la bibliothèque reste disponible."
+# ---------------------------------------------------------------- génération locale
+PAGE_PRETE="non"
+if preparer_page; then
+  PAGE_PRETE="oui"
 else
-  [ -n "${VAULT_EFFECTIF:-}" ] && ecrire_raccourci_page fichier || true
-  note "La page locale n'a pas démarré. Ouvre vault.html : ta bibliothèque reste disponible."
+  note "La page précédente reste disponible si elle existe."
 fi
 
 # ---------------------------------------------------------------- 7. bonus : Crush
@@ -811,6 +633,36 @@ if [ "$CRUSH_PRET" = "oui" ]; then
   note "Pour t'en servir : dans le Terminal, va dans ton vault ($(affiche "$CIBLE")) puis tape :  crush"
 fi
 
+# ---------------------------------------------------------------- 8. Demander
+# Dernière question : rien n'est imposé. Le défaut reprend l'ancien choix.
+etape "Pour finir : Demander"
+note "Demander : pose des questions à l'IA sur tes vidéos et modifie ton profil, depuis ta page."
+note "Tu pourras changer d'avis à tout moment (double-clic sur « Activer Demander » ou « Désactiver Demander »)."
+DEFAUT_DEMANDER="o"
+DEMANDER_ACTIF="non"
+if [ "$(lire_demander)" = non ]; then DEFAUT_DEMANDER="n"; fi
+if confirmer "Activer Demander (poser des questions à l'IA depuis ta page) ?" "$DEFAUT_DEMANDER"; then
+  if [ "${PAGE_PRETE:-non}" = oui ]; then activer_demander page-prete; else activer_demander; fi
+  rc_demander=$?
+  annoncer_activation "$rc_demander"
+  if [ "$rc_demander" -eq 0 ]; then DEMANDER_ACTIF="oui"; fi
+  case "$rc_demander" in
+    0) DEMANDER_ETAT="oui" ;;
+    1) DEMANDER_ETAT="oui (ta page locale n'a pas démarré : double-clique « Activer Demander » pour réessayer)" ;;
+    *) DEMANDER_ETAT="non modifié (config.env n'a pas pu être mis à jour)" ;;
+  esac
+else
+  desactiver_demander
+  rc_demander=$?
+  if [ "$rc_demander" -eq 2 ]; then
+    DEMANDER_ETAT="non modifié (config.env n'a pas pu être mis à jour)"
+  else
+    DEMANDER_ETAT="non"
+    ok "D'accord : Demander n'est pas activé. « Ma page » ouvre ta bibliothèque."
+    note "Pour l'activer plus tard : double-clique « Activer Demander » dans ton dossier Bobine."
+  fi
+fi
+
 # ---------------------------------------------------------------- résumé final
 echo
 printf "${VERT}${GRAS}  ✨ C'est prêt !${FIN}\n\n"
@@ -825,14 +677,15 @@ printf "   Réveil 15 min   : %s\n" "$REVEIL"
 printf "   Carte (graphe)  : %s\n" "$CARTE"
 printf "   Copie iPhone    : %s\n" "$SYNC"
 printf "   Assistant Crush : %s\n" "$CRUSH_PRET"
+printf "   Demander        : %s\n" "$DEMANDER_ETAT"
 echo
 printf "   ${GRAS}Et maintenant ?${FIN}\n"
 printf "   1. Crée le raccourci iPhone « Send to Bobine » — recette pas-à-pas sur la page du projet\n"
 printf "   2. Partage une vidéo de test, puis surveille :  %s/logs/watch.log\n" "$SCRIPT_DIR"
-if [ "$PAGE_LOCALE" = "oui" ]; then
-  printf "   3. Ta page : http://127.0.0.1:8786/ (ce Mac uniquement)\n"
+if [ "${DEMANDER_ACTIF:-non}" = oui ]; then
+  printf "   3. Ta page : double-clique « Ma page » (http://127.0.0.1:8786/, ce Mac uniquement)\n"
 else
-  printf "   3. Ta page : %s/vault.html\n" "${VAULT_EFFECTIF:-$SCRIPT_DIR}"
+  printf "   3. Ta page : double-clique « Ma page » (%s/vault.html)\n" "${VAULT_EFFECTIF:-$SCRIPT_DIR}"
 fi
 printf "   4. Un jour, pour arrêter Bobine sans supprimer tes fichiers :  ./desinstaller.sh  (dans le dossier de ton vault)\n"
 if [ "$SYNC" = "oui" ]; then
