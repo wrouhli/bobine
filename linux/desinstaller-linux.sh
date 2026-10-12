@@ -67,7 +67,17 @@ import json
 import re
 import sys
 from pathlib import Path
+import os
 unit, vault, script, home = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], Path(sys.argv[4])
+# Un même dossier peut apparaître sous son chemin affiché ou son chemin réel
+# (lien symbolique, ou /var -> /private/var sur macOS). L'activation de la page
+# enregistre le chemin réel ; le réveil, le chemin affiché. Seul ce dossier est
+# reconnu : la comparaison se fait sur le chemin réel, rien de plus large.
+reel = os.path.realpath(str(vault))
+
+def meme(arg, attendu):
+    """Vrai si arg désigne exactement le chemin attendu de CE dossier."""
+    return os.path.realpath(arg) == os.path.realpath(str(attendu))
 
 def arguments(text):
     # Sous-ensemble non ambigu : mots nus ou entièrement entre guillemets,
@@ -137,7 +147,7 @@ try:
     if not args or not Path(args[0]).is_absolute():
         raise ValueError("exécutable ambigu")
     if script == "watch-linux.sh":
-        valid = args == ["/bin/bash", str(vault / script)]
+        valid = len(args) == 2 and args[0] == "/bin/bash" and meme(args[1], vault / script)
     elif script == "tunnel":
         # Ce test n'est appelé que si la page appartient à ce vault. Le tunnel
         # doit aussi utiliser un fichier dédié qui dessert sa PAGE_ORIGIN.
@@ -161,7 +171,8 @@ try:
             valid = origins == ["https://" + host] and services == ["http://127.0.0.1:8786", "http_status:404"]
     else:
         valid = (re.fullmatch(r"python(?:3(?:\.\d+)*)?", Path(args[0]).name) is not None and
-                 args[1:] == [str(vault / script), "--vault", str(vault)])
+                 len(args) == 4 and meme(args[1], vault / script) and args[2] == "--vault"
+                 and meme(args[3], vault) and os.path.realpath(args[3]) == reel)
 except (OSError, ValueError, IndexError, TypeError):
     valid = False
 sys.exit(0 if valid else 1)
