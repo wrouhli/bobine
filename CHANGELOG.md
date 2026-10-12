@@ -4,6 +4,8 @@
 
 En préparation 🚧
 
+- **Correctif Safari** : sur iPhone et Mac avec Safari, « Demander » affichait « Reconnecte Bobine » au lieu de répondre. La page imposait une politique de référent trop stricte qui faisait envoyer une origine vide, refusée par le contrôle de sécurité. Corrigé sans assouplir ce contrôle.
+
 - **Demander (refonte, étape 3, première partie)** : questions directement dans la page servie, réponses avec liens vers les fiches, recherche locale et extraits plafonnés ; une question depuis une fiche reste limitée à cette vidéo. Le serveur de page est partagé avec Mac et reste local sur Mac. La copie iCloud garde sa lecture seule, sans bouton inopérant. Clé conservée côté serveur, protections intersites, quotas persistants, échéances strictes et conversations uniquement dans l'onglet. Le profil éditable viendra dans une PR distincte.
 
 - **Finitions et captures** : encadrés mieux équilibrés (« Pour toi », Profil), texte de la recherche raccourci pour tenir sur iPhone, captures du README refaites à partir d'une bibliothèque fictive (liste, fiche, iPhone, carte), deux fois plus légères au total.

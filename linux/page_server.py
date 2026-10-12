@@ -295,7 +295,11 @@ class PageHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         for nom, valeur in {"Content-Type": type_contenu, "Content-Length": str(len(corps)),
                             "Cache-Control": "no-store", "X-Robots-Tag": "noindex",
-                            "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
+                            "X-Content-Type-Options": "nosniff",
+                            # same-origin, pas no-referrer : sous Safari (WebKit), no-referrer
+                            # fait partir les POST avec Origin: null, refusés par le contrôle
+                            # d'origine. Rien n'est transmis aux autres sites dans les deux cas.
+                            "Referrer-Policy": "same-origin",
                             "X-Frame-Options": "DENY", "Connection": "close"}.items():
             self.send_header(nom, valeur)
         for nom, valeur in (entetes or {}).items():

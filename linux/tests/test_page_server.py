@@ -172,6 +172,28 @@ class ServeurDemander(unittest.TestCase):
         self.assertEqual(self.post()[0], 200)
         self.mock.assert_called_once_with(self.vault, "organisation", historique=[], fiche=None)
 
+    def test_politique_referent_compatible_safari(self):
+        # WebKit envoie Origin: null quand la politique vaut no-referrer : le
+        # contrôle d'origine refuserait alors toute question depuis Safari.
+        for methode, chemin, corps in (("GET", "/", None), ("GET", "/vault.html", None),
+                                       ("GET", "/api/bobine", None), ("GET", "/health", None),
+                                       ("GET", "/inconnu", None)):
+            _, entetes, _ = self.requete(methode, chemin, corps)
+            self.assertEqual(entetes.get("Referrer-Policy"), "same-origin", chemin)
+        _, entetes, _ = self.post()
+        self.assertEqual(entetes.get("Referrer-Policy"), "same-origin")
+        h = self.entetes()
+        h["Origin"] = "https://pirate.example"
+        _, entetes, _ = self.post(headers=h)
+        self.assertEqual(entetes.get("Referrer-Policy"), "same-origin")
+
+    def test_origine_nulle_toujours_refusee_meme_en_same_origin(self):
+        # Le correctif porte sur l'en-tête émis, pas sur un assouplissement du contrôle.
+        h = self.entetes()
+        h["Origin"] = "null"
+        self.assertEqual(self.post(headers=h)[0], 403)
+        self.mock.assert_not_called()
+
     def test_autre_site_tente_appeler_et_obtenir_jeton(self):
         h = self.entetes()
         h.update(Origin="https://pirate.example", **{"Sec-Fetch-Site": "cross-site"})
