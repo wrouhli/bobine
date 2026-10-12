@@ -48,9 +48,17 @@ You share a video from your iPhone. A few minutes later, Bobine has downloaded i
 
 ## Overview
 
-**Your Bobine page**: instant search, topic pills, cards with summaries:
+**Your library**: instant search (even inside transcripts), topic filters, one card per video:
 
-![Your Bobine page: search, topics, cards](assets/capture-liste.png)
+![Your Bobine library: search, topics, one card per video](assets/capture-liste.png)
+
+**One page per video**: the summary, the key takeaways and a "For you" block based on your profile *(with an API key)*, plus the full memo and the transcript:
+
+![A video page: summary, key takeaways, For you](assets/capture-fiche.png)
+
+**On your iPhone too**: the same page in your pocket, through iCloud on the Mac or your server's address on Linux:
+
+![Bobine on an iPhone: the library and a video page](assets/capture-iphone.png)
 
 **The topic map**: the subjects of your collection, linked to one another:
 
