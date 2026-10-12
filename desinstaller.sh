@@ -98,7 +98,13 @@ try:
         raise ValueError("chemin ambigu")
     expected = [str(vault / ".venv/bin/python"), str(vault / "page_server.py"),
                 "--vault", str(effective), "--local"]
-    valid = data.get("Label") == "com.bobine.page" and data.get("ProgramArguments") == expected
+    args = data.get("ProgramArguments")
+    # Même dossier sous son chemin affiché ou réel (lien symbolique) : reconnu.
+    # Chaque chemin est comparé à SON équivalent ; aucun autre dossier n'est admis.
+    meme = (isinstance(args, list) and len(args) == 5 and all(isinstance(a, str) for a in args)
+            and args[2] == "--vault" and args[4] == "--local"
+            and all(os.path.realpath(args[i]) == os.path.realpath(expected[i]) for i in (0, 1, 3)))
+    valid = data.get("Label") == "com.bobine.page" and meme
 except (OSError, ValueError, TypeError, AttributeError, ExpatError, RuntimeError, ImportError):
     valid = False
 sys.exit(0 if valid else 1)
