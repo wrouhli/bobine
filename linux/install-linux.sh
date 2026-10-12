@@ -189,25 +189,119 @@ while [ -z "$CIBLE" ]; do
     CIBLE=""; continue
   fi
   if ! CONTENU="$(/bin/ls -Aq "$CIBLE" 2>/dev/null)" || [ -n "$CONTENU" ]; then
+    if [ -f "$CIBLE/config.env" ] || [ -d "$CIBLE/.venv" ]; then
+      # Un Bobine déjà installé ailleurs : on propose de le mettre à jour.
+      # Seuls les fichiers programme changent ; fiches, réglages et pages restent intacts.
+      if confirmer "Ce dossier contient déjà un Bobine. Le mettre à jour en gardant tes fiches et tes réglages ?" "o"; then
+        GARDE="maj"
+        break
+      fi
+      note "D'accord, on n'y touche pas."
+      REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
+      CIBLE=""; continue
+    fi
     avis "Ce dossier contient déjà des fichiers. Choisis un dossier vide pour les protéger."
     REP="$(question "Emplacement de ton vault" "$(affiche "$DEFAUT_CIBLE")")"
     CIBLE=""; continue
   fi
 done
 
+# Copie d'un fichier programme du dépôt vers le vault. Installation neuve : copie
+# simple. Mise à jour : un fichier identique est laissé tel quel, un fichier
+# différent est d'abord mis de côté dans le dossier de sauvegarde, un lien
+# symbolique ou un dossier du même nom n'est jamais écrasé.
+SAUVEGARDE=""; REMPLACES=0; AJOUTES=0; SAUVES=0
+identiques() {  # $1 et $2 ont-ils exactement le même contenu ?
+  if command -v cmp >/dev/null 2>&1; then cmp -s "$1" "$2"; return; fi
+  "${PY:-python3}" -c 'import sys; sys.exit(open(sys.argv[1], "rb").read() != open(sys.argv[2], "rb").read())' "$1" "$2" 2>/dev/null
+}
+installer_fichier() {  # $1 = chemin relatif au dépôt
+  local source="$DEPOT/$1" destination="$CIBLE/$1"
+  [ -f "$source" ] || return 0
+  if [ "$GARDE" = "maj" ]; then
+    if [ -L "$destination" ]; then
+      avis "« $1 » est un lien symbolique chez toi : gardé tel quel, pas mis à jour."
+      return 0
+    fi
+    if [ -d "$destination" ]; then
+      avis "« $1 » est un dossier chez toi : gardé tel quel, pas mis à jour."
+      return 0
+    fi
+    if [ -f "$destination" ]; then
+      if identiques "$source" "$destination"; then return 0; fi
+      if ! mkdir -p "$(dirname "$SAUVEGARDE/$1")" || ! cp -p "$destination" "$SAUVEGARDE/$1"; then
+        avis "Impossible de sauvegarder « $1 » : il est gardé tel quel, pas mis à jour."
+        return 0
+      fi
+      SAUVES=$((SAUVES + 1))
+      if cp "$source" "$destination"; then REMPLACES=$((REMPLACES + 1)); fi
+    else
+      mkdir -p "$(dirname "$destination")" 2>/dev/null
+      if cp "$source" "$destination"; then AJOUTES=$((AJOUTES + 1)); fi
+    fi
+  else
+    mkdir -p "$(dirname "$destination")" 2>/dev/null
+    cp "$source" "$destination"
+  fi
+  if [ -x "$source" ]; then chmod +x "$destination" 2>/dev/null || true; fi
+}
+
 if [ "$GARDE" = "oui" ]; then
   ok "D'accord — ce dossier devient ton dossier Bobine (installé sur place)."
 else
+  if [ "$GARDE" = "maj" ]; then
+    # Un dossier de sauvegarde par mise à jour, horodaté ; un suffixe le rend unique
+    # si deux mises à jour tombent dans la même minute.
+    HORODATAGE="$(date '+%Y%m%d-%H%M')"
+    SAUVEGARDE="$CIBLE/.bobine-sauvegarde-$HORODATAGE"
+    n=1
+    while [ -e "$SAUVEGARDE" ] || [ -L "$SAUVEGARDE" ]; do
+      n=$((n + 1)); SAUVEGARDE="$CIBLE/.bobine-sauvegarde-$HORODATAGE-$n"
+    done
+    # Le nom du vault : si tu as gardé la proposition, on reprend celui de ta configuration.
+    ANCIEN_NOM="$(grep -m1 '^NOM=' "$CIBLE/config.env" 2>/dev/null | cut -d'=' -f2- | tr -d '"' || true)"
+    if [ -n "${ANCIEN_NOM:-}" ] && [ "$NOM_VAULT" = "${NOM_DEFAUT:-$NOM_VAULT}" ] && [ "$ANCIEN_NOM" != "$NOM_VAULT" ]; then
+      NOM_VAULT="$ANCIEN_NOM"
+      ok "Nom repris de ta configuration : $NOM_VAULT"
+    fi
+  fi
   for f in ingest.py filtre.py enrichir.py generate_page.py graphe.py \
            watch-linux.sh inbox_server.py page_server.py demander.py activer-page-web.sh install-linux.sh desinstaller-linux.sh \
            page-locale.sh activer-demander.sh desactiver-demander.sh ouvrir-ma-page.sh \
            requirements.txt config.example.env filtres.exemple.yaml \
-           LICENSE README.md .gitignore; do
-    [ -f "$DEPOT/$f" ] && cp "$DEPOT/$f" "$CIBLE/$f"
+           LICENSE; do
+    installer_fichier "$f"
   done
-  [ -d "$DEPOT/exemples" ] && cp -R "$DEPOT/exemples" "$CIBLE/" 2>/dev/null
-  [ -d "$DEPOT/systemd" ] && cp -R "$DEPOT/systemd" "$CIBLE/" 2>/dev/null
-  ok "Fichiers installés dans : $(affiche "$CIBLE")"
+  for dossier in exemples systemd; do
+    [ -d "$DEPOT/$dossier" ] || continue
+    while IFS= read -r chemin; do
+      installer_fichier "${chemin#"$DEPOT"/}"
+    done < <(find "$DEPOT/$dossier" -type f 2>/dev/null)
+  done
+  # README.md et .gitignore : fournis à l'installation ; déjà présents, ils sont à toi, on n'y touche pas.
+  for f in README.md .gitignore; do
+    if [ -f "$DEPOT/$f" ] && [ ! -e "$CIBLE/$f" ] && [ ! -L "$CIBLE/$f" ]; then
+      cp "$DEPOT/$f" "$CIBLE/$f"
+    fi
+  done
+  if [ "$GARDE" = "maj" ]; then
+    if [ "$REMPLACES" -eq 0 ] && [ "$AJOUTES" -eq 0 ]; then
+      ok "Ton dossier Bobine est déjà à jour : $(affiche "$CIBLE")"
+    else
+      BILAN=""
+      if [ "$REMPLACES" -eq 1 ]; then BILAN="1 fichier remplacé"; fi
+      if [ "$REMPLACES" -gt 1 ]; then BILAN="$REMPLACES fichiers remplacés"; fi
+      if [ "$AJOUTES" -eq 1 ]; then BILAN="${BILAN:+$BILAN, }1 fichier ajouté"; fi
+      if [ "$AJOUTES" -gt 1 ]; then BILAN="${BILAN:+$BILAN, }$AJOUTES fichiers ajoutés"; fi
+      if [ "$SAUVES" -gt 0 ]; then
+        BILAN="$BILAN, anciens fichiers gardés dans ${SAUVEGARDE##*/}/"
+      fi
+      ok "Mise à jour de ton dossier Bobine : $BILAN"
+    fi
+    note "Tes fiches, tes réglages et tes pages n'ont pas bougé."
+  else
+    ok "Fichiers installés dans : $(affiche "$CIBLE")"
+  fi
 fi
 cd "$CIBLE" || exit 1
 SCRIPT_DIR="$(pwd)"
@@ -638,7 +732,7 @@ else
 fi
 printf "   5. (Option) Les liens par HTTP : voir README.md, « Le serveur de liens »\n"
 printf "   6. Un jour, pour arrêter Bobine sans supprimer tes fichiers :  ./desinstaller-linux.sh\n"
-if [ -z "$GARDE" ]; then
+if [ -z "$GARDE" ] || [ "$GARDE" = "maj" ]; then
   echo
   printf "   ${GRAS}Un dernier réflexe — le ménage :${FIN}\n"
   printf "   • ton vault vit ici :       %s\n" "$(affiche "$CIBLE")"
