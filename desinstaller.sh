@@ -70,6 +70,48 @@ else
   note "Pas de réveil installé — rien à retirer."
 fi
 
+# La page locale est indépendante du réveil. Ne jamais arrêter celle d'un autre vault.
+PAGE_PLIST="$HOME/Library/LaunchAgents/com.bobine.page.plist"
+PY_PAGE=""
+for candidat in "$VAULT/.venv/bin/python" python3 python3.13 python3.12 python3.11 python3.10; do
+  if command -v "$candidat" >/dev/null 2>&1; then PY_PAGE="$candidat"; break; fi
+done
+if [ -e "$PAGE_PLIST" ] || [ -L "$PAGE_PLIST" ]; then
+  if [ -n "$PY_PAGE" ] && [ ! -L "$PAGE_PLIST" ] && "$PY_PAGE" -B - "$PAGE_PLIST" "$VAULT" <<'PYTHON'
+import os
+import plistlib
+from xml.parsers.expat import ExpatError
+import sys
+from pathlib import Path
+try:
+    with open(sys.argv[1], "rb") as stream:
+        data = plistlib.load(stream)
+    vault = Path(sys.argv[2])
+    config = vault / "config.env"
+    if config.is_symlink() or (config.exists() and not config.is_file()):
+        raise ValueError("configuration non ordinaire")
+    sys.path.insert(0, str(vault))
+    from enrichir import charger_config
+    configured = charger_config(vault).get("VAULT")
+    effective = Path(os.path.expandvars(configured)).expanduser() if configured else vault
+    if not effective.is_absolute() or any(ord(c) < 32 or ord(c) == 127 for c in str(effective)):
+        raise ValueError("chemin ambigu")
+    expected = [str(vault / ".venv/bin/python"), str(vault / "page_server.py"),
+                "--vault", str(effective), "--local"]
+    valid = data.get("Label") == "com.bobine.page" and data.get("ProgramArguments") == expected
+except (OSError, ValueError, TypeError, AttributeError, ExpatError, RuntimeError, ImportError):
+    valid = False
+sys.exit(0 if valid else 1)
+PYTHON
+  then
+    launchctl bootout "gui/$(id -u)/com.bobine.page" 2>/dev/null || launchctl remove com.bobine.page 2>/dev/null || true
+    rm -f "$PAGE_PLIST"
+    ok "Service de page locale retiré ; les fichiers du vault sont conservés."
+  else
+    note "Un service de page existe, mais il n'appartient pas exactement à ce dossier : il est conservé."
+  fi
+fi
+
 # ------------------------------------------ 2. la copie iCloud (iPhone)
 etape "2/3 — La copie iCloud (ta page sur l'iPhone)"
 ICOPIE="$HOME/Library/Mobile Documents/com~apple~CloudDocs/$NOM"
