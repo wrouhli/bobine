@@ -60,7 +60,12 @@ note "Tes vidéos locales et tous tes autres fichiers restent en place."
 # ------------------------------------------------- 1. le réveil automatique
 etape "1/3 — Le réveil automatique"
 PLIST="$HOME/Library/LaunchAgents/com.bobine.watch.plist"
-if [ -f "$PLIST" ] && { grep -qF "<string>$VAULT/watch.sh</string>" "$PLIST" || grep -qxF "$VAULT/watch.sh" "$PLIST"; }; then
+# Même échappement que l'installateur : le plist contient le chemin échappé pour
+# XML (un dossier avec &, < ou > reste reconnu comme le nôtre).
+echapper_xml() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+if [ -f "$PLIST" ] && { grep -qF "<string>$(echapper_xml "$VAULT/watch.sh")</string>" "$PLIST" || grep -qxF "$VAULT/watch.sh" "$PLIST"; }; then
   launchctl bootout "gui/$(id -u)/com.bobine.watch" 2>/dev/null || launchctl remove com.bobine.watch 2>/dev/null || true
   rm -f "$PLIST"
   ok "Réveil retiré (il ne tournera plus toutes les 15 minutes)."

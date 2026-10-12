@@ -806,14 +806,16 @@ elif [ "$REVEIL" = "oui" ]; then
   for unite in bobine-watch.service bobine-watch.timer bobine-watch.path; do
     if [ -L "$UNIT_DIR/$unite" ]; then rm -f "$UNIT_DIR/$unite"; fi
   done
+  # Les chemins sont cités entre guillemets : un dossier avec des espaces reste
+  # lisible pour systemd, et la lecture des réveils sait reconnaître un chemin cité.
   cat > "$UNIT_DIR/bobine-watch.service" <<EOF
 [Unit]
 Description=Bobine — relève la boîte de réception et prépare les fiches
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash $SCRIPT_DIR/watch-linux.sh
-WorkingDirectory=$SCRIPT_DIR
+ExecStart=/bin/bash "$SCRIPT_DIR/watch-linux.sh"
+WorkingDirectory="$SCRIPT_DIR"
 EOF
   cat > "$UNIT_DIR/bobine-watch.timer" <<EOF
 [Unit]
@@ -831,7 +833,7 @@ EOF
 Description=Bobine — déclenche la relève dès qu'un lien arrive
 
 [Path]
-PathModified=$SCRIPT_DIR/inbox.txt
+PathModified="$SCRIPT_DIR/inbox.txt"
 Unit=bobine-watch.service
 
 [Install]

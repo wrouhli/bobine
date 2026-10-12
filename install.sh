@@ -786,6 +786,12 @@ ok "config.env écrit (clé comprise, lisible par toi seul)"
 # Bobine n'en fait tourner qu'un à la fois : celui d'un autre dossier n'est
 # remplacé qu'avec ton accord (reveil_libre). Les anciens réveils d'un autre nom
 # qui relèvent CE dossier sont proposés au remplacement (ranger_anciens_reveils).
+# Les chemins écrits dans le plist sont échappés pour XML : un dossier contenant
+# &, < ou > produirait sinon un fichier illisible, que personne ne pourrait plus
+# charger ni reconnaître (le désinstalleur applique le même échappement).
+echapper_xml() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
 PLIST="$HOME/Library/LaunchAgents/com.bobine.watch.plist"
 if [ "$REVEIL" = "oui" ] && ! reveil_libre "$PLIST" "$SCRIPT_DIR/watch.sh"; then
   REVEIL="non"
@@ -804,7 +810,7 @@ elif [ "$REVEIL" = "oui" ]; then
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>$SCRIPT_DIR/watch.sh</string>
+    <string>$(echapper_xml "$SCRIPT_DIR/watch.sh")</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>StartCalendarInterval</key>
@@ -814,8 +820,8 @@ elif [ "$REVEIL" = "oui" ]; then
     <dict><key>Minute</key><integer>30</integer></dict>
     <dict><key>Minute</key><integer>45</integer></dict>
   </array>
-  <key>StandardOutPath</key><string>$SCRIPT_DIR/logs/launchd.out.log</string>
-  <key>StandardErrorPath</key><string>$SCRIPT_DIR/logs/launchd.err.log</string>
+  <key>StandardOutPath</key><string>$(echapper_xml "$SCRIPT_DIR/logs/launchd.out.log")</string>
+  <key>StandardErrorPath</key><string>$(echapper_xml "$SCRIPT_DIR/logs/launchd.err.log")</string>
 </dict>
 </plist>
 EOF
