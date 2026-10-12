@@ -12,6 +12,7 @@ import argparse
 import base64
 import collections
 import fcntl
+import hashlib
 import hmac
 import json
 import math
@@ -29,7 +30,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import demander
-from enrichir import charger_config, resoudre_fournisseur
+from enrichir import FICHIER_PROFIL, TAILLE_MAX_PROFIL, charger_config, empreinte_profil, lire_profil, resoudre_fournisseur
 
 FICHIERS = {"/": "vault.html", "/vault.html": "vault.html", "/graph.html": "graph.html"}
 TYPES = {nom: "text/html; charset=utf-8" for nom in FICHIERS.values()}
@@ -40,6 +41,97 @@ DELAI_DEMANDE = 60
 MAX_PAR_MINUTE = 10
 MAX_PAR_JOUR = 100
 FICHIER_COMPTEUR = ".bobine-demandes.json"
+MAX_CORPS_PROFIL = 16384
+DELAI_PAGE = 90
+# Même en-tête que celui écrit par l'installation : des explications, jamais lues.
+ENTETE_PROFIL = (
+    "# Ton profil Bobine (facultatif).\n"
+    "# Écris quelques lignes sur toi : ce que tu fais, ce que tu cherches dans tes vidéos.\n"
+    "# Bobine s'en sert pour le bloc « Pour toi » de chaque fiche.\n"
+    "# Les lignes qui commencent par # sont des explications : elles ne sont jamais lues.\n"
+    "# Ce texte est envoyé à ton service d'IA avec les demandes de résumé : évite les informations sensibles.\n"
+    "\n"
+)
+
+
+class ErreurProfil(Exception):
+    def __init__(self, statut, message, code):
+        super().__init__(message)
+        self.statut, self.message, self.code = statut, message, code
+
+
+def version_profil(vault):
+    """Empreinte du fichier tel qu'il est sur le disque : détecte une modification
+    faite ailleurs (fichier, autre onglet) entre la lecture et l'enregistrement."""
+    chemin = Path(vault) / FICHIER_PROFIL
+    try:
+        fd = os.open(chemin, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return ""
+    except OSError:
+        raise ErreurProfil(503, "Ton profil n'est pas lisible pour le moment.", "profil_illisible") from None
+    with os.fdopen(fd, "rb") as flux:
+        infos = os.fstat(flux.fileno())
+        if not stat.S_ISREG(infos.st_mode) or infos.st_size > 65536:
+            raise ErreurProfil(503, "Ton profil n'est pas lisible pour le moment.", "profil_illisible")
+        return hashlib.sha256(flux.read(65537)).hexdigest()[:20]
+
+
+def texte_profil_valide(texte):
+    """Texte propre, ou ErreurProfil avec un message simple."""
+    if not isinstance(texte, str):
+        raise ErreurProfil(400, "Le profil n'est pas lisible.", "profil_invalide")
+    texte = texte.replace("\r\n", "\n").replace("\r", "\n")
+    if any((ord(c) < 32 and c not in "\n\t") or ord(c) == 127 for c in texte):
+        raise ErreurProfil(400, "Le profil contient des caractères invisibles. Retire-les puis réessaie.",
+                           "profil_invalide")
+    lignes = [ligne.rstrip() for ligne in texte.split("\n")]
+    if any(ligne.lstrip().startswith("#") for ligne in lignes):
+        raise ErreurProfil(400, "Une ligne qui commence par # serait ignorée par Bobine. "
+                           "Retire ce # ou place-le plus loin dans la phrase.", "profil_diese")
+    texte = "\n".join(lignes).strip()
+    if len(texte) > TAILLE_MAX_PROFIL:
+        raise ErreurProfil(400, "Ton profil est trop long : garde l'essentiel en "
+                           + str(TAILLE_MAX_PROFIL) + " caractères maximum.", "profil_trop_long")
+    return texte
+
+
+def ecrire_profil(vault, texte):
+    """Écriture atomique en 600 ; jamais à travers un lien ou un fichier spécial."""
+    chemin = Path(vault) / FICHIER_PROFIL
+    try:
+        infos = os.lstat(chemin)
+        if not stat.S_ISREG(infos.st_mode) or infos.st_nlink != 1:
+            raise ErreurProfil(409, "Ton profil est un fichier particulier : modifie-le directement "
+                               "dans le dossier Bobine.", "profil_special")
+    except FileNotFoundError:
+        pass
+    fd, temporaire = tempfile.mkstemp(prefix=".bobine-profil-", dir=str(chemin.parent))
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as flux:
+            flux.write(ENTETE_PROFIL + (texte + "\n" if texte else ""))
+            flux.flush()
+            os.fsync(flux.fileno())
+        os.replace(temporaire, chemin)
+    finally:
+        if os.path.exists(temporaire):
+            os.unlink(temporaire)
+
+
+def regenerer_page(vault):
+    """Page refaite tout de suite, gratuitement (aucun appel IA). Vrai si réussi."""
+    script = Path(__file__).with_name("generate_page.py")
+    if not script.is_file():
+        return False
+    try:
+        fin = subprocess.run([sys.executable, str(script), "--vault", str(vault)],
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, timeout=DELAI_PAGE, cwd=str(script.parent))
+        return fin.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
 
 
 def fichier_demande(chemin):
@@ -197,6 +289,7 @@ class ServeurBobine(ThreadingHTTPServer):
         self.origine_publique = publique
         self.jeton = secrets.token_urlsafe(32)
         self.occupe = threading.Lock()
+        self.profil_verrou = threading.Lock()
         self.connexions = threading.BoundedSemaphore(MAX_CONNEXIONS)
         self.compteur = Compteur(self.vault)
         self.admissions = collections.deque(maxlen=120)
@@ -368,7 +461,23 @@ class PageHandler(BaseHTTPRequestHandler):
                 self._erreur(429, "Patiente un instant avant de réessayer.", "limite", {"Retry-After": "60"})
                 return
             disponible = self.server.disponible()
-            self._json(200, {"disponible": disponible, "jeton": self.server.jeton if disponible else ""})
+            # Le jeton protège aussi le profil, qui fonctionne sans clé API.
+            self._json(200, {"disponible": disponible, "profil": True, "jeton": self.server.jeton})
+            return
+        if chemin == "/api/profil":
+            if not self._origine_api():
+                self._erreur(403, "Ouvre Bobine depuis son adresse habituelle.", "origine_refusee")
+                return
+            if not self.server.admettre_api():
+                self._erreur(429, "Patiente un instant avant de réessayer.", "limite", {"Retry-After": "60"})
+                return
+            try:
+                with self.server.profil_verrou:
+                    self._json(200, {"texte": lire_profil(self.server.vault),
+                                     "version": version_profil(self.server.vault),
+                                     "max": TAILLE_MAX_PROFIL})
+            except ErreurProfil as erreur:
+                self._erreur(erreur.statut, erreur.message, erreur.code)
             return
         nom = fichier_demande(self.path)
         if not nom:
@@ -391,7 +500,7 @@ class PageHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._auth():
             return
-        if self.path != "/api/demander":
+        if self.path not in ("/api/demander", "/api/profil"):
             self._erreur(404, "Cette action n'existe pas.", "introuvable")
             return
         jeton = self._unique("X-Bobine-Token") or ""
@@ -414,6 +523,9 @@ class PageHandler(BaseHTTPRequestHandler):
             self._erreur(411, "La demande est incomplète.", "longueur_absente")
             return
         taille = int(longueur)
+        if self.path == "/api/profil":
+            self._post_profil(taille)
+            return
         if not 1 <= taille <= MAX_CORPS:
             self._erreur(413, "Cette demande est trop longue. Raccourcis ta question.", "demande_trop_longue")
             return
@@ -485,6 +597,75 @@ class PageHandler(BaseHTTPRequestHandler):
             if verrou_fichier is not None:
                 os.close(verrou_fichier)
             self.server.occupe.release()
+
+
+def _post_profil_methode(self, taille):
+    """Enregistre Mon profil.txt : corps lu et validé avant tout verrou ou écriture."""
+    if not 1 <= taille <= MAX_CORPS_PROFIL:
+        self._entree_finie()
+        self._erreur(413, "Ton profil est trop long.", "profil_trop_long")
+        return
+    try:
+        brut = self.rfile.read(taille)
+        if len(brut) != taille:
+            raise ValueError()
+        donnees = json.loads(brut.decode("utf-8"))
+        if (not isinstance(donnees, dict) or set(donnees) != {"texte", "version"}
+                or not isinstance(donnees["version"], str) or len(donnees["version"]) > 64):
+            raise ValueError()
+        texte = texte_profil_valide(donnees["texte"])
+    except socket.timeout:
+        self._erreur(408, "L'enregistrement a pris trop de temps. Réessaie.", "delai_depasse")
+        return
+    except ErreurProfil as erreur:
+        self._erreur(erreur.statut, erreur.message, erreur.code)
+        return
+    except (ValueError, UnicodeError, RecursionError):
+        self._erreur(400, "Le profil n'est pas lisible.", "profil_invalide")
+        return
+    finally:
+        self._entree_finie()
+    if not self.server.profil_verrou.acquire(blocking=False):
+        self._erreur(409, "Un enregistrement est déjà en cours. Réessaie dans un instant.", "occupe")
+        return
+    verrou = None
+    try:
+        try:
+            verrou = os.open(self.server.vault / ".bobine-profil.lock",
+                             os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+            infos = os.fstat(verrou)
+            if not stat.S_ISREG(infos.st_mode) or infos.st_nlink != 1:
+                raise OSError("verrou non régulier")
+            fcntl.flock(verrou, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            self._erreur(409, "Un enregistrement est déjà en cours. Réessaie dans un instant.", "occupe")
+            return
+        except OSError:
+            self._erreur(503, "Ton profil ne peut pas être enregistré pour le moment.", "indisponible")
+            return
+        try:
+            if not hmac.compare_digest(version_profil(self.server.vault).encode(), donnees["version"].encode()):
+                raise ErreurProfil(409, "Ton profil a été modifié ailleurs. Recharge la page pour voir "
+                                   "la dernière version : ton texte reste dans le champ.", "profil_modifie")
+            ecrire_profil(self.server.vault, texte)
+            version = version_profil(self.server.vault)
+        except ErreurProfil as erreur:
+            self._erreur(erreur.statut, erreur.message, erreur.code)
+            return
+        except OSError:
+            self._erreur(503, "Ton profil ne peut pas être enregistré pour le moment.", "indisponible")
+            return
+        page = regenerer_page(self.server.vault)
+        self._json(200, {"texte": lire_profil(self.server.vault), "version": version,
+                         "empreinte": empreinte_profil(lire_profil(self.server.vault)),
+                         "page_actualisee": page})
+    finally:
+        if verrou is not None:
+            os.close(verrou)
+        self.server.profil_verrou.release()
+
+
+PageHandler._post_profil = _post_profil_methode
 
 
 def main():
