@@ -194,6 +194,20 @@ class FicheComplete(unittest.TestCase):
         self.assertNotRegex(page, r"url\(\s*['\"]?https?://")
         self.assertNotRegex(page.lower(), r"6c4dff|8b6dff")
 
+    def test_boutons_de_fiche_espaces_et_alignes(self):
+        """« Voir la vidéo » et « Poser une question » vivent sur un rang flex
+        dédié : un espace constant les sépare (avant : collés, second décalé)."""
+        with tempfile.TemporaryDirectory() as dossier:
+            page = generer(vault_demo(dossier))
+        self.assertIn(".actions-fiche{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:18px}", page)
+        self.assertIn(".actions-fiche .btn{margin-top:0}", page)
+        self.assertNotIn(".fiche .demander-acces{margin-right:8px}", page)
+        rangs = re.findall(r'<div class="actions-fiche">(.*?)</div>', page, re.S)
+        self.assertEqual(len(rangs), page.count('<article class="fiche"'))
+        for rang in rangs:
+            self.assertIn("Voir la vidéo", rang)
+            self.assertIn("Poser une question sur cette vidéo", rang)
+
     @unittest.skipUnless(__import__("importlib").util.find_spec("numpy"), "numpy requis pour la carte")
     def test_carte_sans_transcriptions_et_avec_lien_vers_la_fiche(self):
         with tempfile.TemporaryDirectory() as dossier:
