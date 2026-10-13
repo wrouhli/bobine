@@ -1,5 +1,9 @@
 # Journal des versions
 
+## Non publié
+
+- **Fiches** : « Voir la vidéo » et « Poser une question sur cette vidéo » ont désormais un vrai espace entre eux et sont alignés sur la même ligne (avant : collés l'un à l'autre, second légèrement décalé vers le bas). Sur écran étroit, les deux boutons s'empilent proprement au lieu de déborder.
+
 ## v1.3.1 (12 octobre 2026)
 
 - **Demander, questions ouvertes** : « qu'est-ce qu'il y a sur X ? » présente désormais ce que tes fiches disent du sujet, fiche par fiche, au lieu d'une abstention. Et si le modèle s'abstient malgré des fiches retrouvées, la réponse liste celles qui en parlent le plus, au lieu d'un refus sec.

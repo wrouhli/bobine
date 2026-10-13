@@ -302,7 +302,6 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .profil-boutons{display:flex;gap:10px;flex-wrap:wrap}
   .demander-actions .btn.btn-discret{background:var(--fond);border:1px solid var(--trait-fort);color:var(--encre)}
   .demander-statut.erreur{padding:12px 16px;border-left:4px solid var(--ambre);background:var(--surface)}
-  .fiche .demander-acces{margin-right:8px}
 
   /* ---------- fiche ---------- */
   .fiche,.vue-profil{display:none;padding-top:28px}
@@ -317,6 +316,10 @@ TEMPLATE_LISTE = r"""<!DOCTYPE html>
   .btn{display:inline-flex;align-items:center;gap:8px;margin-top:18px;padding:10px 18px;border-radius:999px;
     font-weight:600;font-size:15px;text-decoration:none;border:1px solid var(--trait-fort);background:var(--fond)}
   .btn:hover{background:var(--surface)}
+  /* Les boutons d'une fiche partagent un rang : espace constant entre eux,
+     alignement centré, et empilement propre sur écran étroit. */
+  .actions-fiche{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:18px}
+  .actions-fiche .btn{margin-top:0}
   .niveaux{display:none;background:var(--surface);border-radius:999px;padding:4px;margin-top:28px}
   .js .niveaux{display:flex;width:fit-content}
   .niveau{padding:8px 18px;border-radius:999px;border:0;background:transparent;font-weight:500;font-size:15px;color:var(--encre-2);cursor:pointer}
@@ -2077,9 +2080,10 @@ def rendre_fiche(e, par_id, profil=""):
         + '<div class="fiche-grille"><div>'
         + '<h1 id="t-' + id_ + '">' + html.escape(e["titre"]) + "</h1>"
         + '<div class="meta">' + meta_html(e, complete=True) + "</div>"
-        + bouton
+        + '<div class="actions-fiche">' + bouton
         + '<a class="btn demander-acces" href="#demander" data-demander-fiche="'
         + html.escape(id_, quote=True) + '" hidden>Poser une question sur cette vidéo</a>'
+        + "</div>"
         + niveaux
         + '<section class="section-niveau" data-niveau="bref"><h2 class="titre-niveau">En bref</h2>' + bref + "</section>"
         + section_memo
