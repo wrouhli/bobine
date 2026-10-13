@@ -1,6 +1,6 @@
 <div align="center">
   <sub>🌍 <b>Français</b> · <a href="README.md">English</a></sub>
-  <img src="assets/banniere.png" alt="Bobine : tes Reels sauvegardés deviennent une base locale, chez toi" width="820">
+  <img src="assets/banniere-fr.jpg" alt="Bobine : tes vidéos sauvegardées deviennent une base locale, cherchable, à toi" width="820">
   <h1>🎞️ Bobine</h1>
   <p><b>Tes Reels, et n'importe quelle vidéo TikTok/YouTube, sauvegardés deviennent une base de connaissances locale, cherchable et interrogeable. Sur ton Mac ou ton serveur, chez toi.</b></p>
   <p>

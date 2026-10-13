@@ -1,6 +1,6 @@
 <div align="center">
   <sub>🌍 <a href="README.fr.md">Français</a> · <b>English</b></sub>
-  <img src="assets/banniere.png" alt="Bobine: your saved videos become a local library, at home" width="820">
+  <img src="assets/banniere.jpg" alt="Bobine: your saved videos become a local library, at home" width="820">
   <h1>🎞️ Bobine</h1>
   <p><b>Your saved Reels, and any TikTok or YouTube video, become a local knowledge base you can search and question. On your Mac or your server, at home.</b></p>
   <p>
