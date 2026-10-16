@@ -14,6 +14,7 @@
   <p>
     <a href="https://github.com/wrouhli/bobine/stargazers"><img src="https://img.shields.io/github/stars/wrouhli/bobine?style=for-the-badge&label=%E2%AD%90%20Star%20this%20repo&color=6C4DFF&logo=github&logoColor=white" alt="⭐ Star this repo"></a>
   </p>
+  <p>🌐 <a href="https://get-bobine.wahidrouhli.com"><b>Website: get-bobine.wahidrouhli.com</b></a></p>
 </div>
 
 You share a video from your iPhone. A few minutes later, Bobine has downloaded it, transcribed it, summarized it and filed it into a card. In the evening, you open a little web page on your phone: everything is there, with search. **And everything stays at home.**

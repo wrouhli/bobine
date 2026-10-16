@@ -14,6 +14,7 @@
   <p>
     <a href="https://github.com/wrouhli/bobine/stargazers"><img src="https://img.shields.io/github/stars/wrouhli/bobine?style=for-the-badge&label=%E2%AD%90%20Mets%20une%20%C3%A9toile&color=6C4DFF&logo=github&logoColor=white" alt="⭐ Mets une étoile"></a>
   </p>
+  <p>🌐 <a href="https://get-bobine.wahidrouhli.com"><b>Site : get-bobine.wahidrouhli.com</b></a></p>
 </div>
 
 Tu partages une vidéo depuis ton iPhone. Quelques minutes plus tard, Bobine l'a téléchargée, transcrite, résumée et rangée dans une fiche. Le soir, tu ouvres une petite page web sur ton téléphone : tout est là, avec une recherche. **Et tout reste chez toi.**
